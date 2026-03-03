@@ -17,6 +17,45 @@ interface Props {
   tableName: string;
 }
 
+interface CellInputProps {
+  initialValue: string;
+  onValueChange: (val: string) => void;
+  onSave: (val: string) => void;
+  onCancel: () => void;
+  disabled?: boolean;
+}
+
+function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled }: CellInputProps) {
+  const [localValue, setLocalValue] = useState(initialValue);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setLocalValue(val);
+    onValueChange(val);
+  };
+
+  return (
+    <div className="flex items-center w-full h-full p-0 relative bg-background border border-primary/50 shadow-sm overflow-hidden">
+      <input
+        autoFocus
+        className="flex-1 h-full bg-transparent outline-none px-2 py-1.5 text-sm font-mono text-foreground"
+        value={localValue}
+        onChange={handleChange}
+        onFocus={(e) => e.currentTarget.select()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            onSave(localValue);
+          } else if (e.key === 'Escape') {
+            onCancel();
+          }
+        }}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
+
 export default function TableView({ tableName }: Props) {
   const { activeConnection } = useAppStore();
   const [data, setData] = useState<QueryResult | null>(null);
@@ -33,6 +72,10 @@ export default function TableView({ tableName }: Props) {
   
   // In-place row state
   const [newRowData, setNewRowData] = useState<Record<string, string> | null>(null);
+
+  // Inline editing state: only track which cell is being edited
+  const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const fetchData = useCallback(async () => {
     if (!activeConnection?.connId) return;
@@ -133,6 +176,82 @@ export default function TableView({ tableName }: Props) {
     }
   };
 
+  const handleSaveCell = async (rowIndex: number, colName: string, valueToSave: string) => {
+    if (!activeConnection?.connId || !data) return;
+
+    const row = tableData[rowIndex];
+    const oldValue = row[colName];
+
+    // If value is the same, just close editing
+    if (String(oldValue) === valueToSave) {
+      setEditingCell(null);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    const startTime = performance.now();
+
+    try {
+      // Find primary keys for WHERE clause
+      const pks = structure.filter(c => c.pk);
+      if (pks.length === 0) {
+        throw new Error("Table has no primary key. Editing is not supported for tables without primary keys.");
+      }
+
+      const whereClause = pks.map(pk => {
+        const val = row[pk.name];
+        if (val === null) return `"${pk.name}" IS NULL`;
+        if (typeof val === 'number') return `"${pk.name}" = ${val}`;
+        return `"${pk.name}" = '${String(val).replace(/'/g, "''")}'`;
+      }).join(' AND ');
+
+      const columnInfo = structure.find(c => c.name === colName);
+      const isNumeric = columnInfo?.col_type.toLowerCase().includes('int') || 
+                         columnInfo?.col_type.toLowerCase().includes('real') ||
+                         columnInfo?.col_type.toLowerCase().includes('double') ||
+                         columnInfo?.col_type.toLowerCase().includes('float');
+
+      let formattedValue: string;
+      if (valueToSave === '') {
+        formattedValue = 'NULL';
+      } else if (isNumeric) {
+        if (isNaN(Number(valueToSave))) {
+          throw new Error(`Invalid numeric value: ${valueToSave}`);
+        }
+        formattedValue = valueToSave;
+      } else {
+        formattedValue = `'${valueToSave.replace(/'/g, "''")}'`;
+      }
+
+      const sql = `UPDATE "${tableName}" SET "${colName}" = ${formattedValue} WHERE ${whereClause};`;
+      await executeQuery(sql, activeConnection.connId);
+
+      const duration = performance.now() - startTime;
+      useAppStore.getState().addLog({
+        sql,
+        status: 'success',
+        duration,
+        message: `Cell in "${tableName}" updated`
+      });
+
+      setEditingCell(null);
+      setEditValue('');
+      await fetchData();
+    } catch (e: any) {
+      const duration = performance.now() - startTime;
+      setError(e.toString());
+      useAppStore.getState().addLog({
+        sql: `UPDATE "${tableName}" ...`,
+        status: 'error',
+        duration,
+        message: e.toString()
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const totalPages = Math.ceil(totalRows / pageSize);
 
 
@@ -184,9 +303,33 @@ export default function TableView({ tableName }: Props) {
           </div>
         ),
         cell: (info) => {
-          const { text, className } = formatCellValue(info.getValue());
+          const rowIndex = info.row.index;
+          const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colName === colName;
+          const value = info.getValue();
+
+          if (isEditing) {
+            return (
+              <CellInput
+                initialValue={value === null ? '' : String(value)}
+                onValueChange={setEditValue}
+                onSave={(val) => handleSaveCell(rowIndex, colName, val)}
+                onCancel={() => setEditingCell(null)}
+                disabled={saving}
+              />
+            );
+          }
+
+          const { text, className } = formatCellValue(value);
           return (
-            <div className="px-2 py-1 cell-content truncate" title={text}>
+            <div 
+              className="px-2 py-1 cell-content truncate w-full h-full cursor-text group-hover:bg-accent/10 transition-colors select-none" 
+              title={text}
+              onDoubleClick={() => {
+                if (newRowData) return;
+                setEditValue(value === null ? '' : String(value));
+                setEditingCell({ rowIndex, colName });
+              }}
+            >
               <span className={className}>{text}</span>
             </div>
           );
@@ -196,7 +339,7 @@ export default function TableView({ tableName }: Props) {
     });
 
     return cols;
-  }, [data, structure, sortCol, sortDir, page, pageSize]);
+  }, [data, structure, sortCol, sortDir, page, pageSize, editingCell, saving, newRowData]);
 
   const tableData = useMemo(() => {
     if (!data) return [];
@@ -243,7 +386,7 @@ export default function TableView({ tableName }: Props) {
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-border bg-surface/[0.5] backdrop-blur flex-shrink-0 relative z-10">
         <div className="flex items-center space-x-2">
-          {!newRowData ? (
+          {!newRowData && !editingCell ? (
             <>
               <Button variant="outline" size="sm" onClick={() => fetchData()} className="h-8 bg-background/50 hover:bg-secondary border-border" title="Refresh">
                 <RefreshCw size={14} className="mr-2 text-muted-foreground" />
@@ -256,13 +399,34 @@ export default function TableView({ tableName }: Props) {
             </>
           ) : (
             <>
-              <Button size="sm" onClick={handleSaveNewRow} disabled={saving} className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button 
+                size="sm" 
+                onClick={() => newRowData ? handleSaveNewRow() : handleSaveCell(editingCell!.rowIndex, editingCell!.colName, editValue)} 
+                disabled={saving} 
+                className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground" 
+                title="Save Changes (⌘+Enter)"
+              >
                 {saving ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Check size={14} className="mr-2" />}
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : (
+                  <span className="flex items-center">
+                    Save Changes
+                    <span className="ml-2 flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary-foreground/30 bg-primary-foreground/10 text-[9px] font-bold tracking-tighter">
+                      <span className="text-[10px]">⌘</span>
+                      <span className="opacity-50">+</span>
+                      <span>ENTER</span>
+                    </span>
+                  </span>
+                )}
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleDiscardNewRow} disabled={saving} className="h-8 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                <XIcon size={14} className="mr-2" />
-                Discard
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => newRowData ? handleDiscardNewRow() : setEditingCell(null)} 
+                disabled={saving} 
+                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" 
+                title="Discard (Esc)"
+              >
+                <XIcon size={14} />
               </Button>
             </>
           )}
@@ -358,6 +522,13 @@ export default function TableView({ tableName }: Props) {
                           placeholder={columnInfo?.dflt_value || 'NULL'}
                           value={newRowData[colName] || ''}
                           onChange={(e) => setNewRowData({ ...newRowData, [colName]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                              handleSaveNewRow();
+                            } else if (e.key === 'Escape') {
+                              handleDiscardNewRow();
+                            }
+                          }}
                           disabled={saving}
                           autoFocus={colName === data.columns[0]}
                           autoComplete="off"
