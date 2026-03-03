@@ -1,0 +1,238 @@
+import { useState } from 'react';
+import { open, save } from '@tauri-apps/plugin-dialog';
+import { useAppStore, type Connection } from '../store/useAppStore';
+import { createDatabase } from '../lib/db';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Database, FolderOpen, Plus, ArrowRight, X, Clock } from 'lucide-react';
+
+export default function ConnectionDialog() {
+  const { showConnectionDialog, setShowConnectionDialog, connections, activeConnection, removeConnection } = useAppStore();
+
+  const [name, setName] = useState('');
+  const [path, setPath] = useState('');
+  const [error, setError] = useState('');
+
+  // Filter out the active connection from recent list
+  const recentConnections = connections.filter(
+    (c) => c.id !== activeConnection?.id
+  );
+
+  const handleBrowse = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: 'SQLite Database',
+            extensions: ['db', 'sqlite', 'sqlite3', 'db3'],
+          },
+          {
+            name: 'All Files',
+            extensions: ['*'],
+          },
+        ],
+      });
+      if (selected) {
+        setPath(selected as string);
+        if (!name) {
+          const parts = (selected as string).split('/');
+          setName(parts[parts.length - 1].replace(/\.[^.]+$/, ''));
+        }
+      }
+    } catch (e) {
+      console.error('File dialog error:', e);
+    }
+  };
+
+  const handleCreateNew = async () => {
+    try {
+      const selected = await save({
+        filters: [
+          {
+            name: 'SQLite Database',
+            extensions: ['db', 'sqlite', 'sqlite3'],
+          },
+        ],
+        defaultPath: 'new-database.db',
+      });
+      if (selected) {
+        let filePath = selected as string;
+        // Ensure .db extension
+        if (!/\.\w+$/.test(filePath)) {
+          filePath += '.db';
+        }
+        // Create the database file via Rust
+        await createDatabase(filePath);
+        setPath(filePath);
+        if (!name) {
+          const parts = filePath.split('/');
+          setName(parts[parts.length - 1].replace(/\.[^.]+$/, ''));
+        }
+      }
+    } catch (e: any) {
+      setError(`Failed to create database: ${e}`);
+    }
+  };
+
+  const handleConnect = () => {
+    if (!path.trim()) {
+      setError('Please provide a database path');
+      return;
+    }
+
+    const conn: Connection = {
+      id: `conn-${Date.now()}`,
+      name: name || path.split('/').pop() || 'Database',
+      path: path.trim(),
+      type: 'sqlite',
+      lastUsed: Date.now(),
+    };
+
+    setShowConnectionDialog(false);
+    window.dispatchEvent(
+      new CustomEvent('vibedb:connect', { detail: conn })
+    );
+  };
+
+  const handleSwitchTo = (conn: Connection) => {
+    setShowConnectionDialog(false);
+    window.dispatchEvent(
+      new CustomEvent('vibedb:connect', { detail: conn })
+    );
+  };
+
+  return (
+    <Dialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
+      <DialogContent className="sm:max-w-[480px] bg-card border-border shadow-2xl p-0 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent-secondary to-primary" />
+        
+        <div className="p-6">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="flex items-center space-x-2 text-xl font-bold tracking-tight">
+              <Database className="text-primary" />
+              <span>SQLite Connection</span>
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground mt-1">
+              Open an existing database or create a new one to connect.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Recent Connections */}
+          {recentConnections.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Clock size={12} className="text-muted-foreground" />
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Recent Connections
+                </span>
+              </div>
+              <div className="grid gap-2 max-h-[160px] overflow-auto">
+                {recentConnections.map((conn) => (
+                  <div
+                    key={conn.id}
+                    className="flex items-center gap-3 p-2.5 rounded-lg bg-background border border-border/50 cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-all group"
+                    onClick={() => handleSwitchTo(conn)}
+                  >
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+                      <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-foreground truncate">{conn.name}</div>
+                      <div className="text-[10px] text-muted-foreground truncate font-mono">{conn.path}</div>
+                    </div>
+                    <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
+                    <button
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeConnection(conn.id);
+                      }}
+                      title="Remove"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="border-b border-border mt-4" />
+            </div>
+          )}
+
+          <div className="grid gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Connection Name
+              </Label>
+              <Input
+                id="name"
+                placeholder="My Database"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-background/80 border-border focus-visible:ring-primary h-11 transition-all hover:bg-background"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="path" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Database File
+              </Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="path"
+                  placeholder="/path/to/database.db"
+                  value={path}
+                  onChange={(e) => {
+                    setPath(e.target.value);
+                    setError('');
+                  }}
+                  className="flex-1 bg-background/80 border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all hover:bg-background"
+                />
+                <Button 
+                  variant="secondary" 
+                  onClick={handleBrowse} 
+                  className="px-3 border border-border bg-background/80 hover:border-primary/50 transition-colors h-11"
+                  title="Browse Files"
+                >
+                  <FolderOpen size={18} className="text-muted-foreground hover:text-foreground" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCreateNew} 
+                  className="px-3 border-primary/30 text-primary hover:bg-primary/10 h-11 transition-colors group"
+                  title="Create New Database"
+                >
+                  <Plus size={18} className="group-hover:neon-text" />
+                </Button>
+              </div>
+              {error && (
+                <p className="text-xs text-destructive font-medium mt-2 p-2 bg-destructive/10 rounded border border-destructive/20 animate-fade-in">
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="bg-secondary/50 p-4 border-t border-border flex sm:justify-between items-center">
+          <Button
+            variant="ghost"
+            onClick={() => setShowConnectionDialog(false)}
+            className="hover:bg-secondary text-muted-foreground"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleConnect} 
+            className="shadow-glow px-8 rounded-full font-semibold tracking-wide"
+          >
+            Connect
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
