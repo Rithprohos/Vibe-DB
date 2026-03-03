@@ -99,6 +99,8 @@ interface AppState {
   // Tab actions
   addTab: (tab: Tab) => void;
   closeTab: (id: string) => void;
+  closeAllTabs: () => void;
+  closeOtherTabs: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
   openTableTab: (tableName: string, type: TabType) => void;
@@ -174,7 +176,7 @@ export const useAppStore = create<AppState>()(
 
       addTab: (tab) =>
         set((state) => {
-          const existing = state.tabs.find(t => t.id === tab.id);
+          const existing = state.tabs.find((t) => t.id === tab.id);
           if (existing) {
             return { activeTabId: tab.id };
           }
@@ -193,6 +195,19 @@ export const useAppStore = create<AppState>()(
           }
           return { tabs: newTabs, activeTabId: newActiveId };
         }),
+
+      closeAllTabs: () =>
+        set(() => ({
+          tabs: [],
+          activeTabId: null,
+          selectedTable: null,
+        })),
+
+      closeOtherTabs: (id) =>
+        set((state) => ({
+          tabs: state.tabs.filter((t) => t.id === id),
+          activeTabId: id,
+        })),
 
       setActiveTab: (id) => set({ activeTabId: id }),
 
@@ -223,10 +238,10 @@ export const useAppStore = create<AppState>()(
         }));
       },
     }),
-{
-      name: 'vibedb-storage',
+    {
+      name: "vibedb-storage",
       partialize: (state) => ({
-        connections: state.connections.map(c => ({
+        connections: state.connections.map((c) => ({
           id: c.id,
           name: c.name,
           path: c.path,
@@ -241,6 +256,6 @@ export const useAppStore = create<AppState>()(
 export function useActiveTab() {
   return useAppStore((s) => {
     if (!s.activeTabId) return null;
-    return s.tabs.find(t => t.id === s.activeTabId) || null;
+    return s.tabs.find((t) => t.id === s.activeTabId) || null;
   });
 }
