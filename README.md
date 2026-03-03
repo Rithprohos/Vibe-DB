@@ -1,5 +1,9 @@
 # VibeDB
 
+<p align="center">
+  <img src="./app-icon.png" alt="VibeDB Logo" width="120" height="120">
+</p>
+
 A modern, cross-platform SQLite database manager built with Tauri v2 and React.
 
 ![VibeDB](https://img.shields.io/badge/version-0.2.0-blue)
