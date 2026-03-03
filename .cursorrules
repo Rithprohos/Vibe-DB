@@ -1,0 +1,8 @@
+# Package Manager Rule
+
+**ONLY use bun as the package manager for this project.**
+
+- ✅ Use: `bun install`, `bun add`, `bun run`, `bun dev`, `bun build`
+- ❌ Never use: `npm`, `yarn`, `pnpm`, `npx`
+
+All package management commands must use bun. This project is configured to work exclusively with bun.

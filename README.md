@@ -25,21 +25,23 @@ VibeDB is a sleek, high-performance SQLite database management tool designed for
 - **Multi-Tab Interface** — Work with multiple queries and tables simultaneously with persistent state
 - **Query AI Assistant** — Powered by Pollinations AI for intelligent query suggestions
 - **Dark-First UI** — Easy on the eyes with a carefully crafted dark theme
-- **Connection Management** — Save and quickly switch between databases
+- **Connection Management** — Save and quickly switch between databases with environment tags (local, testing, development, production)
+- **Persistent Storage** — Connection settings stored in a durable JSON file via `tauri-plugin-store` (survives app updates and system cleaners)
 - **Query History** — Track executed queries with status and duration
 - **Performance Optimized** — Tab limits, result truncation, memoized components for smooth UX
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Backend | Tauri v2 (Rust) + sqlx |
-| Frontend | React 19 + TypeScript |
-| Build | Vite 7 |
-| Styling | Tailwind CSS + CSS Variables |
-| State | Zustand (with persistence) |
-| Editor | CodeMirror 6 (SQL mode) |
-| AI | Pollinations AI |
+| Layer    | Technology                                 |
+| -------- | ------------------------------------------ |
+| Backend  | Tauri v2 (Rust) + sqlx                     |
+| Frontend | React 19 + TypeScript                      |
+| Build    | Vite 7                                     |
+| Styling  | Tailwind CSS + CSS Variables               |
+| State    | Zustand (persisted via tauri-plugin-store) |
+| Editor   | CodeMirror 6 (SQL mode)                    |
+| AI       | Pollinations AI                            |
+| Security | tauri-plugin-stronghold (encrypted vault)  |
 
 ## Getting Started
 
@@ -131,8 +133,8 @@ See [ROADMAP.md](./ROADMAP.md) for details.
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
+| Shortcut         | Action        |
+| ---------------- | ------------- |
 | `⌘/Ctrl + Enter` | Execute query |
 
 ## Development
@@ -149,6 +151,7 @@ bun run preview      # Preview production build
 ### Testing
 
 #### Rust Backend Tests
+
 ```bash
 cd src-tauri
 cargo test           # Run all Rust unit tests
@@ -158,6 +161,7 @@ cargo test -- --nocapture  # Show println output
 ```
 
 #### Frontend Tests
+
 ```bash
 # Coming soon - Vitest setup planned
 bun vitest run       # Run frontend tests (when added)
@@ -172,11 +176,19 @@ bun vitest run       # Run frontend tests (when added)
 
 ## Security
 
-VibeDB takes security seriously. Key considerations:
+VibeDB uses a two-tier storage architecture for security:
 
+| Storage          | Purpose                                    | Technology                                                                |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------------------------- |
+| **App Settings** | Connection names, paths, tags, preferences | `tauri-plugin-store` — durable JSON file on disk                          |
+| **Secure Vault** | Passwords, tokens, API keys (future)       | `tauri-plugin-stronghold` — Argon2id + XChaCha20-Poly1305 encrypted vault |
+
+### Key Security Features
+
+- **No localStorage** — All persistent data is stored in native files, not in browser storage that can be wiped by system cleaners
+- **Encrypted credentials** — When remote database engines (Turso, PostgreSQL, MySQL) are added, passwords will be stored in an encrypted Stronghold vault
 - **CSP** — Content Security Policy planned for production builds
-- **Local storage** — SQLite paths stored locally (no remote credentials yet)
-- **Future engines** — Secure credential storage when Turso/PostgreSQL/MySQL support lands
+- **Connection tagging** — Environment labels (local/testing/development/production) help prevent accidental operations on production databases
 
 See [ROADMAP.md](./ROADMAP.md) for security hardening plans.
 
@@ -195,4 +207,4 @@ MIT License — feel free to use this project for your own purposes.
 
 ---
 
-*Crafted with vibe coding and AI assistance.*
+_Crafted with vibe coding and AI assistance._

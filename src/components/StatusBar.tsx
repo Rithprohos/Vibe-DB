@@ -17,9 +17,20 @@ export default function StatusBar() {
       
       {activeConnection && (
         <>
-          <div className="flex items-center space-x-1.5 mr-6 border-l border-border pl-6">
+          <div className="flex items-center gap-2 mr-6 border-l border-border pl-6">
             <Database size={12} className="text-primary/70" />
             <span className="font-medium text-foreground">{activeConnection.name}</span>
+
+            {activeConnection.tag && (
+              <span className={cn(
+                "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border leading-none flex items-center h-[18px]",
+                activeConnection.tag === 'production' 
+                  ? "bg-red-500/20 text-red-400 border-red-500/40" 
+                  : "bg-primary/20 text-primary border-primary/40"
+              )}>
+                {activeConnection.tag}
+              </span>
+            )}
           </div>
           <div className="flex items-center space-x-1.5 border-l border-border pl-6">
             <span className="font-mono">{tables.length}</span>

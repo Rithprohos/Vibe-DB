@@ -1,7 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { TableInfo, ColumnInfo, QueryResult } from "../store/useAppStore";
 
-export async function connectDatabase(path: string, name: string): Promise<string> {
+export async function connectDatabase(
+  path: string,
+  name: string,
+): Promise<string> {
   return invoke<string>("connect_database", { path, name });
 }
 
@@ -56,4 +59,8 @@ export async function getTableData(
 
 export async function createDatabase(dbPath: string): Promise<string> {
   return invoke<string>("create_database", { dbPath });
+}
+
+export async function getDatabaseVersion(connId?: string): Promise<string> {
+  return invoke<string>("get_database_version", { connId });
 }

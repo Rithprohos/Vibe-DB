@@ -41,4 +41,7 @@ pub trait DatabaseEngine: Send + Sync {
 
     /// Creates a new database file at the specified path.
     async fn create_database(&self, path: &str) -> EngineResult<String>;
+
+    /// Gets the database version information.
+    async fn get_version(&self) -> EngineResult<String>;
 }

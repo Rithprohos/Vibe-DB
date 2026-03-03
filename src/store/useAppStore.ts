@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage, StateStorage } from "zustand/middleware";
+import { LazyStore } from "@tauri-apps/plugin-store";
 
 export interface Connection {
   id: string;
@@ -8,6 +9,7 @@ export interface Connection {
   path: string;
   type: "sqlite";
   lastUsed: number;
+  tag?: "local" | "testing" | "development" | "production";
 }
 
 export interface TableInfo {
@@ -87,8 +89,16 @@ interface AppState {
   isAiPanelOpen: boolean;
   setIsAiPanelOpen: (val: boolean) => void;
 
+  // Metadata
+  databaseVersion: string | null;
+  setDatabaseVersion: (version: string | null) => void;
+
   // Actions
   addConnection: (conn: Connection) => void;
+  updateConnection: (
+    id: string,
+    updates: Partial<Pick<Connection, "name" | "tag">>,
+  ) => void;
   removeConnection: (id: string) => void;
   setActiveConnection: (conn: Connection | null) => void;
   setIsConnected: (val: boolean) => void;
@@ -113,6 +123,24 @@ interface AppState {
 
 let tabCounter = 0;
 
+// Initialize Tauri Store
+const tauriStore = new LazyStore("app_settings.json");
+
+// Define custom storage for Zustand to use Tauri Store
+const storage: StateStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    return (await tauriStore.get<string | null>(name)) ?? null;
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    await tauriStore.set(name, value);
+    await tauriStore.save();
+  },
+  removeItem: async (name: string): Promise<void> => {
+    await tauriStore.delete(name);
+    await tauriStore.save();
+  },
+};
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -127,8 +155,10 @@ export const useAppStore = create<AppState>()(
       logs: [],
       showLogDrawer: false,
       isAiPanelOpen: false,
+      databaseVersion: null,
 
       setIsAiPanelOpen: (val) => set({ isAiPanelOpen: val }),
+      setDatabaseVersion: (version) => set({ databaseVersion: version }),
 
       addConnection: (conn) =>
         set((state) => ({
@@ -141,6 +171,17 @@ export const useAppStore = create<AppState>()(
       removeConnection: (id) =>
         set((state) => ({
           connections: state.connections.filter((c) => c.id !== id),
+        })),
+
+      updateConnection: (id, updates) =>
+        set((state) => ({
+          connections: state.connections.map((c) =>
+            c.id === id ? { ...c, ...updates } : c,
+          ),
+          activeConnection:
+            state.activeConnection?.id === id
+              ? { ...state.activeConnection, ...updates }
+              : state.activeConnection,
         })),
 
       setActiveConnection: (conn) =>
@@ -247,8 +288,10 @@ export const useAppStore = create<AppState>()(
           path: c.path,
           type: c.type,
           lastUsed: c.lastUsed,
+          tag: c.tag,
         })),
       }),
+      storage: createJSONStorage(() => storage),
     },
   ),
 );

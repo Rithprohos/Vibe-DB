@@ -4,8 +4,9 @@ import { listTables } from '../lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Database, Zap, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox } from 'lucide-react';
+import { Database, Zap, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, ArrowRightLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import EditConnectionDialog from './EditConnectionDialog';
 
 export default function Sidebar() {
   const {
@@ -24,6 +25,7 @@ export default function Sidebar() {
   const [viewsOpen, setViewsOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [isResizing, setIsResizing] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -98,16 +100,61 @@ export default function Sidebar() {
     >
       <div className="p-3">
         {isConnected && activeConnection ? (
-          <div 
-            className="flex items-center space-x-3 p-3 rounded-md bg-background border border-border cursor-pointer hover:border-primary/50 transition-colors group"
-            onClick={() => setShowConnectionDialog(true)}
-          >
-            <Database size={18} className="text-primary group-hover:neon-text transition-all" />
-            <div className="flex-1 overflow-hidden">
-              <div className="text-sm font-medium text-foreground truncate">{activeConnection.name}</div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">SQLite</div>
+          <>
+            <div 
+              className="relative flex items-center space-x-3 p-3 rounded-md bg-background border border-border cursor-pointer hover:border-primary/50 transition-colors group"
+              onClick={() => setEditDialogOpen(true)}
+            >
+              <Database size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
+              <div className="flex-1 min-w-0 pr-12">
+                <div className="text-sm font-medium text-foreground truncate leading-tight">
+                  {activeConnection.name}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0">SQLite</div>
+                  {activeConnection.tag && (
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border flex-shrink-0 whitespace-nowrap",
+                      activeConnection.tag === 'production' 
+                        ? "bg-red-500/20 text-red-400 border-red-500/40" 
+                        : "bg-primary/20 text-primary border-primary/40"
+                    )}>
+                      {activeConnection.tag}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons - Absolute positioned to not interfere with text layout */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                <button
+                  className="p-1.5 rounded-md hover:bg-primary/10 hover:text-primary text-muted-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditDialogOpen(true);
+                  }}
+                  title="Edit Connection"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  className="p-1.5 rounded-md hover:bg-primary/10 hover:text-primary text-muted-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowConnectionDialog(true);
+                  }}
+                  title="Switch Connection"
+                >
+                  <ArrowRightLeft size={12} />
+                </button>
+              </div>
             </div>
-          </div>
+            <EditConnectionDialog
+              connection={activeConnection}
+              open={editDialogOpen}
+              onOpenChange={setEditDialogOpen}
+            />
+          </>
         ) : (
           <Button 
             className="w-full justify-start space-x-2 shadow-glow" 
