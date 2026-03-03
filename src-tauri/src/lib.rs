@@ -151,6 +151,21 @@ async fn create_database(db_path: String) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Gets the version of the database.
+#[tauri::command]
+async fn get_database_version(
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+) -> Result<String, String> {
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+    engine.get_version().await.map_err(|e| e.to_string())
+}
+
 /// Resolves the connection ID from optional parameter or active connection.
 async fn get_connection_id(
     state: &tauri::State<'_, Arc<AppState>>,
@@ -174,6 +189,25 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_stronghold::Builder::new(|password| {
+                use argon2::{hash_raw, Config, Variant, Version};
+                let config = Config {
+                    lanes: 4,
+                    mem_cost: 10_000,
+                    time_cost: 10,
+                    variant: Variant::Argon2id,
+                    version: Version::Version13,
+                    ..Default::default()
+                };
+                let salt = b"vibedb_secure_salt_fixed";
+                let key =
+                    hash_raw(password.as_bytes(), salt, &config).expect("failed to hash password");
+                key.to_vec()
+            })
+            .build(),
+        )
+        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
@@ -184,7 +218,8 @@ pub fn run() {
             get_table_structure,
             execute_query,
             get_table_row_count,
-            create_database
+            create_database,
+            get_database_version
         ])
         .run(tauri::generate_context!())
         // PANIC: Application cannot continue without Tauri runtime.

@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { useAppStore, type Connection } from './store/useAppStore';
-import { listTables, connectDatabase } from './lib/db';
+import { listTables, connectDatabase, getDatabaseVersion } from './lib/db';
 import Sidebar from './components/Sidebar';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
@@ -26,6 +26,7 @@ export default function App() {
     addConnection,
     setActiveConnection,
     addTab,
+    setDatabaseVersion,
   } = useAppStore();
 
   const handleConnect = useCallback(
@@ -35,6 +36,7 @@ export default function App() {
         const connId = await connectDatabase(conn.path, conn.name);
 
         const tables = await listTables(connId);
+        const version = await getDatabaseVersion(connId);
         
         // Update connection with new session connId (not persisted)
         const updatedConn = { ...conn, connId, lastUsed: Date.now() };
@@ -42,6 +44,7 @@ export default function App() {
         // Set active connection first (this clears tables), then set tables
         setActiveConnection(updatedConn);
         setTables(tables);
+        setDatabaseVersion(version);
         setIsConnected(true);
         addConnection(updatedConn);
 

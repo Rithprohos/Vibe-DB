@@ -32,6 +32,7 @@ pub trait DatabaseEngine: Send + Sync {
     async fn execute_query(&self, query: &str) -> EngineResult<QueryResult>;
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64>;
     async fn create_database(&self, path: &str) -> EngineResult<String>;
+    async fn get_version(&self) -> EngineResult<String>;
 }
 ```
 
@@ -94,15 +95,20 @@ Essential SQLite management features before multi-engine support.
 
 ### Workspace
 
-| Feature           | Priority | Description                                              |
-| ----------------- | -------- | -------------------------------------------------------- |
-| Tabs Context Menu | ✅ Done  | Right-click on tabs to close, close others, or close all |
+| Feature           | Priority | Description                                                 |
+| ----------------- | -------- | ----------------------------------------------------------- |
+| Tabs Context Menu | ✅ Done  | Right-click on tabs to close, close others, or close all    |
+| Connection Tags   | ✅ Done  | Environment labels: local, testing, development, production |
+| Editable Names    | ✅ Done  | Edit connection names and tags without reconnecting         |
+| Database Version  | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar        |
 
 ### Tasks
 
 - [ ] Create Table Wizard component
 - [x] Inline cell editing with save/cancel
 - [x] Tabs context menu (close, close other, close all)
+- [x] Editable connection names and tags
+- [x] Database versioning support in backend and UI
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
@@ -222,9 +228,16 @@ Security improvements for production readiness.
 | Issue                              | Severity | Status      |
 | ---------------------------------- | -------- | ----------- |
 | No Content Security Policy (CSP)   | High     | 🔴 Critical |
-| Connection paths in localStorage   | Low      | 🟢 Deferred |
+| Connection paths in localStorage   | Low      | ✅ Fixed    |
 | Broad Tauri capability permissions | Low      | 🟡 Review   |
 | No AI data guardrails              | Low      | 🟢 Deferred |
+
+### Completed
+
+- [x] Migrate state persistence from `localStorage` to `tauri-plugin-store` (`app_settings.json`)
+- [x] Set up `tauri-plugin-stronghold` for encrypted credential vault (Argon2id + XChaCha20-Poly1305)
+- [x] Add connection environment tags (local, testing, development, production)
+- [x] Register store and stronghold permissions in Tauri capabilities
 
 ### Tasks
 
@@ -232,17 +245,22 @@ Security improvements for production readiness.
 - [ ] Audit Tauri capabilities (remove unused permissions)
 - [ ] Document security posture in README
 
-### Secure Storage (Deferred to v0.3+)
+### Storage Architecture (Implemented)
 
-SQLite file paths don't require secure storage — they're just locations on disk. Secure storage will be implemented when remote engines land:
+| Storage                   | File                | Purpose                                    |
+| ------------------------- | ------------------- | ------------------------------------------ |
+| `tauri-plugin-store`      | `app_settings.json` | Connection metadata, tags, preferences     |
+| `tauri-plugin-stronghold` | `credentials.hold`  | Encrypted passwords, auth tokens, API keys |
+
+### Secure Credential Storage (Ready for v0.3+)
+
+Stronghold vault is installed and configured. When remote engines land, credentials will be stored securely:
 
 | Engine     | Sensitive Data                |
 | ---------- | ----------------------------- |
 | Turso      | Auth tokens                   |
 | PostgreSQL | Passwords, connection strings |
 | MySQL      | Passwords, connection strings |
-
-Implementation: `tauri-plugin-store` with encryption or OS keychain integration.
 
 ### CSP Configuration (Target)
 

@@ -6,7 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Database, FolderOpen, Plus, ArrowRight, X, Clock } from 'lucide-react';
+import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil } from 'lucide-react';
+import EditConnectionDialog from './EditConnectionDialog';
+import { cn } from '@/lib/utils';
 
 export default function ConnectionDialog() {
   const { showConnectionDialog, setShowConnectionDialog, connections, activeConnection, removeConnection } = useAppStore();
@@ -14,6 +16,8 @@ export default function ConnectionDialog() {
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
+  const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();
+  const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
 
   // Filter out the active connection from recent list
   const recentConnections = connections.filter(
@@ -89,6 +93,7 @@ export default function ConnectionDialog() {
       path: path.trim(),
       type: 'sqlite',
       lastUsed: Date.now(),
+      tag,
     };
 
     setShowConnectionDialog(false);
@@ -105,7 +110,8 @@ export default function ConnectionDialog() {
   };
 
   return (
-    <Dialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
+    <>
+      <Dialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
       <DialogContent className="sm:max-w-[480px] bg-card border-border shadow-2xl p-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent-secondary to-primary" />
         
@@ -140,10 +146,32 @@ export default function ConnectionDialog() {
                       <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">{conn.name}</div>
-                      <div className="text-[10px] text-muted-foreground truncate font-mono">{conn.path}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium text-foreground truncate">{conn.name}</div>
+                        {conn.tag && (
+                          <span className={cn(
+                            "px-1.5 py-0 rounded-[4px] text-[8px] font-bold uppercase tracking-widest border",
+                            conn.tag === 'production' 
+                              ? "bg-red-500/10 text-red-400 border-red-500/20" 
+                              : "bg-primary/10 text-primary/80 border-primary/20"
+                          )}>
+                            {conn.tag}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5 opacity-70">{conn.path}</div>
                     </div>
                     <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
+                    <button
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-primary/10 hover:text-primary flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingConnection(conn);
+                      }}
+                      title="Edit"
+                    >
+                      <Pencil size={12} />
+                    </button>
                     <button
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
                       onClick={(e) => {
@@ -171,7 +199,7 @@ export default function ConnectionDialog() {
                 placeholder="My Database"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="bg-background/80 border-border focus-visible:ring-primary h-11 transition-all hover:bg-background"
+                className="bg-background border-border focus-visible:ring-primary h-11 transition-all focus:bg-background"
               />
             </div>
 
@@ -188,12 +216,12 @@ export default function ConnectionDialog() {
                     setPath(e.target.value);
                     setError('');
                   }}
-                  className="flex-1 bg-background/80 border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all hover:bg-background"
+                  className="flex-1 bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
                 />
                 <Button 
                   variant="secondary" 
                   onClick={handleBrowse} 
-                  className="px-3 border border-border bg-background/80 hover:border-primary/50 transition-colors h-11"
+                  className="px-3 border border-border bg-background hover:bg-secondary transition-colors h-11"
                   title="Browse Files"
                 >
                   <FolderOpen size={18} className="text-muted-foreground hover:text-foreground" />
@@ -212,6 +240,29 @@ export default function ConnectionDialog() {
                   {error}
                 </p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Environment Label (Optional)
+              </Label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {(['local', 'testing', 'development', 'production'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTag(tag === t ? undefined : t)}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                      tag === t 
+                        ? t === 'production'
+                          ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(248,113,113,0.15)]'
+                          : 'bg-primary/20 border-primary text-primary shadow-[0_0_10px_rgba(0,229,153,0.15)]'
+                        : 'bg-background hover:bg-secondary border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -232,7 +283,13 @@ export default function ConnectionDialog() {
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      <EditConnectionDialog
+        connection={editingConnection}
+        open={!!editingConnection}
+        onOpenChange={(open) => !open && setEditingConnection(null)}
+      />
+    </>
   );
 }
 

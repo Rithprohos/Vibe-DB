@@ -2,7 +2,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Sparkles, Zap } from 'lucide-react';
 
 export default function TopBar() {
-  const { isAiPanelOpen, setIsAiPanelOpen, activeConnection, tabs, activeTabId } = useAppStore();
+  const { isAiPanelOpen, setIsAiPanelOpen, activeConnection, tabs, activeTabId, databaseVersion } = useAppStore();
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const isDataTabActive = activeTab?.type === 'data';
@@ -20,11 +20,16 @@ export default function TopBar() {
           VibeDB
         </span>
         {activeConnection && (
-          <div className="flex items-center gap-1.5 ml-2 pl-3 border-l border-border">
+          <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
             <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(0,229,153,0.4)]" />
             <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
               {activeConnection.name}
             </span>
+            {databaseVersion && (
+              <span className="text-[10px] text-muted-foreground/50 font-mono bg-background/30 px-1 rounded border border-border/40">
+                v{databaseVersion}
+              </span>
+            )}
           </div>
         )}
       </div>

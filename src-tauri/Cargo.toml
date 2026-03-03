@@ -29,6 +29,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 async-trait = "0.1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
+tauri-plugin-store = "2.4.2"
+tauri-plugin-stronghold = "2.3.1"
+rust-argon2 = "1.0.0"
 
 [dev-dependencies]
 tokio-test = "0.4"

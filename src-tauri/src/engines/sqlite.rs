@@ -270,4 +270,19 @@ impl DatabaseEngine for SqliteEngine {
         pool.close().await;
         Ok(path.to_string())
     }
+
+    async fn get_version(&self) -> EngineResult<String> {
+        let pool = self.pool.read().await;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
+
+        let row = sqlx::query("SELECT sqlite_version() as version")
+            .fetch_one(pool)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        let version: String = row.get("version");
+        Ok(version)
+    }
 }
