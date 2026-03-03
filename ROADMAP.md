@@ -71,7 +71,7 @@ Essential SQLite management features before multi-engine support.
 | Feature              | Priority | Description                                                   |
 | -------------------- | -------- | ------------------------------------------------------------- |
 | Create Table Wizard  | High     | Visual table builder with column types, constraints, defaults |
-| Inline Data Edit     | ✅ Done  | Click cell → edit → save directly in table view             |
+| Inline Data Edit     | ✅ Done  | Click cell → edit → save directly in table view               |
 | Edit Table Structure | Medium   | Add/drop columns, modify types/constraints                    |
 | Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships                    |
 | Index Manager        | Low      | View existing indexes, create new ones                        |
@@ -92,10 +92,17 @@ Essential SQLite management features before multi-engine support.
 | Query Folders   | Medium   | Organize saved queries into folders/categories                           |
 | Query Templates | Low      | Pre-built queries for common operations (create table, insert, etc.)     |
 
+### Workspace
+
+| Feature           | Priority | Description                                              |
+| ----------------- | -------- | -------------------------------------------------------- |
+| Tabs Context Menu | ✅ Done  | Right-click on tabs to close, close others, or close all |
+
 ### Tasks
 
 - [ ] Create Table Wizard component
 - [x] Inline cell editing with save/cancel
+- [x] Tabs context menu (close, close other, close all)
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
@@ -107,12 +114,12 @@ Essential SQLite management features before multi-engine support.
 
 ### Testing
 
-| Component | Status | Coverage |
-|-----------|--------|----------|
-| Engine types | ✅ Done | Unit tests for all data structures |
-| Engine registry | ✅ Done | Connection/disconnect tests |
-| SQLite engine | ✅ Done | Full integration tests |
-| Frontend components | 📋 Planned | Vitest + React Testing Library |
+| Component           | Status     | Coverage                           |
+| ------------------- | ---------- | ---------------------------------- |
+| Engine types        | ✅ Done    | Unit tests for all data structures |
+| Engine registry     | ✅ Done    | Connection/disconnect tests        |
+| SQLite engine       | ✅ Done    | Full integration tests             |
+| Frontend components | 📋 Planned | Vitest + React Testing Library     |
 
 ### Performance Optimizations
 
