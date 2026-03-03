@@ -1,6 +1,8 @@
-mod engines;
+pub mod engines;
 
-use engines::{EngineRegistry, DatabaseEngine, ConnectionConfig, TableInfo, ColumnInfo, QueryResult};
+use engines::{
+    ColumnInfo, ConnectionConfig, DatabaseEngine, EngineRegistry, QueryResult, TableInfo,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -31,7 +33,10 @@ async fn connect_database(
     let id = format!("conn-{}", uuid::Uuid::new_v4());
     let config = ConnectionConfig::sqlite(id.clone(), name, path);
 
-    state.registry.connect(config).await
+    state
+        .registry
+        .connect(config)
+        .await
         .map_err(|e| e.to_string())?;
 
     let mut active = state.active_connection.write().await;
@@ -46,7 +51,10 @@ async fn disconnect_database(
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: String,
 ) -> Result<(), String> {
-    state.registry.disconnect(&conn_id).await
+    state
+        .registry
+        .disconnect(&conn_id)
+        .await
         .map_err(|e| e.to_string())
 }
 
@@ -68,7 +76,10 @@ async fn list_tables(
     conn_id: Option<String>,
 ) -> Result<Vec<TableInfo>, String> {
     let id = get_connection_id(&state, conn_id).await?;
-    let engine = state.registry.get_engine(&id).await
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
         .map_err(|e| e.to_string())?;
     engine.list_tables().await.map_err(|e| e.to_string())
 }
@@ -81,9 +92,15 @@ async fn get_table_structure(
     table_name: String,
 ) -> Result<Vec<ColumnInfo>, String> {
     let id = get_connection_id(&state, conn_id).await?;
-    let engine = state.registry.get_engine(&id).await
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
         .map_err(|e| e.to_string())?;
-    engine.get_table_structure(&table_name).await.map_err(|e| e.to_string())
+    engine
+        .get_table_structure(&table_name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Executes a SQL query.
@@ -94,9 +111,15 @@ async fn execute_query(
     query: String,
 ) -> Result<QueryResult, String> {
     let id = get_connection_id(&state, conn_id).await?;
-    let engine = state.registry.get_engine(&id).await
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
         .map_err(|e| e.to_string())?;
-    engine.execute_query(&query).await.map_err(|e| e.to_string())
+    engine
+        .execute_query(&query)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Gets the row count of a table.
@@ -107,16 +130,25 @@ async fn get_table_row_count(
     table_name: String,
 ) -> Result<i64, String> {
     let id = get_connection_id(&state, conn_id).await?;
-    let engine = state.registry.get_engine(&id).await
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
         .map_err(|e| e.to_string())?;
-    engine.get_table_row_count(&table_name).await.map_err(|e| e.to_string())
+    engine
+        .get_table_row_count(&table_name)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Creates a new SQLite database file.
 #[tauri::command]
 async fn create_database(db_path: String) -> Result<String, String> {
     let engine = engines::SqliteEngine::new();
-    engine.create_database(&db_path).await.map_err(|e| e.to_string())
+    engine
+        .create_database(&db_path)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Resolves the connection ID from optional parameter or active connection.
@@ -128,7 +160,9 @@ async fn get_connection_id(
         Some(id) => Ok(id),
         None => {
             let active = state.active_connection.read().await;
-            active.clone().ok_or_else(|| "No active connection".to_string())
+            active
+                .clone()
+                .ok_or_else(|| "No active connection".to_string())
         }
     }
 }

@@ -1,0 +1,47 @@
+name: Rust Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/rust-tests.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Rust code
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run cargo tests
+        working-directory: ./src-tauri
+        run: cargo test --verbose
+
+      - name: Run cargo clippy
+        working-directory: ./src-tauri
+        run: cargo clippy -- -D warnings
+        continue-on-error: true
+
+      - name: Check cargo fmt
+        working-directory: ./src-tauri
+        run: cargo fmt -- --check
+        continue-on-error: true

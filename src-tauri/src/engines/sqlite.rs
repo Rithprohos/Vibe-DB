@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-use sqlx::{Row, Column};
+use sqlx::{Column, Row};
 use tokio::sync::RwLock;
 
 use super::traits::DatabaseEngine;
-use super::types::{TableInfo, ColumnInfo, QueryResult, ConnectionConfig};
-use super::{EngineResult, EngineError};
+use super::types::{ColumnInfo, ConnectionConfig, QueryResult, TableInfo};
+use super::{EngineError, EngineResult};
 
 /// SQLite database engine implementation using sqlx.
-/// 
+///
 /// Connection pools are managed internally and automatically closed on drop.
 pub struct SqliteEngine {
     pool: RwLock<Option<SqlitePool>>,
@@ -24,14 +24,17 @@ impl SqliteEngine {
 
     /// Validates a table name to prevent SQL injection.
     /// Only allows alphanumeric characters and underscores.
-    fn validate_table_name(name: &str) -> EngineResult<()> {
+    pub fn validate_table_name(name: &str) -> EngineResult<()> {
         if name.is_empty() {
-            return Err(EngineError::QueryError("Table name cannot be empty".to_string()));
+            return Err(EngineError::QueryError(
+                "Table name cannot be empty".to_string(),
+            ));
         }
         if !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return Err(EngineError::QueryError(
-                format!("Invalid table name '{}': only alphanumeric characters and underscores allowed", name)
-            ));
+            return Err(EngineError::QueryError(format!(
+                "Invalid table name '{}': only alphanumeric characters and underscores allowed",
+                name
+            )));
         }
         Ok(())
     }
@@ -73,8 +76,9 @@ fn json_from_row(row: &sqlx::sqlite::SqliteRow, col_idx: usize) -> serde_json::V
 #[async_trait]
 impl DatabaseEngine for SqliteEngine {
     async fn connect(&self, config: &ConnectionConfig) -> EngineResult<()> {
-        let path = config.path.as_ref()
-            .ok_or_else(|| EngineError::ConfigError("Database path is required for SQLite".to_string()))?;
+        let path = config.path.as_ref().ok_or_else(|| {
+            EngineError::ConfigError("Database path is required for SQLite".to_string())
+        })?;
 
         let connection_string = format!("sqlite:{}?mode=rwc", path);
 
@@ -102,11 +106,12 @@ impl DatabaseEngine for SqliteEngine {
 
     async fn list_tables(&self) -> EngineResult<Vec<TableInfo>> {
         let pool = self.pool.read().await;
-        let pool = pool.as_ref()
-            .ok_or_else(|| EngineError::ConnectionFailed("Not connected to database".to_string()))?;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
 
         let rows = sqlx::query(
-            "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') ORDER BY name"
+            "SELECT name, type FROM sqlite_master WHERE type IN ('table', 'view') ORDER BY name",
         )
         .fetch_all(pool)
         .await
@@ -126,10 +131,11 @@ impl DatabaseEngine for SqliteEngine {
 
     async fn get_table_structure(&self, table_name: &str) -> EngineResult<Vec<ColumnInfo>> {
         Self::validate_table_name(table_name)?;
-        
+
         let pool = self.pool.read().await;
-        let pool = pool.as_ref()
-            .ok_or_else(|| EngineError::ConnectionFailed("Not connected to database".to_string()))?;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
 
         // Safe because we validated the table name
         let query = format!("PRAGMA table_info(\"{}\")", table_name);
@@ -156,23 +162,25 @@ impl DatabaseEngine for SqliteEngine {
 
     async fn execute_query(&self, query: &str) -> EngineResult<QueryResult> {
         let pool = self.pool.read().await;
-        let pool = pool.as_ref()
-            .ok_or_else(|| EngineError::ConnectionFailed("Not connected to database".to_string()))?;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
 
         let trimmed = query.trim();
-        
+
         // Strip leading single-line comments (-- ...) to find actual statement
-        let stripped = trimmed.lines()
+        let stripped = trimmed
+            .lines()
             .filter(|line| !line.trim().starts_with("--"))
             .collect::<Vec<_>>()
             .join("\n");
-        
+
         let upper = stripped.trim().to_uppercase();
 
         // Check if this is a query that returns rows
-        let is_select = upper.starts_with("SELECT") 
-            || upper.starts_with("PRAGMA") 
-            || upper.starts_with("EXPLAIN") 
+        let is_select = upper.starts_with("SELECT")
+            || upper.starts_with("PRAGMA")
+            || upper.starts_with("EXPLAIN")
             || upper.starts_with("WITH")
             || upper.starts_with("TABLE");
 
@@ -199,11 +207,7 @@ impl DatabaseEngine for SqliteEngine {
 
             let result_rows: Vec<Vec<serde_json::Value>> = rows
                 .iter()
-                .map(|row| {
-                    (0..row.len())
-                        .map(|i| json_from_row(row, i))
-                        .collect()
-                })
+                .map(|row| (0..row.len()).map(|i| json_from_row(row, i)).collect())
                 .collect();
 
             let row_count = result_rows.len();
@@ -231,10 +235,11 @@ impl DatabaseEngine for SqliteEngine {
 
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64> {
         Self::validate_table_name(table_name)?;
-        
+
         let pool = self.pool.read().await;
-        let pool = pool.as_ref()
-            .ok_or_else(|| EngineError::ConnectionFailed("Not connected to database".to_string()))?;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
 
         // Safe because we validated the table name
         let query = format!("SELECT COUNT(*) as count FROM \"{}\"", table_name);

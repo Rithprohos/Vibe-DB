@@ -102,6 +102,15 @@ Essential SQLite management features before multi-engine support.
 - [ ] Save query dialog with name/description
 - [ ] Query library with search/filter
 
+### Testing
+
+| Component | Status | Coverage |
+|-----------|--------|----------|
+| Engine types | ✅ Done | Unit tests for all data structures |
+| Engine registry | ✅ Done | Connection/disconnect tests |
+| SQLite engine | ✅ Done | Full integration tests |
+| Frontend components | 📋 Planned | Vitest + React Testing Library |
+
 ### Performance Optimizations
 
 | Optimization | Status | Description |
