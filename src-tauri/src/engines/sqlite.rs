@@ -24,7 +24,7 @@ impl SqliteEngine {
 
     /// Validates a table name to prevent SQL injection.
     /// Only allows alphanumeric characters and underscores.
-    fn validate_table_name(name: &str) -> EngineResult<()> {
+    pub fn validate_table_name(name: &str) -> EngineResult<()> {
         if name.is_empty() {
             return Err(EngineError::QueryError("Table name cannot be empty".to_string()));
         }

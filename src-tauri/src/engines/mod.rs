@@ -1,6 +1,6 @@
 mod traits;
-mod types;
-mod sqlite;
+pub mod types;
+pub mod sqlite;
 
 pub use traits::DatabaseEngine;
 pub use types::{TableInfo, ColumnInfo, QueryResult, EngineType, ConnectionConfig};

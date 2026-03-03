@@ -1,4 +1,4 @@
-mod engines;
+pub mod engines;
 
 use engines::{EngineRegistry, DatabaseEngine, ConnectionConfig, TableInfo, ColumnInfo, QueryResult};
 use std::sync::Arc;

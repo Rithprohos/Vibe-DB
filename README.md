@@ -146,6 +146,23 @@ bun run build        # Production build
 bun run preview      # Preview production build
 ```
 
+### Testing
+
+#### Rust Backend Tests
+```bash
+cd src-tauri
+cargo test           # Run all Rust unit tests
+cargo test engines   # Run engine tests only
+cargo test sqlite    # Run SQLite tests only
+cargo test -- --nocapture  # Show println output
+```
+
+#### Frontend Tests
+```bash
+# Coming soon - Vitest setup planned
+bun vitest run       # Run frontend tests (when added)
+```
+
 ### Code Style
 
 - TypeScript strict mode
