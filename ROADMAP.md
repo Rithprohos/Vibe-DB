@@ -4,11 +4,12 @@ Multi-database engine support for VibeDB.
 
 ## Current State (v0.2)
 
-| Database | Status | Notes |
-|----------|--------|-------|
-| SQLite | ✅ Stable | Full support via `sqlx` |
+| Database | Status    | Notes                   |
+| -------- | --------- | ----------------------- |
+| SQLite   | ✅ Stable | Full support via `sqlx` |
 
 ### SQLite Commands
+
 - `connect_database` — Connect to a SQLite database
 - `disconnect_database` — Disconnect from database
 - `set_active_connection` — Set active connection for queries
@@ -41,6 +42,7 @@ pub trait DatabaseEngine: Send + Sync {
 Refactored backend to support multiple database drivers.
 
 ### Completed Tasks
+
 - [x] Create `DatabaseEngine` trait abstraction
 - [x] Implement engine registry pattern
 - [x] Abstract connection configuration
@@ -66,33 +68,34 @@ Essential SQLite management features before multi-engine support.
 
 ### Table Management
 
-| Feature | Priority | Description |
-|---------|----------|-------------|
-| Create Table Wizard | High | Visual table builder with column types, constraints, defaults |
-| Inline Data Edit | High | Click cell → edit → save directly in table view |
-| Edit Table Structure | Medium | Add/drop columns, modify types/constraints |
-| Schema Viewer (ERD) | Medium | Visual diagram of tables and relationships |
-| Index Manager | Low | View existing indexes, create new ones |
+| Feature              | Priority | Description                                                   |
+| -------------------- | -------- | ------------------------------------------------------------- |
+| Create Table Wizard  | High     | Visual table builder with column types, constraints, defaults |
+| Inline Data Edit     | ✅ Done  | Click cell → edit → save directly in table view             |
+| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints                    |
+| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships                    |
+| Index Manager        | Low      | View existing indexes, create new ones                        |
 
 ### Data Operations
 
-| Feature | Priority | Description |
-|---------|----------|-------------|
-| Import Data | Medium | CSV, JSON, SQL file import |
-| Export Data | Medium | Export table/query results as CSV, JSON, SQL |
-| Backup/Restore | Low | One-click database backup and restore |
+| Feature        | Priority | Description                                  |
+| -------------- | -------- | -------------------------------------------- |
+| Import Data    | Medium   | CSV, JSON, SQL file import                   |
+| Export Data    | Medium   | Export table/query results as CSV, JSON, SQL |
+| Backup/Restore | Low      | One-click database backup and restore        |
 
 ### Query Management
 
-| Feature | Priority | Description |
-|---------|----------|-------------|
-| Saved Queries | High | Save queries to library with name/description, persisted across sessions |
-| Query Folders | Medium | Organize saved queries into folders/categories |
-| Query Templates | Low | Pre-built queries for common operations (create table, insert, etc.) |
+| Feature         | Priority | Description                                                              |
+| --------------- | -------- | ------------------------------------------------------------------------ |
+| Saved Queries   | High     | Save queries to library with name/description, persisted across sessions |
+| Query Folders   | Medium   | Organize saved queries into folders/categories                           |
+| Query Templates | Low      | Pre-built queries for common operations (create table, insert, etc.)     |
 
 ### Tasks
+
 - [ ] Create Table Wizard component
-- [ ] Inline cell editing with save/cancel
+- [x] Inline cell editing with save/cancel
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
@@ -104,15 +107,15 @@ Essential SQLite management features before multi-engine support.
 
 ### Performance Optimizations
 
-| Optimization | Status | Description |
-|--------------|--------|-------------|
-| Tab limit | ✅ Done | Max 20 tabs, oldest auto-removed |
-| Result truncation | ✅ Done | Max 1000 rows stored per result |
-| Zustand selectors | ✅ Done | `useActiveTab`, `useTabById`, `useConnection` — subscribe to only needed state |
-| Memoized components | ✅ Done | QueryEditor wrapped in `memo()` |
-| Tab reuse | ✅ Done | Opening same table reuses existing tab |
-| Virtual scrolling | 📋 Planned | Render only visible rows for large result sets |
-| Lazy tab loading | 📋 Planned | Don't render inactive tabs until switched |
+| Optimization        | Status     | Description                                                                    |
+| ------------------- | ---------- | ------------------------------------------------------------------------------ |
+| Tab limit           | ✅ Done    | Max 20 tabs, oldest auto-removed                                               |
+| Result truncation   | ✅ Done    | Max 1000 rows stored per result                                                |
+| Zustand selectors   | ✅ Done    | `useActiveTab`, `useTabById`, `useConnection` — subscribe to only needed state |
+| Memoized components | ✅ Done    | QueryEditor wrapped in `memo()`                                                |
+| Tab reuse           | ✅ Done    | Opening same table reuses existing tab                                         |
+| Virtual scrolling   | 📋 Planned | Render only visible rows for large result sets                                 |
+| Lazy tab loading    | 📋 Planned | Don't render inactive tabs until switched                                      |
 
 ---
 
@@ -120,13 +123,14 @@ Essential SQLite management features before multi-engine support.
 
 [Turso](https://turso.tech/) — LibSQL/SQLite-compatible edge database.
 
-| Feature | Priority |
-|---------|----------|
-| Connection via URL + Auth Token | High |
-| Embedded replica support | Medium |
-| Sync status display | Low |
+| Feature                         | Priority |
+| ------------------------------- | -------- |
+| Connection via URL + Auth Token | High     |
+| Embedded replica support        | Medium   |
+| Sync status display             | Low      |
 
 ### Tasks
+
 - [ ] Add `libsql` crate dependency
 - [ ] Implement `TursoEngine` struct
 - [ ] Support embedded replica mode
@@ -134,6 +138,7 @@ Essential SQLite management features before multi-engine support.
 - [ ] Update connection dialog UI
 
 ### Dependencies
+
 ```toml
 libsql = "0.x"
 ```
@@ -144,15 +149,16 @@ libsql = "0.x"
 
 Full PostgreSQL database support.
 
-| Feature | Priority |
-|---------|----------|
-| Connection via connection string | High |
-| Schema browser | High |
-| SSL/TLS support | High |
-| Custom port/host | Medium |
-| SSH tunnel | Low |
+| Feature                          | Priority |
+| -------------------------------- | -------- |
+| Connection via connection string | High     |
+| Schema browser                   | High     |
+| SSL/TLS support                  | High     |
+| Custom port/host                 | Medium   |
+| SSH tunnel                       | Low      |
 
 ### Tasks
+
 - [ ] Add `sqlx` postgres feature
 - [ ] Implement `PostgresEngine` struct
 - [ ] Handle PostgreSQL-specific types (JSON, arrays, etc.)
@@ -160,6 +166,7 @@ Full PostgreSQL database support.
 - [ ] Connection pooling
 
 ### Dependencies
+
 ```toml
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-native-tls"] }
 ```
@@ -170,20 +177,22 @@ sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-native-tls"] }
 
 MySQL and MariaDB support.
 
-| Feature | Priority |
-|---------|----------|
-| Connection via connection string | High |
-| Schema browser | High |
-| SSL support | Medium |
-| MariaDB compatibility | Medium |
+| Feature                          | Priority |
+| -------------------------------- | -------- |
+| Connection via connection string | High     |
+| Schema browser                   | High     |
+| SSL support                      | Medium   |
+| MariaDB compatibility            | Medium   |
 
 ### Tasks
+
 - [ ] Add `sqlx` MySQL feature
 - [ ] Implement `MySQLEngine` struct
 - [ ] Handle MySQL-specific types
 - [ ] Support multiple character sets
 
 ### Dependencies
+
 ```toml
 sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-native-tls"] }
 ```
@@ -194,14 +203,15 @@ sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-native-tls"] }
 
 Security improvements for production readiness.
 
-| Issue | Severity | Status |
-|-------|----------|--------|
-| No Content Security Policy (CSP) | High | 🔴 Critical |
-| Connection paths in localStorage | Low | 🟢 Deferred |
-| Broad Tauri capability permissions | Low | 🟡 Review |
-| No AI data guardrails | Low | 🟢 Deferred |
+| Issue                              | Severity | Status      |
+| ---------------------------------- | -------- | ----------- |
+| No Content Security Policy (CSP)   | High     | 🔴 Critical |
+| Connection paths in localStorage   | Low      | 🟢 Deferred |
+| Broad Tauri capability permissions | Low      | 🟡 Review   |
+| No AI data guardrails              | Low      | 🟢 Deferred |
 
 ### Tasks
+
 - [ ] Implement strict CSP in `tauri.conf.json`
 - [ ] Audit Tauri capabilities (remove unused permissions)
 - [ ] Document security posture in README
@@ -210,15 +220,16 @@ Security improvements for production readiness.
 
 SQLite file paths don't require secure storage — they're just locations on disk. Secure storage will be implemented when remote engines land:
 
-| Engine | Sensitive Data |
-|--------|----------------|
-| Turso | Auth tokens |
+| Engine     | Sensitive Data                |
+| ---------- | ----------------------------- |
+| Turso      | Auth tokens                   |
 | PostgreSQL | Passwords, connection strings |
-| MySQL | Passwords, connection strings |
+| MySQL      | Passwords, connection strings |
 
 Implementation: `tauri-plugin-store` with encryption or OS keychain integration.
 
 ### CSP Configuration (Target)
+
 ```json
 {
   "app": {
@@ -235,14 +246,15 @@ Implementation: `tauri-plugin-store` with encryption or OS keychain integration.
 
 ### Potential Engines
 
-| Database | Complexity | Use Case |
-|----------|------------|----------|
-| ClickHouse | Medium | Analytics |
-| MongoDB | Medium | Document store |
-| Redis | Low | Key-value |
-| DuckDB | Low | Analytics (SQLite-compatible) |
+| Database   | Complexity | Use Case                      |
+| ---------- | ---------- | ----------------------------- |
+| ClickHouse | Medium     | Analytics                     |
+| MongoDB    | Medium     | Document store                |
+| Redis      | Low        | Key-value                     |
+| DuckDB     | Low        | Analytics (SQLite-compatible) |
 
 ### Features to Consider
+
 - [ ] Connection testing before save
 - [ ] Connection groups/folders
 - [ ] Import/export between engines
@@ -253,13 +265,13 @@ Implementation: `tauri-plugin-store` with encryption or OS keychain integration.
 
 ## Timeline (Estimated)
 
-| Version | Target | Focus | Status |
-|---------|--------|-------|--------|
-| v0.2 | Q1 2026 | Engine abstraction | ✅ Complete |
-| v0.2.x | Q1 2026 | Security + UX polish | 🔜 In Progress |
-| v0.3 | Q2 2026 | Turso support | 📋 Planned |
-| v0.4 | Q3 2026 | PostgreSQL | 📋 Planned |
-| v0.5 | Q4 2026 | MySQL | 📋 Planned |
+| Version | Target  | Focus                | Status         |
+| ------- | ------- | -------------------- | -------------- |
+| v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete    |
+| v0.2.x  | Q1 2026 | Security + UX polish | 🔜 In Progress |
+| v0.3    | Q2 2026 | Turso support        | 📋 Planned     |
+| v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned     |
+| v0.5    | Q4 2026 | MySQL                | 📋 Planned     |
 
 ---
 
@@ -268,6 +280,7 @@ Implementation: `tauri-plugin-store` with encryption or OS keychain integration.
 Want to help implement an engine? Open an issue or PR with your target database.
 
 ### Engine Implementation Checklist
+
 1. Implement `DatabaseEngine` trait in `src-tauri/src/engines/<engine>.rs`
 2. Add `EngineType` variant to `types.rs`
 3. Register engine in `EngineRegistry::connect()`
