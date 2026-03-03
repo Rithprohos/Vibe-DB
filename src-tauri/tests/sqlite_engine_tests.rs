@@ -1,12 +1,14 @@
 // Integration tests for SQLite engine
 use vibe_db_lib::engines::sqlite::SqliteEngine;
-use vibe_db_lib::engines::{ConnectionConfig, TableInfo, ColumnInfo, QueryResult, EngineResult, DatabaseEngine};
+use vibe_db_lib::engines::{
+    ColumnInfo, ConnectionConfig, DatabaseEngine, EngineResult, QueryResult, TableInfo,
+};
 
 fn create_test_config(path: &str) -> ConnectionConfig {
     ConnectionConfig::sqlite(
         "test-conn".to_string(),
         "Test".to_string(),
-        path.to_string()
+        path.to_string(),
     )
 }
 
@@ -32,7 +34,10 @@ fn test_validate_table_name_invalid() {
 
     let result = SqliteEngine::validate_table_name("users; DROP TABLE users;");
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid table name"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid table name"));
 
     let result = SqliteEngine::validate_table_name("table-name");
     assert!(result.is_err());
@@ -97,7 +102,9 @@ async fn test_sqlite_engine_list_tables() {
     assert!(tables.is_empty());
 
     // Create a table
-    let _: EngineResult<QueryResult> = engine.execute_query("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)").await;
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+        .await;
 
     // Now should have tables
     let tables: Vec<TableInfo> = engine.list_tables().await.unwrap();
@@ -118,15 +125,17 @@ async fn test_sqlite_engine_get_table_structure() {
     let _: EngineResult<()> = engine.connect(&config).await;
 
     // Create a table with various column types
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "CREATE TABLE test_table (
+    let _: EngineResult<QueryResult> = engine
+        .execute_query(
+            "CREATE TABLE test_table (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL DEFAULT 'unknown',
             age INTEGER,
             score REAL,
             data BLOB
-        )"
-    ).await;
+        )",
+        )
+        .await;
 
     // Get structure
     let columns: Vec<ColumnInfo> = engine.get_table_structure("test_table").await.unwrap();
@@ -155,13 +164,13 @@ async fn test_sqlite_engine_execute_query_select() {
     let _: EngineResult<()> = engine.connect(&config).await;
 
     // Create and populate table
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "CREATE TABLE numbers (id INTEGER PRIMARY KEY, value INTEGER)"
-    ).await;
-    
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "INSERT INTO numbers (value) VALUES (1), (2), (3)"
-    ).await;
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE numbers (id INTEGER PRIMARY KEY, value INTEGER)")
+        .await;
+
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("INSERT INTO numbers (value) VALUES (1), (2), (3)")
+        .await;
 
     // Select
     let result: QueryResult = engine.execute_query("SELECT * FROM numbers").await.unwrap();
@@ -180,14 +189,15 @@ async fn test_sqlite_engine_execute_query_insert() {
 
     let _: EngineResult<()> = engine.connect(&config).await;
 
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)"
-    ).await;
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+        .await;
 
     // Insert
-    let result: QueryResult = engine.execute_query(
-        "INSERT INTO items (name) VALUES ('test'), ('test2')"
-    ).await.unwrap();
+    let result: QueryResult = engine
+        .execute_query("INSERT INTO items (name) VALUES ('test'), ('test2')")
+        .await
+        .unwrap();
 
     assert_eq!(result.rows_affected, 2);
     assert!(result.message.contains("2 row(s) affected"));
@@ -204,12 +214,15 @@ async fn test_sqlite_engine_execute_query_with_comment() {
 
     let _: EngineResult<()> = engine.connect(&config).await;
 
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "CREATE TABLE test (id INTEGER PRIMARY KEY)"
-    ).await;
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+        .await;
 
     // Query with comment - should still work
-    let result: QueryResult = engine.execute_query("-- This is a comment\nSELECT * FROM test").await.unwrap();
+    let result: QueryResult = engine
+        .execute_query("-- This is a comment\nSELECT * FROM test")
+        .await
+        .unwrap();
     assert!(result.columns.is_empty()); // No rows yet
 
     engine.disconnect().await;
@@ -224,13 +237,13 @@ async fn test_sqlite_engine_get_table_row_count() {
 
     let _: EngineResult<()> = engine.connect(&config).await;
 
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "CREATE TABLE count_test (id INTEGER PRIMARY KEY)"
-    ).await;
-    
-    let _: EngineResult<QueryResult> = engine.execute_query(
-        "INSERT INTO count_test VALUES (1), (2), (3), (4), (5)"
-    ).await;
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE count_test (id INTEGER PRIMARY KEY)")
+        .await;
+
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("INSERT INTO count_test VALUES (1), (2), (3), (4), (5)")
+        .await;
 
     let count: i64 = engine.get_table_row_count("count_test").await.unwrap();
     assert_eq!(count, 5);
@@ -248,7 +261,9 @@ async fn test_sqlite_engine_execute_query_error() {
     let _: EngineResult<()> = engine.connect(&config).await;
 
     // Invalid SQL
-    let result: EngineResult<QueryResult> = engine.execute_query("SELECT * FROM nonexistent_table").await;
+    let result: EngineResult<QueryResult> = engine
+        .execute_query("SELECT * FROM nonexistent_table")
+        .await;
     assert!(result.is_err());
 
     engine.disconnect().await;

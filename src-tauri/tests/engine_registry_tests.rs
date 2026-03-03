@@ -1,5 +1,7 @@
 // Tests for engine registry and error handling
-use vibe_db_lib::engines::{EngineRegistry, EngineError, EngineType, EngineResult, ConnectionConfig};
+use vibe_db_lib::engines::{
+    ConnectionConfig, EngineError, EngineRegistry, EngineResult, EngineType,
+};
 
 #[test]
 fn test_engine_registry_new() {
@@ -35,11 +37,11 @@ fn test_engine_error_debug() {
 async fn test_engine_registry_connect_sqlite() {
     let registry = EngineRegistry::new();
     let temp_path = std::env::temp_dir().join("test_vibedb.db");
-    
+
     let config = ConnectionConfig::sqlite(
         "test-conn-id".to_string(),
         "Test Connection".to_string(),
-        temp_path.to_string_lossy().to_string()
+        temp_path.to_string_lossy().to_string(),
     );
 
     // Test connection
@@ -62,10 +64,10 @@ async fn test_engine_registry_connect_sqlite() {
 #[tokio::test]
 async fn test_engine_registry_get_nonexistent() {
     let registry = EngineRegistry::new();
-    
+
     let result: EngineResult<_> = registry.get_engine("nonexistent-id").await;
     assert!(result.is_err());
-    
+
     if let Err(err) = result {
         assert!(err.to_string().contains("No connection found"));
     }
@@ -74,7 +76,7 @@ async fn test_engine_registry_get_nonexistent() {
 #[tokio::test]
 async fn test_engine_registry_connect_unsupported_engine() {
     let registry = EngineRegistry::new();
-    
+
     let config = ConnectionConfig {
         id: "test-id".to_string(),
         name: "Test".to_string(),
@@ -90,7 +92,7 @@ async fn test_engine_registry_connect_unsupported_engine() {
 
     let result: EngineResult<String> = registry.connect(config).await;
     assert!(result.is_err());
-    
+
     let err: EngineError = result.unwrap_err();
     assert!(err.to_string().contains("Unsupported engine"));
 }
