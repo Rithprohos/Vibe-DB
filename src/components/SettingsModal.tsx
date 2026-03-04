@@ -150,12 +150,12 @@ function AboutSettings() {
         </div>
         <h2 className="text-xl font-bold text-foreground">VibeDB</h2>
         <p className="text-sm text-muted-foreground mt-1">Cross-platform SQLite Manager</p>
-        <div className="text-xs font-mono text-muted-foreground/60 mt-2">Version 0.1.0</div>
+        <div className="text-xs font-mono text-muted-foreground/60 mt-2">Version 0.2.1</div>
       </div>
 
       <div className="p-4 rounded-lg bg-secondary/30 border border-border">
         <p className="text-xs text-muted-foreground text-center leading-relaxed">
-          A modern, fast, and intuitive database management tool built with Tauri, React, and TypeScript.
+          A premium, high-performance SQLite database manager built with Tauri v2, React, and Rust. Designed with AI-assisted "vibe coding" for a superior developer experience.
         </p>
       </div>
 

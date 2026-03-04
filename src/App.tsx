@@ -117,6 +117,58 @@ export default function App() {
     return unsubscribe;
   }, [handleConnect]);
 
+  // Selectors for keybindings
+  const showLogDrawer = useAppStore(s => s.showLogDrawer);
+  const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
+  const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
+  const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
+  const closeTab = useAppStore(s => s.closeTab);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+
+  // Global Keybindings
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if user is in an input/textarea to avoid triggering shortcuts unexpectedly
+      // except for Cmd+Enter which is handled by QueryEditor
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        // Special case: Cmd+L should probably still toggle logs even if in input
+        // unless it's a conflict. But usually Cmd+, works everywhere.
+        if (e.key !== ',' && e.key !== 'l' && e.key !== 'Enter') return;
+      }
+
+      const isMod = e.metaKey || e.ctrlKey;
+      
+      if (isMod && e.key === 'n') {
+        e.preventDefault();
+        setShowConnectionDialog(true);
+      } else if (isMod && e.key === 'w') {
+        if (activeTabId) {
+          e.preventDefault();
+          closeTab(activeTabId);
+        }
+      } else if (isMod && e.key === 't') {
+        e.preventDefault();
+        const id = `query-${Date.now()}`;
+        addTab({
+          id,
+          connectionId: activeSidebarConnectionId || 'none',
+          type: 'query',
+          title: 'New Query',
+          query: '-- New Query Tab\n',
+        });
+      } else if (isMod && e.key === 'l') {
+        e.preventDefault();
+        setShowLogDrawer(!showLogDrawer);
+      } else if (isMod && e.key === ',') {
+        e.preventDefault();
+        setShowSettingsModal(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTabId, activeSidebarConnectionId, showLogDrawer, setShowConnectionDialog, closeTab, addTab, setShowLogDrawer, setShowSettingsModal]);
+
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const renderContent = () => {
