@@ -1,10 +1,12 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAppStore, type Connection } from './store/useAppStore';
 import { listTables, connectDatabase, getDatabaseVersion } from './lib/db';
+import DatabaseBar from './components/DatabaseBar';
 import Sidebar from './components/Sidebar';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import WelcomeScreen from './components/WelcomeScreen';
+import EmptyTabScreen from './components/EmptyTabScreen';
 import ConnectionDialog from './components/ConnectionDialog';
 import LogDrawer from './components/LogDrawer';
 import TableView from './components/TableView';
@@ -15,89 +17,123 @@ import AiPanel from './components/AiPanel';
 import './index.css';
 
 export default function App() {
-  const {
-    activeConnection,
-    isConnected,
-    showConnectionDialog,
-    tabs,
-    activeTabId,
-    setTables,
-    setIsConnected,
-    addConnection,
-    setActiveConnection,
-    addTab,
-    setDatabaseVersion,
-  } = useAppStore();
+  // Use granular selectors to prevent unnecessary re-renders
+  const connections = useAppStore(s => s.connections);
+  const isConnected = useAppStore(s => s.isConnected);
+  const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
+  const tabs = useAppStore(s => s.tabs);
+  const activeTabId = useAppStore(s => s.activeTabId);
+  const setTables = useAppStore(s => s.setTables);
+  const setIsConnected = useAppStore(s => s.setIsConnected);
+  const addConnection = useAppStore(s => s.addConnection);
+  const updateConnection = useAppStore(s => s.updateConnection);
+  const setActiveSidebarConnection = useAppStore(s => s.setActiveSidebarConnection);
+  const addTab = useAppStore(s => s.addTab);
+  const setDatabaseVersion = useAppStore(s => s.setDatabaseVersion);
+  const autoConnectAttempted = useRef(false);
 
   const handleConnect = useCallback(
     async (conn: Connection) => {
       try {
-        // Always create a fresh connection - connId is session-only
-        const connId = await connectDatabase(conn.path, conn.name);
+        let connId = conn.connId;
+        
+        // If not connected, connect to the tauri backend
+        if (!connId) {
+          connId = await connectDatabase(conn.path, conn.name);
+          const version = await getDatabaseVersion(connId);
+          updateConnection(conn.id, { connId, lastUsed: Date.now() });
+          setDatabaseVersion(version);
+        } else {
+          updateConnection(conn.id, { lastUsed: Date.now() });
+        }
 
+        // Fetch tables for this specific connection
         const tables = await listTables(connId);
-        const version = await getDatabaseVersion(connId);
-        
-        // Update connection with new session connId (not persisted)
-        const updatedConn = { ...conn, connId, lastUsed: Date.now() };
-        
-        // Set active connection first (this clears tables), then set tables
-        setActiveConnection(updatedConn);
-        setTables(tables);
-        setDatabaseVersion(version);
+        setTables(conn.id, tables);
         setIsConnected(true);
-        addConnection(updatedConn);
+        setActiveSidebarConnection(conn.id);
 
-        const queryTabId = `query-welcome-${Date.now()}`;
-        addTab({
-          id: queryTabId,
-          type: 'query',
-          title: 'Query 1',
-          query: tables.length === 0
-            ? '-- Welcome to VibeDB! 🚀\n-- This is a fresh database. Create your first table:\n\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  email TEXT UNIQUE,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);\n'
-            : '-- Connected to ' + conn.name + '\n\nSELECT * FROM sqlite_master;\n',
-        });
+        if (tables.length === 0) {
+          const queryTabId = `query-welcome-${Date.now()}`;
+          addTab({
+            id: queryTabId,
+            connectionId: conn.id,
+            type: 'query',
+            title: 'Query 1',
+            query: '-- Welcome to VibeDB! 🚀\n-- This is a fresh database. Create your first table:\n\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  email TEXT UNIQUE,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);\n',
+          });
+        }
       } catch (e: any) {
         console.error('Failed to connect:', e);
-        setIsConnected(false);
+        // Only set disconnected if we literally have 0 connections working
+        if (connections.filter(c => c.connId).length === 0) {
+          setIsConnected(false);
+        }
         alert(`Failed to connect: ${e}`);
       }
     },
-    [setTables, setIsConnected, addConnection, addTab, setActiveConnection]
+    [setTables, setIsConnected, updateConnection, addTab, setActiveSidebarConnection, setDatabaseVersion, connections]
   );
 
-  // Listen for connect events
+  // Listen for connect events (from ConnectionDialog or DatabaseBar)
   useEffect(() => {
     const handler = (e: Event) => {
       const conn = (e as CustomEvent).detail as Connection;
+      // If it's a new connection (not in store yet), add it
+      if (!connections.find(c => c.id === conn.id)) {
+        addConnection(conn);
+      }
       handleConnect(conn);
     };
     window.addEventListener('vibedb:connect', handler);
     return () => window.removeEventListener('vibedb:connect', handler);
-  }, [handleConnect]);
+  }, [handleConnect, connections, addConnection]);
 
-  // Auto-reconnect on mount
+  // Auto-connect previously active connection after store hydrates
   useEffect(() => {
-    if (activeConnection && !isConnected) {
-      handleConnect(activeConnection);
+    if (autoConnectAttempted.current) return;
+    
+    const doAutoConnect = async () => {
+      const state = useAppStore.getState();
+      if (state.activeSidebarConnectionId && !state.isConnected) {
+        autoConnectAttempted.current = true;
+        const connToRestore = state.connections.find(c => c.id === state.activeSidebarConnectionId);
+        if (connToRestore) {
+          handleConnect(connToRestore);
+        }
+      }
+    };
+    
+    const unsubscribe = useAppStore.persist.onFinishHydration(() => {
+      doAutoConnect();
+    });
+    
+    // Also try immediately in case already hydrated
+    if (useAppStore.persist.hasHydrated()) {
+      doAutoConnect();
     }
-  }, []);
+    
+    return unsubscribe;
+  }, [handleConnect]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const renderContent = () => {
-    if (!isConnected || !activeTab) {
+    if (!isConnected) {
       return <WelcomeScreen />;
+    }
+    if (!activeTab) {
+      return <EmptyTabScreen />;
     }
 
     switch (activeTab.type) {
       case 'data':
         return activeTab.tableName ? (
-          <TableView tableName={activeTab.tableName} />
+          <TableView tableName={activeTab.tableName} tabId={activeTab.id} />
         ) : null;
       case 'structure':
         return activeTab.tableName ? (
-          <TableStructure tableName={activeTab.tableName} />
+          <TableStructure tableName={activeTab.tableName} tabId={activeTab.id} />
         ) : null;
       case 'query':
         return <QueryEditor tabId={activeTab.id} />;
@@ -110,6 +146,7 @@ export default function App() {
     <div className="app-container">
       <TopBar />
       <div className="app-main flex-1 flex overflow-hidden">
+        <DatabaseBar />
         <Sidebar />
         <div className="content-area flex-1 flex flex-col min-w-0 bg-background relative overflow-hidden">
           <TabBar />
@@ -119,7 +156,7 @@ export default function App() {
       </div>
       <StatusBar />
       {showConnectionDialog && <ConnectionDialog />}
-      <LogDrawer /> {/* Rendered LogDrawer */}
+      <LogDrawer />
     </div>
   );
 }

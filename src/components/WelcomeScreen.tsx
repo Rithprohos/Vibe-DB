@@ -1,20 +1,30 @@
-import { useAppStore } from '../store/useAppStore';
+import { memo, useMemo, useCallback } from 'react';
+import { useAppStore, type Connection } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Zap, Database, ArrowRight } from 'lucide-react';
 
-export default function WelcomeScreen() {
-  const { connections, setShowConnectionDialog } = useAppStore();
+const WelcomeScreen = memo(function WelcomeScreen() {
+  const connections = useAppStore(s => s.connections);
+  const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
 
-  const recentConnections = connections.slice(0, 5);
+  const recentConnections = useMemo(() => connections.slice(0, 5), [connections]);
+
+  const handleConnect = useCallback((conn: Connection) => {
+    window.dispatchEvent(new CustomEvent('vibedb:connect', { detail: conn }));
+  }, []);
 
   return (
-    <div className="flex-1 flex items-center justify-center p-8 bg-background relative overflow-hidden">
-      {/* Decorative background glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+    <>
+      {/* Decorative background glow - fixed position to avoid recalc during sidebar resize */}
+      <div className="fixed inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+        <div className="w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] will-change-transform" />
+      </div>
+      
+      <div className="flex-1 flex items-center justify-center p-8 bg-background relative overflow-hidden">
       
       <div className="max-w-md w-full z-10 animate-fade-in">
         <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 text-primary mb-8 mx-auto shadow-glow border border-primary/20">
-          <Zap size={40} className="animate-pulse" />
+          <Zap size={40} />
         </div>
         
         <h1 className="text-5xl font-extrabold text-center mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-foreground to-muted-foreground">
@@ -47,11 +57,7 @@ export default function WelcomeScreen() {
                 <div
                   key={conn.id}
                   className="flex items-center p-4 rounded-xl bg-secondary/30 border border-border/50 cursor-pointer hover:bg-secondary hover:border-primary/50 hover:shadow-[0_0_15px_rgba(0,229,153,0.1)] transition-all group"
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent('vibedb:connect', { detail: conn })
-                    );
-                  }}
+                  onClick={() => handleConnect(conn)}
                 >
                   <div className="w-12 h-12 rounded-lg bg-background flex items-center justify-center mr-4 group-hover:text-primary transition-colors border border-border shadow-sm">
                     <Database size={20} />
@@ -67,6 +73,9 @@ export default function WelcomeScreen() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
-}
+});
+
+export default WelcomeScreen;
