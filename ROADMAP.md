@@ -96,14 +96,16 @@ Essential SQLite management features before multi-engine support.
 
 ### Workspace
 
-| Feature                | Priority | Description                                                             |
-| ---------------------- | -------- | ----------------------------------------------------------------------- |
-| Tabs Context Menu      | ✅ Done  | Right-click on tabs to close, close others, or close all                |
-| Connection Tags        | ✅ Done  | Environment labels: local, testing, development, production             |
-| Editable Names         | ✅ Done  | Edit connection names and tags without reconnecting                     |
-| Database Version       | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar                    |
-| Disconnect / Reconnect | ✅ Done  | Close connection without losing saved data, reconnect from sidebar      |
-| Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag) |
+| Feature                | Priority | Description                                                                            |
+| ---------------------- | -------- | -------------------------------------------------------------------------------------- |
+| Tabs Context Menu      | ✅ Done  | Right-click on tabs to close, close others, or close all                               |
+| Connection Tags        | ✅ Done  | Environment labels: local, testing, development, production                            |
+| Editable Names         | ✅ Done  | Edit connection names and tags without reconnecting                                    |
+| Database Version       | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar                                   |
+| Disconnect / Reconnect | ✅ Done  | Close connection without losing saved data, reconnect from sidebar                     |
+| Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag)                |
+| Keyboard Shortcuts     | ✅ Done  | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute |
+| Settings Modal         | ✅ Done  | Keybindings reference panel accessible via ⌘, or settings icon                         |
 
 ### Tasks
 
@@ -113,6 +115,8 @@ Essential SQLite management features before multi-engine support.
 - [x] Database versioning support in backend and UI
 - [x] Disconnect vs remove connection (preserve saved connection data)
 - [x] Sidebar saved connections list when disconnected
+- [x] Keyboard shortcuts (⌘N, ⌘W, ⌘T, ⌘L, ⌘,, ⌘↵)
+- [x] Settings modal with keybindings reference
 - [ ] Create Table Wizard component
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
