@@ -8,6 +8,7 @@ export default function TopBar() {
   const databaseVersion = useAppStore(s => s.databaseVersion);
   const isAiPanelOpen = useAppStore(s => s.isAiPanelOpen);
   const setIsAiPanelOpen = useAppStore(s => s.setIsAiPanelOpen);
+  const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
   const tabs = useAppStore(s => s.tabs);
   const activeTabId = useAppStore(s => s.activeTabId);
 
@@ -22,6 +23,10 @@ export default function TopBar() {
   const toggleAiPanel = useCallback(
     () => setIsAiPanelOpen(!isAiPanelOpen),
     [setIsAiPanelOpen, isAiPanelOpen]
+  );
+  const openSettings = useCallback(
+    () => setShowSettingsModal(true),
+    [setShowSettingsModal]
   );
 
   return (
@@ -61,7 +66,10 @@ export default function TopBar() {
             AI Chat
           </button>
         )}
-        <button className="p-1.5 rounded hover:bg-white/10 transition-colors">
+        <button 
+          onClick={openSettings}
+          className="p-1.5 rounded hover:bg-white/10 transition-colors"
+        >
           <Settings size={15} />
         </button>
       </div>

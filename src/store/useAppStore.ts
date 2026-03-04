@@ -87,6 +87,9 @@ interface AppState {
   logs: SqlLog[];
   showLogDrawer: boolean;
 
+  // Settings Modal
+  showSettingsModal: boolean;
+
   // AI Panel
   isAiPanelOpen: boolean;
   setIsAiPanelOpen: (val: boolean) => void;
@@ -128,6 +131,7 @@ interface AppState {
   addLog: (log: Omit<SqlLog, "id" | "timestamp">) => void;
   clearLogs: () => void;
   setShowLogDrawer: (val: boolean) => void;
+  setShowSettingsModal: (val: boolean) => void;
 }
 
 let tabCounter = 0;
@@ -163,6 +167,7 @@ export const useAppStore = create<AppState>()(
       activeTabId: null,
       logs: [],
       showLogDrawer: false,
+      showSettingsModal: false,
       isAiPanelOpen: false,
       databaseVersion: null,
 
@@ -262,6 +267,7 @@ export const useAppStore = create<AppState>()(
 
       clearLogs: () => set({ logs: [] }),
       setShowLogDrawer: (val) => set({ showLogDrawer: val }),
+      setShowSettingsModal: (val) => set({ showSettingsModal: val }),
 
       addTab: (tab) =>
         set((state) => {
@@ -282,7 +288,17 @@ export const useAppStore = create<AppState>()(
             newActiveId =
               newTabs[Math.min(idx, newTabs.length - 1)]?.id || null;
           }
-          return { tabs: newTabs, activeTabId: newActiveId };
+          // Update selectedTable to match the new active tab
+          const newActiveTab = newTabs.find((t) => t.id === newActiveId);
+          const newSelectedTable =
+            newActiveTab?.type === "data" || newActiveTab?.type === "structure"
+              ? newActiveTab.title
+              : null;
+          return {
+            tabs: newTabs,
+            activeTabId: newActiveId,
+            selectedTable: newSelectedTable,
+          };
         }),
 
       closeAllTabs: () =>
@@ -298,7 +314,15 @@ export const useAppStore = create<AppState>()(
           activeTabId: id,
         })),
 
-      setActiveTab: (id) => set({ activeTabId: id }),
+      setActiveTab: (id) =>
+        set((state) => {
+          const tab = state.tabs.find((t) => t.id === id);
+          const newSelectedTable =
+            tab?.type === "data" || tab?.type === "structure"
+              ? tab.title
+              : null;
+          return { activeTabId: id, selectedTable: newSelectedTable };
+        }),
 
       updateTab: (id, updates) =>
         set((state) => ({

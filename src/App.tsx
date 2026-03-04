@@ -8,6 +8,7 @@ import StatusBar from './components/StatusBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import EmptyTabScreen from './components/EmptyTabScreen';
 import ConnectionDialog from './components/ConnectionDialog';
+import SettingsModal from './components/SettingsModal';
 import LogDrawer from './components/LogDrawer';
 import TableView from './components/TableView';
 import TableStructure from './components/TableStructure';
@@ -156,6 +157,7 @@ export default function App() {
       </div>
       <StatusBar />
       {showConnectionDialog && <ConnectionDialog />}
+      <SettingsModal />
       <LogDrawer />
     </div>
   );
