@@ -1,9 +1,28 @@
+import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Database, FileText, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function StatusBar() {
-  const { activeConnection, tables, setShowLogDrawer, showLogDrawer, logs } = useAppStore();
+  const connections = useAppStore(s => s.connections);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const tablesByConnection = useAppStore(s => s.tablesByConnection);
+  const showLogDrawer = useAppStore(s => s.showLogDrawer);
+  const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
+  const logCount = useAppStore(s => s.logs.length);
+
+  const activeConnection = useMemo(
+    () => connections.find(c => c.id === activeSidebarConnectionId),
+    [connections, activeSidebarConnectionId]
+  );
+  const tableCount = useMemo(
+    () => activeConnection ? (tablesByConnection[activeConnection.id] || []).length : 0,
+    [activeConnection, tablesByConnection]
+  );
+  const toggleLogDrawer = useCallback(
+    () => setShowLogDrawer(!showLogDrawer),
+    [setShowLogDrawer, showLogDrawer]
+  );
 
   return (
     <footer className="h-[var(--statusbar-height)] flex items-center px-4 bg-secondary border-t border-border text-[11px] text-muted-foreground select-none flex-shrink-0 relative z-20">
@@ -33,7 +52,7 @@ export default function StatusBar() {
             )}
           </div>
           <div className="flex items-center space-x-1.5 border-l border-border pl-6">
-            <span className="font-mono">{tables.length}</span>
+            <span className="font-mono">{tableCount}</span>
             <span>tables</span>
           </div>
         </>
@@ -46,16 +65,16 @@ export default function StatusBar() {
           "flex items-center gap-1.5 px-3 h-full hover:bg-accent hover:text-foreground transition-all cursor-pointer outline-none",
           showLogDrawer && "bg-accent/50 text-foreground"
         )}
-        onClick={() => setShowLogDrawer(!showLogDrawer)}
+        onClick={toggleLogDrawer}
       >
         <FileText size={12} className={showLogDrawer ? "text-primary" : ""} />
         <span className="font-medium tracking-wide uppercase">Logs</span>
-        {logs.length > 0 && (
+        {logCount > 0 && (
           <span className={cn(
             "text-[10px] px-1.5 rounded-full",
             showLogDrawer ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
           )}>
-            {logs.length}
+            {logCount}
           </span>
         )}
         {showLogDrawer ? <ChevronDown size={12} /> : <ChevronUp size={12} />}

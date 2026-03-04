@@ -16,9 +16,9 @@ interface Props {
 }
 
 const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
-  const activeConnection = useAppStore(s => s.activeConnection);
-  const tables = useAppStore(s => s.tables);
   const tab = useAppStore(s => s.tabs.find(t => t.id === tabId));
+  const activeConnection = useAppStore(s => s.connections.find(c => c.id === tab?.connectionId));
+  const tables = useAppStore(s => s.tablesByConnection[tab?.connectionId || ''] || []);
   
   const query = tab?.query || '';
   const result = tab?.result || null;
@@ -42,35 +42,52 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     useAppStore.getState().updateTab(tabId, { query: val });
   }, [tabId]);
 
-  // Resizing logic
-  const startResizing = () => setIsResizing(true);
-  const stopResizing = () => setIsResizing(false);
-  const resize = (e: MouseEvent) => {
-    if (isResizing && resizerRef.current?.parentElement) {
-      const rect = resizerRef.current.parentElement.getBoundingClientRect();
-      const newHeight = e.clientY - rect.top;
-      if (newHeight > 100 && newHeight < window.innerHeight - 200) {
-        setEditorHeight(newHeight);
-      }
+  // Resizing logic - using refs to avoid effect re-runs
+  const isResizingRef = useRef(false);
+  const currentHeightRef = useRef(300);
+
+  const startResizing = useCallback(() => {
+    isResizingRef.current = true;
+    setIsResizing(true);
+    document.body.classList.add('select-none', 'cursor-row-resize');
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    isResizingRef.current = false;
+    setIsResizing(false);
+    document.body.classList.remove('select-none', 'cursor-row-resize');
+    setEditorHeight(currentHeightRef.current);
+  }, []);
+
+  const resize = useCallback((e: MouseEvent) => {
+    if (!isResizingRef.current || !resizerRef.current?.parentElement) return;
+    
+    const rect = resizerRef.current.parentElement.getBoundingClientRect();
+    const newHeight = Math.max(100, Math.min(window.innerHeight - 200, e.clientY - rect.top));
+    
+    if (newHeight === currentHeightRef.current) return;
+    currentHeightRef.current = newHeight;
+    
+    const editorContainer = resizerRef.current.parentElement.querySelector('.cm-editor');
+    if (editorContainer) {
+      (editorContainer as HTMLElement).style.height = `${newHeight}px`;
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => resize(e);
+    const handleMouseUp = () => stopResizing();
+
     if (isResizing) {
-      document.body.classList.add('select-none', 'cursor-row-resize');
-      window.addEventListener('mousemove', resize);
-      window.addEventListener('mouseup', stopResizing);
-    } else {
-      document.body.classList.remove('select-none', 'cursor-row-resize');
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
     }
+
     return () => {
-      document.body.classList.remove('select-none', 'cursor-row-resize');
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing]);
+  }, [isResizing, resize, stopResizing]);
 
   const handleRun = useCallback(async () => {
     if (!activeConnection?.connId || !query.trim()) return;
@@ -100,8 +117,8 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
 
       const upper = query.trim().toUpperCase();
       if (upper.startsWith('CREATE') || upper.startsWith('DROP') || upper.startsWith('ALTER')) {
-        const tables = await listTables(activeConnection.connId);
-        store.setTables(tables);
+        const tablesList = await listTables(activeConnection.connId);
+        store.setTables(activeConnection.id, tablesList);
       }
     } catch (e: any) {
       const elapsed = performance.now() - start;

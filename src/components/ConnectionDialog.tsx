@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { useAppStore, type Connection } from '../store/useAppStore';
+import { useAppStore, type Connection, MAX_ACTIVE_CONNECTIONS } from '../store/useAppStore';
 import { createDatabase } from '../lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,13 @@ import EditConnectionDialog from './EditConnectionDialog';
 import { cn } from '@/lib/utils';
 
 export default function ConnectionDialog() {
-  const { showConnectionDialog, setShowConnectionDialog, connections, activeConnection, removeConnection } = useAppStore();
+  const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
+  const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
+  const connections = useAppStore(s => s.connections);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const removeConnection = useAppStore(s => s.removeConnection);
+  const activeConnection = connections.find(c => c.id === activeSidebarConnectionId);
+  const activeConnectionsCount = connections.filter(c => c.connId).length;
 
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
@@ -87,6 +93,11 @@ export default function ConnectionDialog() {
       return;
     }
 
+    if (activeConnectionsCount >= MAX_ACTIVE_CONNECTIONS) {
+      setError(`Maximum ${MAX_ACTIVE_CONNECTIONS} active connections allowed. Close one first.`);
+      return;
+    }
+
     const conn: Connection = {
       id: `conn-${Date.now()}`,
       name: name || path.split('/').pop() || 'Database',
@@ -103,6 +114,10 @@ export default function ConnectionDialog() {
   };
 
   const handleSwitchTo = (conn: Connection) => {
+    if (!conn.connId && activeConnectionsCount >= MAX_ACTIVE_CONNECTIONS) {
+      setError(`Maximum ${MAX_ACTIVE_CONNECTIONS} active connections allowed. Close one first.`);
+      return;
+    }
     setShowConnectionDialog(false);
     window.dispatchEvent(
       new CustomEvent('vibedb:connect', { detail: conn })

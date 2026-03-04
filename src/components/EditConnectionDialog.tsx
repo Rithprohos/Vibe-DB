@@ -13,7 +13,7 @@ interface EditConnectionDialogProps {
 }
 
 export default function EditConnectionDialog({ connection, open, onOpenChange }: EditConnectionDialogProps) {
-  const { updateConnection } = useAppStore();
+  const updateConnection = useAppStore(s => s.updateConnection);
 
   const [name, setName] = useState('');
   const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore, type ColumnInfo } from '../store/useAppStore';
 import { getTableStructure } from '../lib/db';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,22 +7,32 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   tableName: string;
+  tabId: string;
 }
 
-export default function TableStructure({ tableName }: Props) {
-  const { activeConnection } = useAppStore();
+export default function TableStructure({ tableName, tabId }: Props) {
+  const tabs = useAppStore(s => s.tabs);
+  const connections = useAppStore(s => s.connections);
+  const tab = useMemo(() => tabs.find(t => t.id === tabId), [tabs, tabId]);
+  const activeConnection = useMemo(
+    () => connections.find(c => c.id === tab?.connectionId),
+    [connections, tab?.connectionId]
+  );
+  const connId = activeConnection?.connId;
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!activeConnection?.connId) return;
+    if (!connId) return;
+    let cancelled = false;
     setLoading(true);
-    getTableStructure(tableName, activeConnection.connId)
-      .then(setColumns)
-      .catch((e: any) => setError(e.toString()))
-      .finally(() => setLoading(false));
-  }, [activeConnection, tableName]);
+    getTableStructure(tableName, connId)
+      .then((cols) => { if (!cancelled) setColumns(cols); })
+      .catch((e: any) => { if (!cancelled) setError(e.toString()); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [connId, tableName]);
 
   if (loading) {
     return (

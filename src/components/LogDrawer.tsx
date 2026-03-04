@@ -6,7 +6,10 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
 export default function LogDrawer() {
-  const { logs, showLogDrawer, setShowLogDrawer, clearLogs } = useAppStore();
+  const logs = useAppStore(s => s.logs);
+  const showLogDrawer = useAppStore(s => s.showLogDrawer);
+  const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
+  const clearLogs = useAppStore(s => s.clearLogs);
   const [height, setHeight] = useState(200);
 
   const handleCopy = (sql: string) => {

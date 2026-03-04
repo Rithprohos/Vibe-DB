@@ -15,6 +15,7 @@ import {
 
 interface Props {
   tableName: string;
+  tabId: string;
 }
 
 interface CellInputProps {
@@ -56,8 +57,11 @@ function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled }: 
 }
 
 
-export default function TableView({ tableName }: Props) {
-  const { activeConnection } = useAppStore();
+export default function TableView({ tableName, tabId }: Props) {
+  const tabs = useAppStore(s => s.tabs);
+  const connections = useAppStore(s => s.connections);
+  const tab = tabs.find(t => t.id === tabId);
+  const activeConnection = connections.find(c => c.id === tab?.connectionId);
   const [data, setData] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,7 +109,12 @@ export default function TableView({ tableName }: Props) {
   }, [activeConnection, tableName, page, pageSize, sortCol, sortDir]);
 
   useEffect(() => {
-    fetchData();
+    let ignore = false;
+    const doFetch = async () => {
+      await fetchData();
+    };
+    if (!ignore) doFetch();
+    return () => { ignore = true; };
   }, [fetchData]);
 
   const handleSort = (col: string) => {
@@ -370,6 +379,9 @@ export default function TableView({ tableName }: Props) {
     } else {
       document.body.classList.remove('select-none', 'cursor-col-resize');
     }
+    return () => {
+      document.body.classList.remove('select-none', 'cursor-col-resize');
+    };
   }, [isResizingTable]);
 
   if (loading && !data) {

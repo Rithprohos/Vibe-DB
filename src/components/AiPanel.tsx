@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Sparkles, Loader2, ArrowUpCircle } from 'lucide-react';
 
@@ -9,10 +9,24 @@ const SUGGESTIONS = [
 ];
 
 export default function AiPanel() {
-  const { tables, tabs, isAiPanelOpen, activeTabId, updateTab, addTab } = useAppStore();
+  const tablesByConnection = useAppStore(s => s.tablesByConnection);
+  const tabs = useAppStore(s => s.tabs);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const isAiPanelOpen = useAppStore(s => s.isAiPanelOpen);
+  const activeTabId = useAppStore(s => s.activeTabId);
+  const updateTab = useAppStore(s => s.updateTab);
+  const addTab = useAppStore(s => s.addTab);
   const [prompt, setPrompt] = useState("");
   const [generatedSQL, setGeneratedSQL] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
   const isDataTabActive = activeTab?.type === 'data';
@@ -26,8 +40,11 @@ export default function AiPanel() {
     setIsGenerating(true);
     setPrompt(q);
     
+    // Clear any existing timer
+    if (timerRef.current) clearTimeout(timerRef.current);
+    
     // Simulate generation
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       let mockSql = `-- AI generated from: ${q}\n`;
       if (q.includes("user")) mockSql += `SELECT * FROM users LIMIT 10;`;
       else if (q.includes("count")) mockSql += `SELECT count(*) FROM sqlite_master;`;
@@ -45,6 +62,7 @@ export default function AiPanel() {
     } else {
       addTab({
         id: `query-ai-${Date.now()}`,
+        connectionId: activeTab?.connectionId || activeSidebarConnectionId || "",
         type: 'query',
         title: 'AI Query',
         query: generatedSQL
@@ -72,15 +90,20 @@ export default function AiPanel() {
       <div className="p-3 border-b border-border/50">
         <div className="text-[10px] text-muted-foreground mb-1.5 tracking-wider font-sans">SCHEMA CONTEXT</div>
         <div className="bg-secondary rounded p-2 text-muted-foreground leading-relaxed max-h-[120px] overflow-auto border border-border">
-          {tables.length === 0 ? (
-            <div className="text-[10px] italic">No tables found</div>
-          ) : (
-            tables.map(t => (
+          {(() => {
+            const currentConnectionId = activeTab?.connectionId || activeSidebarConnectionId;
+            const currentTables = currentConnectionId ? (tablesByConnection[currentConnectionId] || []) : [];
+            
+            if (currentTables.length === 0) {
+              return <div className="text-[10px] italic">No tables found</div>;
+            }
+            
+            return currentTables.map((t: { name: string }) => (
               <div key={t.name}>
                 <span className="text-accent-secondary">{t.name}</span>
               </div>
-            ))
-          )}
+            ));
+          })()}
         </div>
       </div>
 

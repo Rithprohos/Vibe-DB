@@ -1,24 +1,29 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { listTables } from '../lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Database, Zap, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, ArrowRightLeft } from 'lucide-react';
+import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
 
 export default function Sidebar() {
-  const {
-    activeConnection,
-    isConnected,
-    tables,
-    selectedTable,
-    setShowConnectionDialog,
-    setTables,
-    openTableTab,
-    addTab,
-  } = useAppStore();
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const connections = useAppStore(s => s.connections);
+  const isConnected = useAppStore(s => s.isConnected);
+  const tablesByConnection = useAppStore(s => s.tablesByConnection);
+  const selectedTable = useAppStore(s => s.selectedTable);
+  const setTables = useAppStore(s => s.setTables);
+  const openTableTab = useAppStore(s => s.openTableTab);
+  const addTab = useAppStore(s => s.addTab);
+
+  const activeConnection = activeSidebarConnectionId 
+    ? connections.find(c => c.id === activeSidebarConnectionId) 
+    : undefined;
+  const tables = activeSidebarConnectionId 
+    ? (tablesByConnection[activeSidebarConnectionId] || []) 
+    : [];
 
   const [search, setSearch] = useState('');
   const [tablesOpen, setTablesOpen] = useState(true);
@@ -28,61 +33,91 @@ export default function Sidebar() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const isResizingRef = useRef(false);
+  const currentWidthRef = useRef(260);
+  const rafIdRef = useRef<number | null>(null);
+  const targetWidthRef = useRef(260);
 
-  // Resizing logic
-  const startResizing = () => setIsResizing(true);
-  const stopResizing = () => setIsResizing(false);
-  const resize = (e: MouseEvent) => {
-    if (isResizing) {
-      if (e.clientX > 200 && e.clientX < 600) {
-        setSidebarWidth(e.clientX);
-      }
+  const startResizing = useCallback(() => {
+    isResizingRef.current = true;
+    setIsResizing(true);
+    document.body.classList.add('select-none', 'cursor-col-resize');
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    isResizingRef.current = false;
+    setIsResizing(false);
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
     }
-  };
+    document.body.classList.remove('select-none', 'cursor-col-resize');
+    setSidebarWidth(currentWidthRef.current);
+  }, []);
+
+  const resize = useCallback((e: MouseEvent) => {
+    if (!isResizingRef.current) return;
+    
+    targetWidthRef.current = Math.max(200, Math.min(600, e.clientX));
+    
+    if (!rafIdRef.current) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        const newWidth = targetWidthRef.current;
+        if (newWidth !== currentWidthRef.current && sidebarRef.current) {
+          currentWidthRef.current = newWidth;
+          sidebarRef.current.style.width = `${newWidth}px`;
+          sidebarRef.current.style.minWidth = `${newWidth}px`;
+        }
+        rafIdRef.current = null;
+      });
+    }
+  }, []);
 
   useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => resize(e);
+    const handleMouseUp = () => stopResizing();
+
     if (isResizing) {
-      document.body.classList.add('select-none');
-      window.addEventListener('mousemove', resize);
-      window.addEventListener('mouseup', stopResizing);
-    } else {
-      document.body.classList.remove('select-none');
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
     }
+
     return () => {
-      document.body.classList.remove('select-none');
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing]);
+  }, [isResizing, resize, stopResizing]);
 
-  const filteredTables = tables.filter(
-    (t) =>
-      t.table_type === 'table' &&
-      t.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredTables = useMemo(() => 
+    tables.filter(
+      (t) =>
+        t.table_type === 'table' &&
+        t.name.toLowerCase().includes(search.toLowerCase())
+    ), [tables, search]);
 
-  const filteredViews = tables.filter(
-    (t) =>
-      t.table_type === 'view' &&
-      t.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredViews = useMemo(() =>
+    tables.filter(
+      (t) =>
+        t.table_type === 'view' &&
+        t.name.toLowerCase().includes(search.toLowerCase())
+    ), [tables, search]);
 
   const handleRefresh = async () => {
     if (!activeConnection?.connId) return;
     try {
       const result = await listTables(activeConnection.connId);
-      setTables(result);
+      setTables(activeConnection.id, result);
     } catch (e) {
       console.error('Failed to refresh:', e);
     }
   };
 
   const handleNewQuery = () => {
+    if (!activeConnection) return;
     const id = `query-${Date.now()}`;
     addTab({
       id,
+      connectionId: activeConnection.id,
       type: 'query',
       title: 'New Query',
       query: '',
@@ -91,15 +126,18 @@ export default function Sidebar() {
 
   return (
     <div 
-      className="relative flex flex-col bg-secondary border-r border-border h-full flex-shrink-0 transition-all duration-200 ease-out select-none"
+      className={cn(
+        "relative flex flex-col bg-background border-r border-border/50 h-full flex-shrink-0 select-none",
+        !isResizing && "transition-[width] duration-200 ease-out"
+      )}
       ref={sidebarRef}
       style={{ 
         width: sidebarWidth, 
-        minWidth: sidebarWidth
+        minWidth: sidebarWidth,
       }}
     >
       <div className="p-3">
-        {isConnected && activeConnection ? (
+        {isConnected && activeConnection?.connId ? (
           <>
             <div 
               className="relative flex items-center space-x-3 p-3 rounded-md bg-background border border-border cursor-pointer hover:border-primary/50 transition-colors group"
@@ -137,16 +175,6 @@ export default function Sidebar() {
                 >
                   <Pencil size={12} />
                 </button>
-                <button
-                  className="p-1.5 rounded-md hover:bg-primary/10 hover:text-primary text-muted-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowConnectionDialog(true);
-                  }}
-                  title="Switch Connection"
-                >
-                  <ArrowRightLeft size={12} />
-                </button>
               </div>
             </div>
             <EditConnectionDialog
@@ -156,13 +184,74 @@ export default function Sidebar() {
             />
           </>
         ) : (
-          <Button 
-            className="w-full justify-start space-x-2 shadow-glow" 
-            onClick={() => setShowConnectionDialog(true)}
-          >
-            <Zap size={16} />
-            <span>New Connection</span>
-          </Button>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Connections</div>
+              <button
+                className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => useAppStore.getState().setShowConnectionDialog(true)}
+              >
+                + New
+              </button>
+            </div>
+            {connections.length > 0 ? (
+              <div className="space-y-1.5">
+                {connections.map((conn) => (
+                  <div
+                    key={conn.id}
+                    className="relative flex items-center space-x-3 p-2.5 rounded-lg border border-border/50 cursor-pointer hover:bg-secondary/50 hover:border-primary/30 transition-all group"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent('vibedb:connect', { detail: conn })
+                      );
+                    }}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+                      <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-foreground truncate leading-tight">
+                        {conn.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          {conn.type === 'sqlite' ? 'SQLite' : conn.type}
+                        </span>
+                        {conn.tag && (
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border flex-shrink-0 whitespace-nowrap leading-none",
+                            conn.tag === 'production'
+                              ? "bg-red-500/20 text-red-400 border-red-500/40"
+                              : conn.tag === 'development'
+                                ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                                : "bg-primary/20 text-primary border-primary/40"
+                          )}>
+                            {conn.tag}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Remove button on hover */}
+                    <button
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground/0 group-hover:text-muted-foreground transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        useAppStore.getState().removeConnection(conn.id);
+                      }}
+                      title="Remove connection"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 px-2">
+                <Database size={20} className="mx-auto text-muted-foreground/40 mb-2" />
+                <div className="text-xs text-muted-foreground">No saved connections</div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -217,8 +306,8 @@ export default function Sidebar() {
                             ? "bg-primary/10 text-primary border border-primary/20" 
                             : "text-muted-foreground hover:bg-accent hover:text-foreground"
                         )}
-                        onClick={() => openTableTab(t.name, 'data')}
-                        onDoubleClick={() => openTableTab(t.name, 'structure')}
+                        onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
+                        onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
                       >
                         <LayoutTemplate size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
                         <span className="truncate">{t.name}</span>
@@ -255,7 +344,7 @@ export default function Sidebar() {
                               ? "bg-primary/10 text-primary border border-primary/20" 
                               : "text-muted-foreground hover:bg-accent hover:text-foreground"
                           )}
-                          onClick={() => openTableTab(t.name, 'data')}
+                          onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
                         >
                           <Eye size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
                           <span className="truncate">{t.name}</span>
@@ -284,7 +373,8 @@ export default function Sidebar() {
       {/* Resizer handle */}
       <div 
         className={cn(
-          "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary active:bg-primary transition-colors z-10",
+          "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary active:bg-primary z-10",
+          !isResizing && "transition-colors",
           isResizing && "bg-primary glow-shadow"
         )}
         onMouseDown={startResizing}

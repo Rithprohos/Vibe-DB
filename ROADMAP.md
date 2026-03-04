@@ -2,7 +2,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2)
+## Current State (v0.2.1)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -18,6 +18,7 @@ Multi-database engine support for VibeDB.
 - `execute_query` — Run SQL queries
 - `get_table_row_count` — Pagination support
 - `create_database` — Create new SQLite file
+- `get_database_version` — Retrieve SQLite version
 
 ### Architecture (Implemented)
 
@@ -95,20 +96,24 @@ Essential SQLite management features before multi-engine support.
 
 ### Workspace
 
-| Feature           | Priority | Description                                                 |
-| ----------------- | -------- | ----------------------------------------------------------- |
-| Tabs Context Menu | ✅ Done  | Right-click on tabs to close, close others, or close all    |
-| Connection Tags   | ✅ Done  | Environment labels: local, testing, development, production |
-| Editable Names    | ✅ Done  | Edit connection names and tags without reconnecting         |
-| Database Version  | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar        |
+| Feature                | Priority | Description                                                             |
+| ---------------------- | -------- | ----------------------------------------------------------------------- |
+| Tabs Context Menu      | ✅ Done  | Right-click on tabs to close, close others, or close all                |
+| Connection Tags        | ✅ Done  | Environment labels: local, testing, development, production             |
+| Editable Names         | ✅ Done  | Edit connection names and tags without reconnecting                     |
+| Database Version       | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar                    |
+| Disconnect / Reconnect | ✅ Done  | Close connection without losing saved data, reconnect from sidebar      |
+| Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag) |
 
 ### Tasks
 
-- [ ] Create Table Wizard component
 - [x] Inline cell editing with save/cancel
 - [x] Tabs context menu (close, close other, close all)
 - [x] Editable connection names and tags
 - [x] Database versioning support in backend and UI
+- [x] Disconnect vs remove connection (preserve saved connection data)
+- [x] Sidebar saved connections list when disconnected
+- [ ] Create Table Wizard component
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
@@ -129,15 +134,19 @@ Essential SQLite management features before multi-engine support.
 
 ### Performance Optimizations
 
-| Optimization        | Status     | Description                                                                    |
-| ------------------- | ---------- | ------------------------------------------------------------------------------ |
-| Tab limit           | ✅ Done    | Max 20 tabs, oldest auto-removed                                               |
-| Result truncation   | ✅ Done    | Max 1000 rows stored per result                                                |
-| Zustand selectors   | ✅ Done    | `useActiveTab`, `useTabById`, `useConnection` — subscribe to only needed state |
-| Memoized components | ✅ Done    | QueryEditor wrapped in `memo()`                                                |
-| Tab reuse           | ✅ Done    | Opening same table reuses existing tab                                         |
-| Virtual scrolling   | 📋 Planned | Render only visible rows for large result sets                                 |
-| Lazy tab loading    | 📋 Planned | Don't render inactive tabs until switched                                      |
+| Optimization         | Status     | Description                                                            |
+| -------------------- | ---------- | ---------------------------------------------------------------------- |
+| Tab limit            | ✅ Done    | Max 20 tabs, oldest auto-removed                                       |
+| Result truncation    | ✅ Done    | Max 1000 rows stored per result                                        |
+| Zustand selectors    | ✅ Done    | All components use granular selectors — no full-store destructuring    |
+| Memoized components  | ✅ Done    | QueryEditor, WelcomeScreen wrapped in `memo()`                         |
+| Memoized derivations | ✅ Done    | `useMemo` for `.find()` / `.filter()` operations across all components |
+| Stable effect deps   | ✅ Done    | Primitive values as `useEffect` deps, not object references            |
+| Stable callbacks     | ✅ Done    | `useCallback` for handlers passed as props or used in effects          |
+| Tab reuse            | ✅ Done    | Opening same table reuses existing tab                                 |
+| Performance rules    | ✅ Done    | `.agents/workflows/performance-rules.md` — 10 enforceable rules        |
+| Virtual scrolling    | 📋 Planned | Render only visible rows for large result sets                         |
+| Lazy tab loading     | 📋 Planned | Don't render inactive tabs until switched                              |
 
 ---
 

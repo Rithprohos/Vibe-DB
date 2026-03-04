@@ -1,52 +1,69 @@
+import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Sparkles, Zap } from 'lucide-react';
+import { Settings, Sparkles } from 'lucide-react';
 
 export default function TopBar() {
-  const { isAiPanelOpen, setIsAiPanelOpen, activeConnection, tabs, activeTabId, databaseVersion } = useAppStore();
+  const connections = useAppStore(s => s.connections);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const databaseVersion = useAppStore(s => s.databaseVersion);
+  const isAiPanelOpen = useAppStore(s => s.isAiPanelOpen);
+  const setIsAiPanelOpen = useAppStore(s => s.setIsAiPanelOpen);
+  const tabs = useAppStore(s => s.tabs);
+  const activeTabId = useAppStore(s => s.activeTabId);
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
-  const isDataTabActive = activeTab?.type === 'data';
+  const activeConnection = useMemo(
+    () => connections.find(c => c.id === activeSidebarConnectionId),
+    [connections, activeSidebarConnectionId]
+  );
+  const isDataTabActive = useMemo(
+    () => tabs.find(t => t.id === activeTabId)?.type === 'data',
+    [tabs, activeTabId]
+  );
+  const toggleAiPanel = useCallback(
+    () => setIsAiPanelOpen(!isAiPanelOpen),
+    [setIsAiPanelOpen, isAiPanelOpen]
+  );
 
   return (
     <div
-      className="flex items-center justify-between px-4 h-[38px] bg-secondary border-b border-border shrink-0 select-none"
+      className="flex items-center justify-between px-3 h-[44px] bg-[#0a0a0f] shrink-0 select-none pl-[80px]"
       data-tauri-drag-region
     >
-      <div className="flex items-center gap-2.5" data-tauri-drag-region>
-        <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center border border-primary/20">
-          <Zap size={13} className="text-primary" />
-        </div>
-        <span className="text-[15px] font-bold tracking-tight bg-gradient-to-r from-primary to-accent-secondary bg-clip-text text-transparent">
-          VibeDB
-        </span>
-        {activeConnection && (
-          <div className="flex items-center gap-2 ml-2 pl-3 border-l border-border">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(0,229,153,0.4)]" />
-            <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
-              {activeConnection.name}
-            </span>
-            {databaseVersion && (
-              <span className="text-[10px] text-muted-foreground/50 font-mono bg-background/30 px-1 rounded border border-border/40">
-                v{databaseVersion}
-              </span>
-            )}
-          </div>
+      {/* Left side: Empty placeholder for drag region */}
+      <div className="flex items-center gap-4 text-muted-foreground w-[60px]" data-tauri-drag-region>
+      </div>
+
+      {/* Center: Title */}
+      <div 
+        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-[12px] font-medium text-muted-foreground/80 gap-1.5" 
+        data-tauri-drag-region
+      >
+        <span>vibe-db {activeConnection ? `— ${activeConnection.name}` : ''}</span>
+        {databaseVersion && (
+          <span className="text-[10px] text-muted-foreground/40 font-mono tracking-widest bg-white/5 px-1.5 py-0.5 rounded ml-1">
+            v{databaseVersion}
+          </span>
         )}
       </div>
-      <div className="flex gap-3 items-center">
+
+      {/* Right side: AI & Settings */}
+      <div className="flex items-center gap-2 text-muted-foreground pr-2">
         {isDataTabActive && (
           <button
-            onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded transition-colors text-[11px] font-medium tracking-wide ${
+            onClick={toggleAiPanel}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors text-[11px] font-medium mr-2 ${
               isAiPanelOpen
-                ? 'bg-accent-secondary/10 border-accent-secondary/30 text-accent-secondary border'
-                : 'hover:bg-accent border border-border text-muted-foreground'
+                ? 'bg-accent-secondary/15 text-accent-secondary border border-accent-secondary/30'
+                : 'hover:bg-white/10 text-muted-foreground border border-transparent'
             }`}
           >
-            <Sparkles size={12} className={isAiPanelOpen ? 'text-accent-secondary' : 'text-muted-foreground'} />
-            AI
+            <Sparkles size={13} className={isAiPanelOpen ? 'text-accent-secondary' : 'text-muted-foreground'} />
+            AI Chat
           </button>
         )}
+        <button className="p-1.5 rounded hover:bg-white/10 transition-colors">
+          <Settings size={15} />
+        </button>
       </div>
     </div>
   );

@@ -44,6 +44,7 @@ export interface QueryResultLight {
 
 export const MAX_RESULT_ROWS = 1000;
 export const MAX_TABS = 20;
+export const MAX_ACTIVE_CONNECTIONS = 5;
 
 export interface SqlLog {
   id: string;
@@ -58,6 +59,7 @@ export type TabType = "data" | "structure" | "query";
 
 export interface Tab {
   id: string;
+  connectionId: string;
   type: TabType;
   title: string;
   tableName?: string;
@@ -69,12 +71,12 @@ export interface Tab {
 interface AppState {
   // Connection
   connections: Connection[];
-  activeConnection: Connection | null;
+  activeSidebarConnectionId: string | null;
   isConnected: boolean;
   showConnectionDialog: boolean;
 
   // Database objects
-  tables: TableInfo[];
+  tablesByConnection: Record<string, TableInfo[]>;
   selectedTable: string | null;
 
   // Tabs
@@ -97,13 +99,16 @@ interface AppState {
   addConnection: (conn: Connection) => void;
   updateConnection: (
     id: string,
-    updates: Partial<Pick<Connection, "name" | "tag">>,
+    updates: Partial<Pick<Connection, "name" | "tag" | "connId" | "lastUsed">>,
   ) => void;
   removeConnection: (id: string) => void;
-  setActiveConnection: (conn: Connection | null) => void;
+  disconnectConnection: (id: string) => void;
+  closeAllConnections: () => void;
+  closeOtherConnections: (id: string) => void;
+  setActiveSidebarConnection: (id: string | null) => void;
   setIsConnected: (val: boolean) => void;
   setShowConnectionDialog: (val: boolean) => void;
-  setTables: (tables: TableInfo[]) => void;
+  setTables: (connectionId: string, tables: TableInfo[]) => void;
   setSelectedTable: (name: string | null) => void;
 
   // Tab actions
@@ -113,7 +118,11 @@ interface AppState {
   closeOtherTabs: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
-  openTableTab: (tableName: string, type: TabType) => void;
+  openTableTab: (
+    connectionId: string,
+    tableName: string,
+    type: TabType,
+  ) => void;
 
   // Log actions
   addLog: (log: Omit<SqlLog, "id" | "timestamp">) => void;
@@ -145,10 +154,10 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       connections: [],
-      activeConnection: null,
+      activeSidebarConnectionId: null,
       isConnected: false,
       showConnectionDialog: false,
-      tables: [],
+      tablesByConnection: {},
       selectedTable: null,
       tabs: [],
       activeTabId: null,
@@ -171,6 +180,46 @@ export const useAppStore = create<AppState>()(
       removeConnection: (id) =>
         set((state) => ({
           connections: state.connections.filter((c) => c.id !== id),
+          activeSidebarConnectionId:
+            state.activeSidebarConnectionId === id
+              ? null
+              : state.activeSidebarConnectionId,
+        })),
+
+      disconnectConnection: (id) =>
+        set((state) => {
+          const updated = state.connections.map((c) =>
+            c.id === id ? { ...c, connId: undefined } : c,
+          );
+          // If disconnecting the active connection, switch to another active one
+          let newActiveId = state.activeSidebarConnectionId;
+          if (state.activeSidebarConnectionId === id) {
+            const nextActive = updated.find((c) => c.connId && c.id !== id);
+            newActiveId = nextActive?.id ?? null;
+          }
+          const hasActiveConnections = updated.some((c) => c.connId);
+          return {
+            connections: updated,
+            activeSidebarConnectionId: newActiveId,
+            isConnected: hasActiveConnections,
+          };
+        }),
+
+      closeAllConnections: () =>
+        set((state) => ({
+          connections: state.connections.map((c) => ({
+            ...c,
+            connId: undefined,
+          })),
+          activeSidebarConnectionId: null,
+          isConnected: false,
+        })),
+
+      closeOtherConnections: (id) =>
+        set((state) => ({
+          connections: state.connections.map((c) =>
+            c.id === id ? c : { ...c, connId: undefined },
+          ),
         })),
 
       updateConnection: (id, updates) =>
@@ -178,26 +227,25 @@ export const useAppStore = create<AppState>()(
           connections: state.connections.map((c) =>
             c.id === id ? { ...c, ...updates } : c,
           ),
-          activeConnection:
-            state.activeConnection?.id === id
-              ? { ...state.activeConnection, ...updates }
-              : state.activeConnection,
         })),
 
-      setActiveConnection: (conn) =>
+      setActiveSidebarConnection: (id) =>
         set({
-          activeConnection: conn,
-          tables: [],
+          activeSidebarConnectionId: id,
           selectedTable: null,
-          tabs: [],
-          activeTabId: null,
-          logs: [],
-          showLogDrawer: false,
         }),
 
       setIsConnected: (val) => set({ isConnected: val }),
       setShowConnectionDialog: (val) => set({ showConnectionDialog: val }),
-      setTables: (tables) => set({ tables }),
+
+      setTables: (connectionId, tables) =>
+        set((state) => ({
+          tablesByConnection: {
+            ...state.tablesByConnection,
+            [connectionId]: tables,
+          },
+        })),
+
       setSelectedTable: (name) => set({ selectedTable: name }),
 
       addLog: (log) =>
@@ -257,10 +305,13 @@ export const useAppStore = create<AppState>()(
           tabs: state.tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         })),
 
-      openTableTab: (tableName, type) => {
+      openTableTab: (connectionId, tableName, type) => {
         const state = get();
         const existing = state.tabs.find(
-          (t) => t.tableName === tableName && t.type === type,
+          (t) =>
+            t.connectionId === connectionId &&
+            t.tableName === tableName &&
+            t.type === type,
         );
         if (existing) {
           set({ activeTabId: existing.id, selectedTable: tableName });
@@ -271,7 +322,7 @@ export const useAppStore = create<AppState>()(
           type === "query"
             ? `Query ${tableName || ""}`
             : `${tableName} (${type === "data" ? "Data" : "Structure"})`;
-        const tab: Tab = { id, type, title, tableName };
+        const tab: Tab = { id, connectionId, type, title, tableName };
         set((state) => ({
           tabs: [...state.tabs, tab].slice(-MAX_TABS),
           activeTabId: id,
@@ -290,6 +341,9 @@ export const useAppStore = create<AppState>()(
           lastUsed: c.lastUsed,
           tag: c.tag,
         })),
+        activeSidebarConnectionId: state.activeSidebarConnectionId,
+        tabs: state.tabs,
+        activeTabId: state.activeTabId,
       }),
       storage: createJSONStorage(() => storage),
     },

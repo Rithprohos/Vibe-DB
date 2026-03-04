@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Database, Wrench, Zap, FileText, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,19 +11,28 @@ import {
 } from '@/components/ui/context-menu';
 
 export default function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab, closeAllTabs, closeOtherTabs, addTab } = useAppStore();
+  const tabs = useAppStore(s => s.tabs);
+  const activeTabId = useAppStore(s => s.activeTabId);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const setActiveTab = useAppStore(s => s.setActiveTab);
+  const closeTab = useAppStore(s => s.closeTab);
+  const closeAllTabs = useAppStore(s => s.closeAllTabs);
+  const closeOtherTabs = useAppStore(s => s.closeOtherTabs);
+  const addTab = useAppStore(s => s.addTab);
 
-  const handleNewQuery = () => {
+  const handleNewQuery = useCallback(() => {
+    if (!activeSidebarConnectionId) return;
     const id = `query-${Date.now()}`;
     addTab({
       id,
+      connectionId: activeSidebarConnectionId,
       type: 'query',
       title: 'New Query',
       query: '',
     });
-  };
+  }, [activeSidebarConnectionId, addTab]);
 
-  const tabIcon = (type: string) => {
+  const tabIcon = useMemo(() => (type: string) => {
     switch (type) {
       case 'data':
         return <Database size={14} className="text-primary" />;
@@ -33,7 +43,7 @@ export default function TabBar() {
       default:
         return <FileText size={14} className="text-muted-foreground" />;
     }
-  };
+  }, []);
 
   if (tabs.length === 0) return null;
 
