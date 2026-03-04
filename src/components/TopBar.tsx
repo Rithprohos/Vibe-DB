@@ -31,7 +31,7 @@ export default function TopBar() {
 
   return (
     <div
-      className="flex items-center justify-between px-3 h-[44px] bg-[#0a0a0f] shrink-0 select-none pl-[80px]"
+      className="flex items-center justify-between px-3 h-[44px] bg-background shrink-0 select-none pl-[80px]"
       data-tauri-drag-region
     >
       {/* Left side: Empty placeholder for drag region */}
@@ -45,7 +45,7 @@ export default function TopBar() {
       >
         <span>vibe-db {activeConnection ? `— ${activeConnection.name}` : ''}</span>
         {databaseVersion && (
-          <span className="text-[10px] text-muted-foreground/40 font-mono tracking-widest bg-white/5 px-1.5 py-0.5 rounded ml-1">
+          <span className="text-[10px] text-muted-foreground/40 font-mono tracking-widest bg-secondary/50 px-1.5 py-0.5 rounded ml-1">
             v{databaseVersion}
           </span>
         )}
@@ -59,7 +59,7 @@ export default function TopBar() {
             className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors text-[11px] font-medium mr-2 ${
               isAiPanelOpen
                 ? 'bg-accent-secondary/15 text-accent-secondary border border-accent-secondary/30'
-                : 'hover:bg-white/10 text-muted-foreground border border-transparent'
+                : 'hover:bg-secondary text-muted-foreground border border-transparent'
             }`}
           >
             <Sparkles size={13} className={isAiPanelOpen ? 'text-accent-secondary' : 'text-muted-foreground'} />
@@ -68,7 +68,7 @@ export default function TopBar() {
         )}
         <button 
           onClick={openSettings}
-          className="p-1.5 rounded hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded hover:bg-secondary transition-colors"
         >
           <Settings size={15} />
         </button>

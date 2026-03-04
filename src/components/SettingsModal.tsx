@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, type Theme } from '../store/useAppStore';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { 
   Settings, 
@@ -7,7 +7,10 @@ import {
   Keyboard, 
   Info,
   Database,
-  Sliders
+  Sliders,
+  Sun,
+  Moon,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +27,40 @@ const navItems: SettingsNavItem[] = [
   { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
   { id: 'keybindings', label: 'Keybindings', icon: <Keyboard size={16} /> },
   { id: 'about', label: 'About', icon: <Info size={16} /> },
+];
+
+interface ThemeOption {
+  id: Theme;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+  iconClass?: string;
+}
+
+const themeOptions: ThemeOption[] = [
+  { 
+    id: 'dark', 
+    name: 'VibeDB Dark', 
+    description: 'Default dark theme for database work', 
+    icon: <Moon size={16} />,
+    color: '#0a0a0f'
+  },
+  { 
+    id: 'light', 
+    name: 'Light', 
+    description: 'Clean light theme for daytime use', 
+    icon: <Sun size={16} />,
+    color: '#ffffff',
+    iconClass: 'text-gray-800'
+  },
+  { 
+    id: 'purple', 
+    name: 'Purple Solarized', 
+    description: 'Vibrant purple theme with solarized feel', 
+    icon: <Sparkles size={16} />,
+    color: '#1a1625'
+  },
 ];
 
 function GeneralSettings() {
@@ -76,32 +113,42 @@ function GeneralSettings() {
 }
 
 function AppearanceSettings() {
+  const theme = useAppStore(s => s.theme);
+  const setTheme = useAppStore(s => s.setTheme);
+
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-4">Theme</h3>
-        <div className="p-4 rounded-lg bg-secondary/30 border border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#0a0a0f] border border-border flex items-center justify-center">
-              <Database size={18} className="text-primary" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">VibeDB Dark</div>
-              <div className="text-xs text-muted-foreground">Default dark theme optimized for database work</div>
-            </div>
-          </div>
-          <div className="mt-4 text-xs text-muted-foreground p-2 bg-primary/5 rounded border border-primary/10">
-            Light theme coming soon
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-4">Accent Color</h3>
-        <div className="flex gap-2">
-          <button className="w-8 h-8 rounded-full bg-[#00e599] ring-2 ring-offset-2 ring-offset-background ring-primary" />
-          <button className="w-8 h-8 rounded-full bg-[#7c3aed] opacity-50 cursor-not-allowed" title="Coming soon" />
-          <button className="w-8 h-8 rounded-full bg-[#3b82f6] opacity-50 cursor-not-allowed" title="Coming soon" />
+        <div className="space-y-2">
+          {themeOptions.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTheme(t.id)}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
+                theme === t.id
+                  ? "bg-primary/10 border-primary/40"
+                  : "bg-secondary/30 border-border hover:border-primary/20 hover:bg-secondary/50"
+              )}
+            >
+              <div 
+                className="w-10 h-10 rounded-lg border flex items-center justify-center shrink-0"
+                style={{ backgroundColor: t.color, borderColor: theme === t.id ? 'var(--accent-primary)' : 'var(--border)' }}
+              >
+                <span className={cn(t.iconClass || 'text-primary')}>
+                  {t.icon}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-foreground">{t.name}</div>
+                <div className="text-xs text-muted-foreground">{t.description}</div>
+              </div>
+              {theme === t.id && (
+                <div className="w-2 h-2 rounded-full bg-primary" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
     </div>

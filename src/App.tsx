@@ -24,6 +24,7 @@ export default function App() {
   const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
   const tabs = useAppStore(s => s.tabs);
   const activeTabId = useAppStore(s => s.activeTabId);
+  const theme = useAppStore(s => s.theme);
   const setTables = useAppStore(s => s.setTables);
   const setIsConnected = useAppStore(s => s.setIsConnected);
   const addConnection = useAppStore(s => s.addConnection);
@@ -32,6 +33,11 @@ export default function App() {
   const addTab = useAppStore(s => s.addTab);
   const setDatabaseVersion = useAppStore(s => s.setDatabaseVersion);
   const autoConnectAttempted = useRef(false);
+
+  // Apply theme on mount and changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const handleConnect = useCallback(
     async (conn: Connection) => {

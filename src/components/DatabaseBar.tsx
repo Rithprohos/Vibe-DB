@@ -60,18 +60,18 @@ export default function DatabaseBar() {
                       "relative w-11 h-11 rounded-xl flex items-center justify-center transition-all group",
                       activeSidebarConnectionId === conn.id 
                         ? "bg-primary/10 text-primary" 
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                     )}
                   >
                     {activeSidebarConnectionId === conn.id && (
-                      <div className="absolute -left-1 w-1 h-6 bg-primary rounded-r-md shadow-[0_0_10px_rgba(0,229,153,0.5)]" />
+                      <div className="absolute -left-1 w-1 h-6 bg-primary rounded-r-md shadow-[0_0_10px_var(--accent-primary)]" />
                     )}
                     
                     <Database size={22} className={cn("transition-transform", activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110")} />
                   </button>
                 </TooltipTrigger>
               </ContextMenuTrigger>
-              <TooltipContent side="right" className="bg-[#2a2a2a] text-white border-[#333] ml-1 px-3 py-1.5 shadow-xl">
+              <TooltipContent side="right" className="bg-popover text-popover-foreground border-border ml-1 px-3 py-1.5 shadow-xl">
                 <p className="font-medium text-sm">{conn.name}</p>
                 {conn.tag && <p className="text-[10px] uppercase opacity-70 mt-0.5">{conn.tag}</p>}
               </TooltipContent>
@@ -94,18 +94,18 @@ export default function DatabaseBar() {
           </ContextMenu>
         ))}
         
-        {activeConnections.length > 0 && <div className="w-6 h-px bg-[#333] my-1" />}
+        {activeConnections.length > 0 && <div className="w-6 h-px bg-border my-1" />}
         
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={handleShowConnectionDialog}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-white/5 hover:text-foreground transition-all group mt-1"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-all group mt-1"
             >
               <Plus size={24} className="group-hover:scale-110 transition-transform" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right" className="bg-[#2a2a2a] text-white border-[#333] ml-1">
+          <TooltipContent side="right" className="bg-popover text-popover-foreground border-border ml-1">
             <p>New Connection</p>
           </TooltipContent>
         </Tooltip>

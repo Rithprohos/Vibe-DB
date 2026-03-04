@@ -57,6 +57,8 @@ export interface SqlLog {
 
 export type TabType = "data" | "structure" | "query";
 
+export type Theme = "dark" | "light" | "purple";
+
 export interface Tab {
   id: string;
   connectionId: string;
@@ -89,6 +91,10 @@ interface AppState {
 
   // Settings Modal
   showSettingsModal: boolean;
+
+  // Theme
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
 
   // AI Panel
   isAiPanelOpen: boolean;
@@ -168,10 +174,12 @@ export const useAppStore = create<AppState>()(
       logs: [],
       showLogDrawer: false,
       showSettingsModal: false,
+      theme: 'dark',
       isAiPanelOpen: false,
       databaseVersion: null,
 
       setIsAiPanelOpen: (val) => set({ isAiPanelOpen: val }),
+      setTheme: (theme) => set({ theme }),
       setDatabaseVersion: (version) => set({ databaseVersion: version }),
 
       addConnection: (conn) =>
@@ -368,6 +376,7 @@ export const useAppStore = create<AppState>()(
         activeSidebarConnectionId: state.activeSidebarConnectionId,
         tabs: state.tabs,
         activeTabId: state.activeTabId,
+        theme: state.theme,
       }),
       storage: createJSONStorage(() => storage),
     },

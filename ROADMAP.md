@@ -106,6 +106,7 @@ Essential SQLite management features before multi-engine support.
 | Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag)                |
 | Keyboard Shortcuts     | ✅ Done  | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute |
 | Settings Modal         | ✅ Done  | Keybindings reference panel accessible via ⌘, or settings icon                         |
+| Theme Switching        | ✅ Done  | Dark, Light, Purple Solarized themes with persisted preference                          |
 
 ### Tasks
 
@@ -117,6 +118,7 @@ Essential SQLite management features before multi-engine support.
 - [x] Sidebar saved connections list when disconnected
 - [x] Keyboard shortcuts (⌘N, ⌘W, ⌘T, ⌘L, ⌘,, ⌘↵)
 - [x] Settings modal with keybindings reference
+- [x] Theme switching (Dark, Light, Purple Solarized)
 - [ ] Create Table Wizard component
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
