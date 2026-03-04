@@ -125,14 +125,15 @@ export default function App() {
   const closeTab = useAppStore(s => s.closeTab);
   const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
 
+  // Keep a ref for showLogDrawer so the effect doesn't re-register on every toggle
+  const showLogDrawerRef = useRef(showLogDrawer);
+  showLogDrawerRef.current = showLogDrawer;
+
   // Global Keybindings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check if user is in an input/textarea to avoid triggering shortcuts unexpectedly
-      // except for Cmd+Enter which is handled by QueryEditor
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        // Special case: Cmd+L should probably still toggle logs even if in input
-        // unless it's a conflict. But usually Cmd+, works everywhere.
         if (e.key !== ',' && e.key !== 'l' && e.key !== 'Enter') return;
       }
 
@@ -158,7 +159,7 @@ export default function App() {
         });
       } else if (isMod && e.key === 'l') {
         e.preventDefault();
-        setShowLogDrawer(!showLogDrawer);
+        setShowLogDrawer(!showLogDrawerRef.current);
       } else if (isMod && e.key === ',') {
         e.preventDefault();
         setShowSettingsModal(true);
@@ -167,7 +168,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, activeSidebarConnectionId, showLogDrawer, setShowConnectionDialog, closeTab, addTab, setShowLogDrawer, setShowSettingsModal]);
+  }, [activeTabId, activeSidebarConnectionId, setShowConnectionDialog, closeTab, addTab, setShowLogDrawer, setShowSettingsModal]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
