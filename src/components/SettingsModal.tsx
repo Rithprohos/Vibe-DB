@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore, type Theme } from '../store/useAppStore';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { 
@@ -65,7 +65,7 @@ const themeOptions: ThemeOption[] = [
 
 function GeneralSettings() {
   const connections = useAppStore(s => s.connections);
-  const activeCount = connections.filter(c => c.connId).length;
+  const activeCount = useMemo(() => connections.filter(c => c.connId).length, [connections]);
   
   return (
     <div className="space-y-6">
@@ -155,15 +155,16 @@ function AppearanceSettings() {
   );
 }
 
+const shortcuts = [
+  { keys: ['Cmd', 'N'], action: 'New Connection' },
+  { keys: ['Cmd', 'W'], action: 'Close Tab' },
+  { keys: ['Cmd', 'T'], action: 'New Query Tab' },
+  { keys: ['Cmd', 'L'], action: 'Toggle Logs' },
+  { keys: ['Cmd', ','], action: 'Open Settings' },
+  { keys: ['Cmd', 'Enter'], action: 'Execute Query' },
+];
+
 function KeybindingsSettings() {
-  const shortcuts = [
-    { keys: ['Cmd', 'N'], action: 'New Connection' },
-    { keys: ['Cmd', 'W'], action: 'Close Tab' },
-    { keys: ['Cmd', 'T'], action: 'New Query Tab' },
-    { keys: ['Cmd', 'L'], action: 'Toggle Logs' },
-    { keys: ['Cmd', ','], action: 'Open Settings' },
-    { keys: ['Cmd', 'Enter'], action: 'Execute Query' },
-  ];
 
   return (
     <div className="space-y-6">
@@ -225,6 +226,8 @@ export default function SettingsModal() {
   const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
+  const activeLabel = useMemo(() => navItems.find(i => i.id === activeTab)?.label, [activeTab]);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'general': return <GeneralSettings />;
@@ -266,7 +269,7 @@ export default function SettingsModal() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="p-4 border-b border-border shrink-0">
             <h2 className="text-base font-semibold text-foreground">
-              {navItems.find(i => i.id === activeTab)?.label}
+              {activeLabel}
             </h2>
           </div>
           <div className="flex-1 overflow-auto p-4">

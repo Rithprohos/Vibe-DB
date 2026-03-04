@@ -15,10 +15,13 @@ interface Props {
   tabId: string;
 }
 
+const EMPTY_ARRAY: any[] = [];
+
 const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
-  const tab = useAppStore(s => s.tabs.find(t => t.id === tabId));
-  const activeConnection = useAppStore(s => s.connections.find(c => c.id === tab?.connectionId));
-  const tables = useAppStore(s => s.tablesByConnection[tab?.connectionId || ''] || []);
+  const tab = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId), [tabId]));
+  const activeConnection = useAppStore(useCallback(s => s.connections.find(c => c.id === tab?.connectionId), [tab?.connectionId]));
+  const tablesOptions = useAppStore(useCallback(s => s.tablesByConnection[tab?.connectionId || ''], [tab?.connectionId]));
+  const tables = tablesOptions || EMPTY_ARRAY;
   
   const query = tab?.query || '';
   const result = tab?.result || null;
@@ -29,6 +32,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const [editorHeight, setEditorHeight] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const resizerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<any>(null);
 
   const schema = useMemo(() => {
     const s: Record<string, string[]> = {};
@@ -45,6 +49,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   // Resizing logic - using refs to avoid effect re-runs
   const isResizingRef = useRef(false);
   const currentHeightRef = useRef(300);
+  const rafId = useRef<number | null>(null);
 
   const startResizing = useCallback(() => {
     isResizingRef.current = true;
@@ -62,15 +67,18 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const resize = useCallback((e: MouseEvent) => {
     if (!isResizingRef.current || !resizerRef.current?.parentElement) return;
     
-    const rect = resizerRef.current.parentElement.getBoundingClientRect();
-    const newHeight = Math.max(100, Math.min(window.innerHeight - 200, e.clientY - rect.top));
+    currentHeightRef.current = Math.max(100, Math.min(window.innerHeight - 200, e.clientY - resizerRef.current.parentElement.getBoundingClientRect().top));
     
-    if (newHeight === currentHeightRef.current) return;
-    currentHeightRef.current = newHeight;
-    
-    const editorContainer = resizerRef.current.parentElement.querySelector('.cm-editor');
-    if (editorContainer) {
-      (editorContainer as HTMLElement).style.height = `${newHeight}px`;
+    if (!rafId.current) {
+      rafId.current = requestAnimationFrame(() => {
+        if (resizerRef.current?.parentElement) {
+          const editorContainer = resizerRef.current.parentElement.querySelector('.cm-editor');
+          if (editorContainer) {
+            (editorContainer as HTMLElement).style.height = `${currentHeightRef.current}px`;
+          }
+        }
+        rafId.current = null;
+      });
     }
   }, []);
 
@@ -89,15 +97,32 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     };
   }, [isResizing, resize, stopResizing]);
 
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('select-none', 'cursor-row-resize');
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
+  }, []);
+
   const handleRun = useCallback(async () => {
-    if (!activeConnection?.connId || !query.trim()) return;
+    let queryToRun = query.trim();
+    if (editorRef.current?.view) {
+      const view = editorRef.current.view;
+      const selection = view.state.selection.main;
+      if (!selection.empty) {
+        queryToRun = view.state.sliceDoc(selection.from, selection.to).trim();
+      }
+    }
+
+    if (!activeConnection?.connId || !queryToRun) return;
     setRunning(true);
     const store = useAppStore.getState();
     store.updateTab(tabId, { error: '', result: null });
     const start = performance.now();
 
     try {
-      const res = await executeQuery(query.trim(), activeConnection.connId);
+      const res = await executeQuery(queryToRun, activeConnection.connId);
       const elapsed = performance.now() - start;
       setDuration(elapsed);
       
@@ -109,13 +134,13 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       store.updateTab(tabId, { result: resultToStore, error: '' });
 
       store.addLog({
-        sql: query.trim(),
+        sql: queryToRun,
         status: 'success',
         duration: elapsed,
         message: truncated ? `${res.message} (showing ${MAX_RESULT_ROWS} of ${res.rows.length})` : res.message
       });
 
-      const upper = query.trim().toUpperCase();
+      const upper = queryToRun.toUpperCase();
       if (upper.startsWith('CREATE') || upper.startsWith('DROP') || upper.startsWith('ALTER')) {
         const tablesList = await listTables(activeConnection.connId);
         store.setTables(activeConnection.id, tablesList);
@@ -127,7 +152,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       store.updateTab(tabId, { error: errMsg, result: null });
 
       store.addLog({
-        sql: query.trim(),
+        sql: queryToRun,
         status: 'error',
         duration: elapsed,
         message: errMsg
@@ -176,6 +201,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         </div>
         
         <CodeMirror
+          ref={editorRef}
           value={query}
           height="100%"
           extensions={[sql({ schema })]}
