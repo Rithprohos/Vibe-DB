@@ -10,6 +10,15 @@ A modern, cross-platform SQLite database manager built with Tauri v2 and React.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 
+## Why VibeDB?
+
+Paid database tools made sense before AI.
+
+Now a solo dev with agents can build
+the same thing in weeks — and give it away free.
+
+That's VibeDB.
+
 ## Overview
 
 VibeDB is a sleek, high-performance SQLite database management tool designed for developers who appreciate clean interfaces and efficient workflows. Created with AI-assisted development using vibe coding principles.
@@ -64,7 +73,7 @@ VibeDB is a sleek, high-performance SQLite database management tool designed for
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/vibe-db.git
+git clone https://github.com/Rithprohos/vibe-db.git
 cd vibe-db
 
 # Install dependencies
