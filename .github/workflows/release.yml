@@ -62,6 +62,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "VibeDB ${{ github.ref_name }}"
           releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
