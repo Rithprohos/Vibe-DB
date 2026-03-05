@@ -247,12 +247,12 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       {/* Results Area */}
       <div className="flex-1 flex flex-col min-h-0 bg-background relative z-0">
         {error ? (
-          <div className="p-4 h-full flex flex-col">
-            <div className="flex items-center space-x-2 text-destructive mb-3">
-              <AlertCircle size={16} />
-              <span className="font-semibold text-sm">Query Error</span>
+          <div className="p-6 h-full flex flex-col">
+            <div className="flex items-center space-x-2 text-destructive mb-4">
+              <AlertCircle size={18} />
+              <span className="font-bold text-sm tracking-tight">Database Error</span>
             </div>
-            <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm font-mono rounded-xl shadow-inner flex-1 overflow-auto whitespace-pre-wrap leading-relaxed">
+            <div className="p-5 bg-destructive/10 border border-destructive/20 text-destructive text-[13px] font-mono rounded-xl shadow-inner flex-1 overflow-auto whitespace-pre-wrap leading-relaxed custom-scrollbar">
               {error}
             </div>
           </div>

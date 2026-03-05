@@ -14,6 +14,10 @@ A modern, cross-platform SQLite database manager built with Tauri v2 and React.
 
 VibeDB is a sleek, high-performance SQLite database management tool designed for developers who appreciate clean interfaces and efficient workflows. Created with AI-assisted development using vibe coding principles.
 
+<p align="center">
+  <img src="./screenshot/screen-shot-1.png" alt="VibeDB Screenshot" width="100%">
+</p>
+
 **[📚 Roadmap](./ROADMAP.md)** — See planned features and release timeline.
 
 ## Features

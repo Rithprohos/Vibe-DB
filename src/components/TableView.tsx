@@ -4,7 +4,7 @@ import { getTableData, getTableRowCount, getTableStructure, executeQuery } from 
 import { formatCellValue } from '../lib/formatters';
 import type { QueryResult, ColumnInfo } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, XCircle, Database } from 'lucide-react';
+import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, XCircle, Database, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useReactTable,
@@ -400,12 +400,12 @@ export default function TableView({ tableName, tabId }: Props) {
         <div className="flex items-center space-x-2">
           {!newRowData && !editingCell ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => fetchData()} className="h-8 bg-background/50 hover:bg-secondary border-border" title="Refresh">
-                <RefreshCw size={14} className="mr-2 text-muted-foreground" />
+              <Button variant="ghost" size="sm" onClick={() => fetchData()} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground" title="Refresh">
+                <RefreshCw size={14} />
                 Refresh
               </Button>
-              <Button size="sm" onClick={handleAddRow} className="h-8 shadow-glow" title="Add New Row">
-                <Plus size={14} className="mr-2" />
+              <Button variant="ghost" size="sm" onClick={handleAddRow} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:bg-primary/10 hover:text-primary" title="Add New Row">
+                <Plus size={14} />
                 Add Record
               </Button>
             </>
@@ -467,8 +467,11 @@ export default function TableView({ tableName, tabId }: Props) {
       </div>
 
       {error && (
-        <div className="m-4 mb-0 p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-md shadow-sm font-medium animate-fade-in flex-shrink-0">
-          {error}
+        <div className="mx-4 mt-4 mb-2 p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg shadow-sm font-medium animate-fade-in flex-shrink-0 flex items-start gap-3">
+          <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+          <div className="flex-1 leading-relaxed">
+            {error}
+          </div>
         </div>
       )}
 
