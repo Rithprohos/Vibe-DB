@@ -1,6 +1,6 @@
 [package]
 name = "vibe-db"
-version = "0.2.3"
+version = "0.2.4"
 description = "Open source database management app"
 authors = ["you"]
 edition = "2021"

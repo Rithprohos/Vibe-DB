@@ -2,7 +2,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.3)
+## Current State (v0.2.4)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -131,7 +131,14 @@ Essential SQLite management features before multi-engine support.
 - [x] Create Table Wizard component with SQL preview and syntax highlighting
 - [x] Filter Query builder with BETWEEN support and WHERE clause generation
 
-### Upcoming Tasks (v0.2.4 & Beyond)
+### Completed in v0.2.4
+
+- [x] Welcome screen shows exactly 2 recent connections (requires min 2 to display section)
+- [x] Tabs cleared when closing connections (disconnect, close all, close others)
+- [x] Invalid paths no longer auto-create databases (file existence check before connect)
+- [x] Failed connections not persisted to store (addConnection after successful connect)
+
+### Upcoming Tasks (v0.2.4)
 
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
@@ -333,7 +340,7 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 | ------- | ------- | -------------------- | -------------- |
 | v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete    |
 | v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete    |
-| v0.2.4  | Q1 2026 | Security + UX polish | 🔜 In Progress |
+| v0.2.4  | Q1 2026 | Bug fixes            | 🔜 In Progress |
 | v0.3    | Q2 2026 | Turso support        | 📋 Planned     |
 | v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned     |
 | v0.5    | Q4 2026 | MySQL                | 📋 Planned     |

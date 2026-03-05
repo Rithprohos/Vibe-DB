@@ -204,17 +204,23 @@ export const useAppStore = create<AppState>()(
           const updated = state.connections.map((c) =>
             c.id === id ? { ...c, connId: undefined } : c,
           );
-          // If disconnecting the active connection, switch to another active one
           let newActiveId = state.activeSidebarConnectionId;
           if (state.activeSidebarConnectionId === id) {
             const nextActive = updated.find((c) => c.connId && c.id !== id);
             newActiveId = nextActive?.id ?? null;
           }
           const hasActiveConnections = updated.some((c) => c.connId);
+          const newTabs = state.tabs.filter((t) => t.connectionId !== id);
+          let newActiveTabId = state.activeTabId;
+          if (state.tabs.some((t) => t.id === state.activeTabId && t.connectionId === id)) {
+            newActiveTabId = newTabs.length > 0 ? newTabs[0].id : null;
+          }
           return {
             connections: updated,
             activeSidebarConnectionId: newActiveId,
             isConnected: hasActiveConnections,
+            tabs: newTabs,
+            activeTabId: newActiveTabId,
           };
         }),
 
@@ -226,6 +232,9 @@ export const useAppStore = create<AppState>()(
           })),
           activeSidebarConnectionId: null,
           isConnected: false,
+          tabs: [],
+          activeTabId: null,
+          selectedTable: null,
         })),
 
       closeOtherConnections: (id) =>
@@ -233,6 +242,8 @@ export const useAppStore = create<AppState>()(
           connections: state.connections.map((c) =>
             c.id === id ? c : { ...c, connId: undefined },
           ),
+          tabs: state.tabs.filter((t) => t.connectionId === id),
+          activeTabId: state.activeTabId && state.tabs.find((t) => t.id === state.activeTabId)?.connectionId === id ? state.activeTabId : state.tabs.find((t) => t.connectionId === id)?.id ?? null,
         })),
 
       updateConnection: (id, updates) =>

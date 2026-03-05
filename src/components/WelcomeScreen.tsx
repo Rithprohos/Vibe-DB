@@ -7,7 +7,7 @@ const WelcomeScreen = memo(function WelcomeScreen() {
   const connections = useAppStore(s => s.connections);
   const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
 
-  const recentConnections = useMemo(() => connections.slice(0, 5), [connections]);
+  const recentConnections = useMemo(() => connections.slice(0, 2), [connections]);
 
   const handleConnect = useCallback((conn: Connection) => {
     window.dispatchEvent(new CustomEvent('vibedb:connect', { detail: conn }));

@@ -159,7 +159,14 @@ impl DatabaseEngine for SqliteEngine {
             EngineError::ConfigError("Database path is required for SQLite".to_string())
         })?;
 
-        let connection_string = format!("sqlite:{}?mode=rwc", path);
+        if !std::path::Path::new(path).exists() {
+            return Err(EngineError::ConnectionFailed(format!(
+                "Database file not found: {}",
+                path
+            )));
+        }
+
+        let connection_string = format!("sqlite:{}?mode=rw", path);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)

@@ -49,6 +49,7 @@ export default function App() {
         if (!connId) {
           connId = await connectDatabase(conn.path, conn.name);
           const version = await getDatabaseVersion(connId);
+          addConnection(conn);
           updateConnection(conn.id, { connId, lastUsed: Date.now() });
           setDatabaseVersion(version);
         } else {
@@ -80,22 +81,18 @@ export default function App() {
         alert(`Failed to connect: ${e}`);
       }
     },
-    [setTables, setIsConnected, updateConnection, addTab, setActiveSidebarConnection, setDatabaseVersion, connections]
+    [setTables, setIsConnected, updateConnection, addTab, setActiveSidebarConnection, setDatabaseVersion, addConnection]
   );
 
   // Listen for connect events (from ConnectionDialog or DatabaseBar)
   useEffect(() => {
     const handler = (e: Event) => {
       const conn = (e as CustomEvent).detail as Connection;
-      // If it's a new connection (not in store yet), add it
-      if (!connections.find(c => c.id === conn.id)) {
-        addConnection(conn);
-      }
       handleConnect(conn);
     };
     window.addEventListener('vibedb:connect', handler);
     return () => window.removeEventListener('vibedb:connect', handler);
-  }, [handleConnect, connections, addConnection]);
+  }, [handleConnect]);
 
   // Auto-connect previously active connection after store hydrates
   useEffect(() => {
