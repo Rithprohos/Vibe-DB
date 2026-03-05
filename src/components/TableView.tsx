@@ -4,7 +4,7 @@ import { getTableData, getTableRowCount, getTableStructure, executeQuery } from 
 import { formatCellValue } from '../lib/formatters';
 import type { QueryResult, ColumnInfo } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, XCircle, Database, AlertCircle } from 'lucide-react';
+import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, XCircle, Database, AlertCircle, Filter, Trash2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useReactTable,
@@ -17,6 +17,32 @@ interface Props {
   tableName: string;
   tabId: string;
 }
+
+interface FilterCondition {
+  id: string;
+  field: string;
+  operator: string;
+  value: string;
+  valueTo: string;
+}
+
+const OPERATORS = [
+  { value: '=', label: '=' },
+  { value: '!=', label: '!=' },
+  { value: '>', label: '>' },
+  { value: '<', label: '<' },
+  { value: '>=', label: '>=' },
+  { value: '<=', label: '<=' },
+  { value: 'LIKE', label: 'LIKE' },
+  { value: 'NOT LIKE', label: 'NOT LIKE' },
+  { value: 'BETWEEN', label: 'BETWEEN' },
+  { value: 'NOT BETWEEN', label: 'NOT BETWEEN' },
+  { value: 'IS NULL', label: 'IS NULL' },
+  { value: 'IS NOT NULL', label: 'IS NOT NULL' },
+];
+
+const UNARY_OPERATORS = ['IS NULL', 'IS NOT NULL'];
+const BETWEEN_OPERATORS = ['BETWEEN', 'NOT BETWEEN'];
 
 interface CellInputProps {
   initialValue: string;
@@ -81,11 +107,54 @@ export default function TableView({ tableName, tabId }: Props) {
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
+  // Filter state
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [filters, setFilters] = useState<FilterCondition[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
+
+  // Build WHERE clause from applied filters
+  const buildWhereClause = useCallback((filterList: FilterCondition[]): string | undefined => {
+    const validFilters = filterList.filter(f => {
+      if (!f.field || !f.operator) return false;
+      if (BETWEEN_OPERATORS.includes(f.operator)) return !!f.value && !!f.valueTo;
+      if (!UNARY_OPERATORS.includes(f.operator) && !f.value) return false;
+      return true;
+    });
+    if (validFilters.length === 0) return undefined;
+
+    const conditions = validFilters.map(f => {
+      if (f.operator === 'IS NULL') return `"${f.field}" IS NULL`;
+      if (f.operator === 'IS NOT NULL') return `"${f.field}" IS NOT NULL`;
+      if (f.operator === 'LIKE' || f.operator === 'NOT LIKE') {
+        return `"${f.field}" ${f.operator} '${f.value.replace(/'/g, "''")}'`;
+      }
+      if (BETWEEN_OPERATORS.includes(f.operator)) {
+        const colInfo = structure.find(c => c.name === f.field);
+        const colType = colInfo?.col_type.toLowerCase() || '';
+        const isNum = colType.includes('int') || colType.includes('real') || colType.includes('double') || colType.includes('float');
+        const fromVal = isNum && !isNaN(Number(f.value)) ? f.value : `'${f.value.replace(/'/g, "''")}'`;
+        const toVal = isNum && !isNaN(Number(f.valueTo)) ? f.valueTo : `'${f.valueTo.replace(/'/g, "''")}'`;
+        return `"${f.field}" ${f.operator} ${fromVal} AND ${toVal}`;
+      }
+      // Check if value is numeric
+      const colInfo = structure.find(c => c.name === f.field);
+      const colType = colInfo?.col_type.toLowerCase() || '';
+      const isNumeric = colType.includes('int') || colType.includes('real') || colType.includes('double') || colType.includes('float');
+      if (isNumeric && !isNaN(Number(f.value))) {
+        return `"${f.field}" ${f.operator} ${f.value}`;
+      }
+      return `"${f.field}" ${f.operator} '${f.value.replace(/'/g, "''")}'`;
+    });
+
+    return conditions.join(' AND ');
+  }, [structure]);
+
   const fetchData = useCallback(async () => {
     if (!activeConnection?.connId) return;
     setLoading(true);
     setError('');
     try {
+      const whereClause = buildWhereClause(appliedFilters);
       const [result, count, struct] = await Promise.all([
         getTableData(
           tableName,
@@ -93,9 +162,10 @@ export default function TableView({ tableName, tabId }: Props) {
           pageSize,
           page * pageSize,
           sortCol || undefined,
-          sortDir
+          sortDir,
+          whereClause
         ),
-        getTableRowCount(tableName, activeConnection.connId),
+        getTableRowCount(tableName, activeConnection.connId, whereClause),
         getTableStructure(tableName, activeConnection.connId),
       ]);
       setData(result);
@@ -106,7 +176,7 @@ export default function TableView({ tableName, tabId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [activeConnection, tableName, page, pageSize, sortCol, sortDir]);
+  }, [activeConnection, tableName, page, pageSize, sortCol, sortDir, appliedFilters, buildWhereClause]);
 
   useEffect(() => {
     let ignore = false;
@@ -129,6 +199,44 @@ export default function TableView({ tableName, tabId }: Props) {
 
   const handleAddRow = () => {
     setNewRowData({});
+  };
+
+  // --- Filter handlers ---
+  const handleAddFilter = () => {
+    const defaultField = data?.columns[0] || '';
+    setFilters(prev => [...prev, { id: crypto.randomUUID(), field: defaultField, operator: '=', value: '', valueTo: '' }]);
+    if (!showFilterPanel) setShowFilterPanel(true);
+  };
+
+  const handleUpdateFilter = (id: string, updates: Partial<FilterCondition>) => {
+    setFilters(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+  };
+
+  const handleRemoveFilter = (id: string) => {
+    setFilters(prev => {
+      const next = prev.filter(f => f.id !== id);
+      if (next.length === 0) {
+        setShowFilterPanel(false);
+        // If there were applied filters, clear them too
+        if (appliedFilters.length > 0) {
+          setAppliedFilters([]);
+          setPage(0);
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedFilters([...filters]);
+    setPage(0);
+  };
+
+  const handleClearAllFilters = () => {
+    setFilters([]);
+    setAppliedFilters([]);
+    setShowFilterPanel(false);
+    setPage(0);
   };
 
   const handleDiscardNewRow = () => {
@@ -408,6 +516,33 @@ export default function TableView({ tableName, tabId }: Props) {
                 <Plus size={14} />
                 Add Record
               </Button>
+              <div className="w-px h-5 bg-border mx-1" />
+              <Button 
+                variant={appliedFilters.length > 0 ? 'default' : 'ghost'}
+                size="sm" 
+                onClick={() => {
+                  if (!showFilterPanel && filters.length === 0) {
+                    handleAddFilter();
+                  } else {
+                    setShowFilterPanel(!showFilterPanel);
+                  }
+                }}
+                className={cn(
+                  "h-8 gap-1.5 relative",
+                  appliedFilters.length > 0
+                    ? "bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Filter rows"
+              >
+                <Filter size={14} />
+                Filter
+                {appliedFilters.length > 0 && (
+                  <span className="ml-1 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1">
+                    {appliedFilters.length}
+                  </span>
+                )}
+              </Button>
             </>
           ) : (
             <>
@@ -465,6 +600,140 @@ export default function TableView({ tableName, tabId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilterPanel && (
+        <div className="border-b border-border bg-secondary/30 backdrop-blur-sm flex-shrink-0 animate-fade-in">
+          <div className="px-4 py-3 space-y-2">
+            {filters.map((filter, idx) => (
+              <div key={filter.id} className="flex items-center gap-2 group">
+                {/* AND label or WHERE label */}
+                <span className="w-14 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right flex-shrink-0">
+                  {idx === 0 ? 'Where' : 'And'}
+                </span>
+
+                {/* Field select */}
+                <div className="relative">
+                  <select
+                    value={filter.field}
+                    onChange={(e) => handleUpdateFilter(filter.id, { field: e.target.value })}
+                    className="h-8 pl-2.5 pr-7 text-xs font-mono bg-background border border-border rounded-md text-foreground appearance-none cursor-pointer hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-colors min-w-[140px]"
+                  >
+                    {data?.columns.map(col => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+                </div>
+
+                {/* Operator select */}
+                <div className="relative">
+                  <select
+                    value={filter.operator}
+                    onChange={(e) => {
+                      const newOp = e.target.value;
+                      const updates: Partial<FilterCondition> = { operator: newOp };
+                      if (UNARY_OPERATORS.includes(newOp)) { updates.value = ''; updates.valueTo = ''; }
+                      if (!BETWEEN_OPERATORS.includes(newOp)) { updates.valueTo = ''; }
+                      handleUpdateFilter(filter.id, updates);
+                    }}
+                    className="h-8 pl-2.5 pr-7 text-xs font-mono bg-background border border-border rounded-md text-foreground appearance-none cursor-pointer hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-colors min-w-[100px]"
+                  >
+                    {OPERATORS.map(op => (
+                      <option key={op.value} value={op.value}>{op.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+                </div>
+
+                {/* Value input(s) */}
+                {!UNARY_OPERATORS.includes(filter.operator) && (
+                  BETWEEN_OPERATORS.includes(filter.operator) ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={filter.value}
+                        onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                        placeholder="From..."
+                        className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
+                        autoFocus={idx === filters.length - 1}
+                      />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">and</span>
+                      <input
+                        type="text"
+                        value={filter.valueTo}
+                        onChange={(e) => handleUpdateFilter(filter.id, { valueTo: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                        placeholder="To..."
+                        className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={filter.value}
+                      onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleApplyFilters();
+                        }
+                      }}
+                      placeholder="Value..."
+                      className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors min-w-[160px] flex-1 max-w-[260px]"
+                      autoFocus={idx === filters.length - 1}
+                    />
+                  )
+                )}
+
+                {/* Remove filter */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemoveFilter(filter.id)}
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  title="Remove filter"
+                >
+                  <Trash2 size={12} />
+                </Button>
+              </div>
+            ))}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="w-14 flex-shrink-0" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleAddFilter}
+                className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Plus size={12} />
+                Add condition
+              </Button>
+              <div className="flex-1" />
+              {appliedFilters.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearAllFilters}
+                  className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  <XCircle size={12} />
+                  Clear all
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={handleApplyFilters}
+                className="h-7 px-4 text-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mx-4 mt-4 mb-2 p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg shadow-sm font-medium animate-fade-in flex-shrink-0 flex items-start gap-3">

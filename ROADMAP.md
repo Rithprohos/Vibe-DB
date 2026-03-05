@@ -80,11 +80,12 @@ Essential SQLite management features before multi-engine support.
 
 ### Data Operations
 
-| Feature        | Priority | Description                                  |
-| -------------- | -------- | -------------------------------------------- |
-| Import Data    | Medium   | CSV, JSON, SQL file import                   |
-| Export Data    | Medium   | Export table/query results as CSV, JSON, SQL |
-| Backup/Restore | Low      | One-click database backup and restore        |
+| Feature              | Priority | Description                                                           |
+| -------------------- | -------- | --------------------------------------------------------------------- |
+| Filter Query Builder | ✅ Done  | Visual WHERE clause builder with multiple conditions, BETWEEN support |
+| Import Data          | Medium   | CSV, JSON, SQL file import                                            |
+| Export Data          | Medium   | Export table/query results as CSV, JSON, SQL                          |
+| Backup/Restore       | Low      | One-click database backup and restore                                 |
 
 ### Query Management
 
@@ -106,7 +107,7 @@ Essential SQLite management features before multi-engine support.
 | Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag)                |
 | Keyboard Shortcuts     | ✅ Done  | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute |
 | Settings Modal         | ✅ Done  | Keybindings reference panel accessible via ⌘, or settings icon                         |
-| Theme Switching        | ✅ Done  | Dark, Light, Purple Solarized themes with persisted preference                          |
+| Theme Switching        | ✅ Done  | Dark, Light, Purple Solarized themes with persisted preference                         |
 
 ### Tasks
 
@@ -140,19 +141,19 @@ Essential SQLite management features before multi-engine support.
 
 ### Performance Optimizations
 
-| Optimization         | Status     | Description                                                            |
-| -------------------- | ---------- | ---------------------------------------------------------------------- |
-| Tab limit            | ✅ Done    | Max 20 tabs, oldest auto-removed                                       |
-| Result truncation    | ✅ Done    | Max 1000 rows stored per result                                        |
-| Zustand selectors    | ✅ Done    | All components use granular selectors — no full-store destructuring    |
-| Memoized components  | ✅ Done    | QueryEditor, WelcomeScreen wrapped in `memo()`                         |
-| Memoized derivations | ✅ Done    | `useMemo` for `.find()` / `.filter()` operations across all components |
-| Stable effect deps   | ✅ Done    | Primitive values as `useEffect` deps, not object references            |
-| Stable callbacks     | ✅ Done    | `useCallback` for handlers passed as props or used in effects          |
-| Tab reuse            | ✅ Done    | Opening same table reuses existing tab                                 |
-| Performance rules    | ✅ Done    | `.agents/workflows/performance-rules.md` — 10 enforceable rules        |
-| Virtual scrolling    | 📋 Planned | Render only visible rows for large result sets                         |
-| Lazy tab loading     | 📋 Planned | Don't render inactive tabs until switched                              |
+| Optimization         | Status     | Description                                                               |
+| -------------------- | ---------- | ------------------------------------------------------------------------- |
+| Tab limit            | ✅ Done    | Max 20 tabs, oldest auto-removed                                          |
+| Result truncation    | ✅ Done    | Max 1000 rows stored per result                                           |
+| Zustand selectors    | ✅ Done    | All components use granular selectors — no full-store destructuring       |
+| Memoized components  | ✅ Done    | QueryEditor, WelcomeScreen wrapped in `memo()`                            |
+| Memoized derivations | ✅ Done    | `useMemo` for `.find()` / `.filter()` operations across all components    |
+| Stable effect deps   | ✅ Done    | Primitive values as `useEffect` deps, not object references               |
+| Stable callbacks     | ✅ Done    | `useCallback` for handlers passed as props or used in effects             |
+| Tab reuse            | ✅ Done    | Opening same table reuses existing tab                                    |
+| Performance rules    | ✅ Done    | `.agents/workflows/performance-rules.md` — 13 enforceable rules (3 tiers) |
+| Virtual scrolling    | 📋 Planned | Render only visible rows for large result sets                            |
+| Lazy tab loading     | 📋 Planned | Don't render inactive tabs until switched                                 |
 
 ---
 
@@ -308,7 +309,7 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 - [ ] Connection groups/folders
 - [ ] Import/export between engines
 - [ ] Schema migration tools
-- [ ] Query builder (visual)
+- [x] Query builder (visual) — Filter query builder in Data tab with WHERE clause support
 
 ---
 

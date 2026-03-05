@@ -37,7 +37,16 @@ export async function executeQuery(
 export async function getTableRowCount(
   tableName: string,
   connId?: string,
+  whereClause?: string,
 ): Promise<number> {
+  if (whereClause) {
+    const query = `SELECT COUNT(*) as count FROM "${tableName}" WHERE ${whereClause}`;
+    const result = await executeQuery(query, connId);
+    if (result.rows.length > 0) {
+      return Number(result.rows[0][0]) || 0;
+    }
+    return 0;
+  }
   return invoke<number>("get_table_row_count", { tableName, connId });
 }
 
@@ -48,8 +57,12 @@ export async function getTableData(
   offset = 0,
   orderBy?: string,
   orderDir: "ASC" | "DESC" = "ASC",
+  whereClause?: string,
 ): Promise<QueryResult> {
   let query = `SELECT * FROM "${tableName}"`;
+  if (whereClause) {
+    query += ` WHERE ${whereClause}`;
+  }
   if (orderBy) {
     query += ` ORDER BY "${orderBy}" ${orderDir}`;
   }

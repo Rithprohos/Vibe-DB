@@ -15,17 +15,17 @@
 
 ## Tech Stack
 
-| Layer     | Technology                                | Notes                                             |
-| --------- | ----------------------------------------- | ------------------------------------------------- |
-| Backend   | Rust + Tauri v2                           | Commands in `src-tauri/src/lib.rs`                |
-| Frontend  | React 19 + TypeScript                     | Vite dev server on port 1420                      |
-| State     | Zustand 5 + Tauri Store                   | `src/store/useAppStore.ts`, persisted via plugin |
-| DB access | Trait-based `DatabaseEngine`             | `src-tauri/src/engines/` — SqliteEngine implemented |
-| Plugins   | `sql`, `dialog`, `store`, `stronghold`, `opener` | SQL, file picker, persistence, secrets, opener    |
-| Styling   | Tailwind + shadcn/ui + CSS variables      | Radix primitives, `src/index.css` for vars        |
-| Icons     | Lucide React                              | SVG icons, no emojis                              |
-| Fonts     | Inter (UI) + JetBrains Mono (data)        | Google Fonts import                               |
-| Editor    | CodeMirror 6                              | SQL syntax highlighting via `@codemirror/lang-sql`|
+| Layer     | Technology                                       | Notes                                               |
+| --------- | ------------------------------------------------ | --------------------------------------------------- |
+| Backend   | Rust + Tauri v2                                  | Commands in `src-tauri/src/lib.rs`                  |
+| Frontend  | React 19 + TypeScript                            | Vite dev server on port 1420                        |
+| State     | Zustand 5 + Tauri Store                          | `src/store/useAppStore.ts`, persisted via plugin    |
+| DB access | Trait-based `DatabaseEngine`                     | `src-tauri/src/engines/` — SqliteEngine implemented |
+| Plugins   | `sql`, `dialog`, `store`, `stronghold`, `opener` | SQL, file picker, persistence, secrets, opener      |
+| Styling   | Tailwind + shadcn/ui + CSS variables             | Radix primitives, `src/index.css` for vars          |
+| Icons     | Lucide React                                     | SVG icons, no emojis                                |
+| Fonts     | Inter (UI) + JetBrains Mono (data)               | Google Fonts import                                 |
+| Editor    | CodeMirror 6                                     | SQL syntax highlighting via `@codemirror/lang-sql`  |
 
 ---
 
@@ -38,7 +38,7 @@ src/
 ├── index.css                # CSS variables design system (~1100 lines)
 ├── store/useAppStore.ts     # Zustand — connections, tabs, tables, logs, theme
 ├── lib/
-│   ├── db.ts                # Tauri invoke wrappers (typed)
+│   ├── db.ts                # Tauri invoke wrappers (typed), client-side WHERE clause filtering
 │   ├── formatters.ts        # Cell value formatting utilities
 │   └── utils.ts             # cn() helper for Tailwind
 └── components/
@@ -51,7 +51,7 @@ src/
     ├── EmptyTabScreen.tsx    # No tabs open placeholder
     ├── ConnectionDialog.tsx  # SQLite file picker + create new DB
     ├── EditConnectionDialog.tsx # Edit connection name/tag
-    ├── TableView.tsx         # Data grid with pagination + sorting
+    ├── TableView.tsx         # Data grid with pagination, sorting, inline editing, filter query builder
     ├── TableStructure.tsx    # Column definitions view
     ├── QueryEditor.tsx       # CodeMirror SQL editor with results panel
     ├── AiPanel.tsx           # AI assistant panel
@@ -88,17 +88,17 @@ src-tauri/
 
 ## Tauri Commands (Rust → Frontend)
 
-| Command               | Parameters                    | Returns           | Description                                          |
-| --------------------- | ----------------------------- | ----------------- | ---------------------------------------------------- |
-| `connect_database`    | `path, name`                  | `String`          | Connects to SQLite, returns connection ID            |
-| `disconnect_database` | `conn_id`                     | `()`              | Disconnects and cleans up resources                  |
-| `set_active_connection`| `conn_id`                    | `()`              | Sets active connection for subsequent queries        |
-| `list_tables`         | `conn_id?`                    | `Vec<TableInfo>`  | Lists tables and views                               |
-| `get_table_structure` | `conn_id?, table_name`        | `Vec<ColumnInfo>` | Column info via `PRAGMA table_info`                   |
-| `execute_query`       | `conn_id?, query`             | `QueryResult`     | Runs any SQL, returns columns+rows or affected count |
-| `get_table_row_count` | `conn_id?, table_name`         | `i64`             | `SELECT COUNT(*)` for pagination                     |
-| `create_database`     | `db_path`                     | `String`          | Creates empty SQLite file with WAL mode              |
-| `get_database_version`| `conn_id?`                    | `String`          | Returns database version string                      |
+| Command                 | Parameters             | Returns           | Description                                          |
+| ----------------------- | ---------------------- | ----------------- | ---------------------------------------------------- |
+| `connect_database`      | `path, name`           | `String`          | Connects to SQLite, returns connection ID            |
+| `disconnect_database`   | `conn_id`              | `()`              | Disconnects and cleans up resources                  |
+| `set_active_connection` | `conn_id`              | `()`              | Sets active connection for subsequent queries        |
+| `list_tables`           | `conn_id?`             | `Vec<TableInfo>`  | Lists tables and views                               |
+| `get_table_structure`   | `conn_id?, table_name` | `Vec<ColumnInfo>` | Column info via `PRAGMA table_info`                  |
+| `execute_query`         | `conn_id?, query`      | `QueryResult`     | Runs any SQL, returns columns+rows or affected count |
+| `get_table_row_count`   | `conn_id?, table_name` | `i64`             | `SELECT COUNT(*)` for pagination                     |
+| `create_database`       | `db_path`              | `String`          | Creates empty SQLite file with WAL mode              |
+| `get_database_version`  | `conn_id?`             | `String`          | Returns database version string                      |
 
 All commands accept optional `conn_id` — if omitted, uses the active connection.
 
@@ -125,11 +125,13 @@ pub trait DatabaseEngine: Send + Sync {
 ```
 
 **EngineRegistry** manages multiple connections:
+
 - `connect(config)` — registers a new engine instance
 - `disconnect(id)` — removes and cleans up
 - `get_engine(id)` — retrieves engine for queries
 
 **EngineType enum** (prepared for future):
+
 - `Sqlite` (implemented)
 - `Turso` (planned)
 - `Postgres` (planned)
@@ -164,7 +166,7 @@ Key state slices in `useAppStore.ts`:
 ```typescript
 interface AppState {
   // Connections
-  connections: Connection[];           // Saved connection configs
+  connections: Connection[]; // Saved connection configs
   activeSidebarConnectionId: string | null;
   isConnected: boolean;
 
