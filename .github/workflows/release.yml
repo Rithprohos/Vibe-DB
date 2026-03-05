@@ -43,14 +43,27 @@ jobs:
       - name: Get Release Notes
         id: notes
         run: |
+          delimiter="$(openssl rand -hex 8)"
+          echo "body<<$delimiter" >> $GITHUB_OUTPUT
+
           if [ -f ".github/release-notes/${{ github.ref_name }}.md" ]; then
-            delimiter="$(openssl rand -hex 8)"
-            echo "body<<$delimiter" >> $GITHUB_OUTPUT
             cat ".github/release-notes/${{ github.ref_name }}.md" >> $GITHUB_OUTPUT
-            echo "$delimiter" >> $GITHUB_OUTPUT
           else
-            echo "body=See the assets to download and install this version." >> $GITHUB_OUTPUT
+            echo "See the assets to download and install this version." >> $GITHUB_OUTPUT
           fi
+
+          cat << 'EOF' >> $GITHUB_OUTPUT
+
+          ---
+          ### ⚠️ macOS "App is damaged" fix
+          This app is not code-signed. After installing, if macOS says "App is damaged", run this in Terminal:
+          ```bash
+          xattr -cr /Applications/VibeDB.app
+          ```
+          Then open the app again.
+          EOF
+
+          echo "$delimiter" >> $GITHUB_OUTPUT
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
