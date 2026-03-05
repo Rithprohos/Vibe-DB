@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
@@ -13,10 +13,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
 
     runs-on: ${{ matrix.platform }}
 
@@ -35,10 +35,22 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
       - name: Install frontend dependencies
         run: bun install
+
+      - name: Get Release Notes
+        id: notes
+        run: |
+          if [ -f ".github/release-notes/${{ github.ref_name }}.md" ]; then
+            delimiter="$(openssl rand -hex 8)"
+            echo "body<<$delimiter" >> $GITHUB_OUTPUT
+            cat ".github/release-notes/${{ github.ref_name }}.md" >> $GITHUB_OUTPUT
+            echo "$delimiter" >> $GITHUB_OUTPUT
+          else
+            echo "body=See the assets to download and install this version." >> $GITHUB_OUTPUT
+          fi
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
@@ -48,8 +60,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'VibeDB ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
+          releaseName: "VibeDB ${{ github.ref_name }}"
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

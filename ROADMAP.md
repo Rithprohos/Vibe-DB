@@ -2,7 +2,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.2)
+## Current State (v0.2.3)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -23,6 +23,7 @@ Multi-database engine support for VibeDB.
 ### Query Safety (Implemented)
 
 Blocked patterns:
+
 - `DELETE` / `UPDATE` without `WHERE` clause
 - Tautological `WHERE` conditions (`1=1`, `'a'='a'`, `TRUE`)
 - `OR` injection patterns (`OR 1=1`)
@@ -77,22 +78,22 @@ Essential SQLite management features before multi-engine support.
 
 ### Table Management
 
-| Feature              | Priority | Description                                                                                         |
-| -------------------- | -------- | --------------------------------------------------------------------------------------------------- |
-| Create Table Wizard  | ✅ Done  | Visual table builder with column types, constraints, defaults, SQL preview with syntax highlighting |
-| Inline Data Edit     | ✅ Done  | Click cell → edit → save directly in table view                                                     |
-| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints                                                          |
-| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships                                                          |
-| Index Manager        | Low      | View existing indexes, create new ones                                                              |
+| Feature              | Priority         | Description                                                                                         |
+| -------------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
+| Create Table Wizard  | ✅ Done (v0.2.3) | Visual table builder with column types, constraints, defaults, SQL preview with syntax highlighting |
+| Inline Data Edit     | ✅ Done (v0.2.3) | Click cell → edit → save directly in table view                                                     |
+| Edit Table Structure | Medium           | Add/drop columns, modify types/constraints                                                          |
+| Schema Viewer (ERD)  | Medium           | Visual diagram of tables and relationships                                                          |
+| Index Manager        | Low              | View existing indexes, create new ones                                                              |
 
 ### Data Operations
 
-| Feature              | Priority | Description                                                           |
-| -------------------- | -------- | --------------------------------------------------------------------- |
-| Filter Query Builder | ✅ Done  | Visual WHERE clause builder with multiple conditions, BETWEEN support |
-| Import Data          | Medium   | CSV, JSON, SQL file import                                            |
-| Export Data          | Medium   | Export table/query results as CSV, JSON, SQL                          |
-| Backup/Restore       | Low      | One-click database backup and restore                                 |
+| Feature              | Priority         | Description                                                           |
+| -------------------- | ---------------- | --------------------------------------------------------------------- |
+| Filter Query Builder | ✅ Done (v0.2.3) | Visual WHERE clause builder with multiple conditions, BETWEEN support |
+| Import Data          | Medium           | CSV, JSON, SQL file import                                            |
+| Export Data          | Medium           | Export table/query results as CSV, JSON, SQL                          |
+| Backup/Restore       | Low              | One-click database backup and restore                                 |
 
 ### Query Management
 
@@ -104,19 +105,19 @@ Essential SQLite management features before multi-engine support.
 
 ### Workspace
 
-| Feature                | Priority | Description                                                                                              |
-| ---------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| Tabs Context Menu      | ✅ Done  | Right-click on tabs to close, close others, or close all                                                 |
-| Connection Tags        | ✅ Done  | Environment labels: local, testing, development, production                                              |
-| Editable Names         | ✅ Done  | Edit connection names and tags without reconnecting                                                      |
-| Database Version       | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar                                                     |
-| Disconnect / Reconnect | ✅ Done  | Close connection without losing saved data, reconnect from sidebar                                       |
-| Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag)                                  |
-| Keyboard Shortcuts     | ✅ Done  | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute (selected or all) |
-| Settings Modal         | ✅ Done  | Keybindings reference panel accessible via ⌘, or settings icon                                           |
-| Theme Switching        | ✅ Done  | Dark, Light, Purple Solarized themes with persisted preference                                           |
+| Feature                | Priority         | Description                                                                                              |
+| ---------------------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
+| Tabs Context Menu      | ✅ Done (v0.2.3) | Right-click on tabs to close, close others, or close all                                                 |
+| Connection Tags        | ✅ Done (v0.2.3) | Environment labels: local, testing, development, production                                              |
+| Editable Names         | ✅ Done (v0.2.3) | Edit connection names and tags without reconnecting                                                      |
+| Database Version       | ✅ Done (v0.2.3) | Display engine version (e.g., SQLite v3.x) in TopBar                                                     |
+| Disconnect / Reconnect | ✅ Done (v0.2.3) | Close connection without losing saved data, reconnect from sidebar                                       |
+| Saved Connections List | ✅ Done (v0.2.3) | Sidebar shows all saved connections when disconnected (name, type, tag)                                  |
+| Keyboard Shortcuts     | ✅ Done (v0.2.3) | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute (selected or all) |
+| Settings Modal         | ✅ Done (v0.2.3) | Keybindings reference panel accessible via ⌘, or settings icon                                           |
+| Theme Switching        | ✅ Done (v0.2.3) | Dark, Light, Purple Solarized themes with persisted preference                                           |
 
-### Tasks
+### Completed (v0.2.3)
 
 - [x] Inline cell editing with save/cancel
 - [x] Tabs context menu (close, close other, close all)
@@ -128,6 +129,10 @@ Essential SQLite management features before multi-engine support.
 - [x] Settings modal with keybindings reference
 - [x] Theme switching (Dark, Light, Purple Solarized)
 - [x] Create Table Wizard component with SQL preview and syntax highlighting
+- [x] Filter Query builder with BETWEEN support and WHERE clause generation
+
+### Upcoming Tasks (v0.2.4 & Beyond)
+
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
@@ -148,19 +153,19 @@ Essential SQLite management features before multi-engine support.
 
 ### Performance Optimizations
 
-| Optimization         | Status     | Description                                                               |
-| -------------------- | ---------- | ------------------------------------------------------------------------- |
-| Tab limit            | ✅ Done    | Max 20 tabs, oldest auto-removed                                          |
-| Result truncation    | ✅ Done    | Max 1000 rows stored per result                                           |
-| Zustand selectors    | ✅ Done    | All components use granular selectors — no full-store destructuring       |
-| Memoized components  | ✅ Done    | QueryEditor, WelcomeScreen wrapped in `memo()`                            |
-| Memoized derivations | ✅ Done    | `useMemo` for `.find()` / `.filter()` operations across all components    |
-| Stable effect deps   | ✅ Done    | Primitive values as `useEffect` deps, not object references               |
-| Stable callbacks     | ✅ Done    | `useCallback` for handlers passed as props or used in effects             |
-| Tab reuse            | ✅ Done    | Opening same table reuses existing tab                                    |
-| Performance rules    | ✅ Done    | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
-| Virtual scrolling    | 📋 Planned | Render only visible rows for large result sets                            |
-| Lazy tab loading     | 📋 Planned | Don't render inactive tabs until switched                                 |
+| Optimization         | Status           | Description                                                               |
+| -------------------- | ---------------- | ------------------------------------------------------------------------- |
+| Tab limit            | ✅ Done (v0.2.3) | Max 20 tabs, oldest auto-removed                                          |
+| Result truncation    | ✅ Done (v0.2.3) | Max 1000 rows stored per result                                           |
+| Zustand selectors    | ✅ Done (v0.2.3) | All components use granular selectors — no full-store destructuring       |
+| Memoized components  | ✅ Done (v0.2.3) | QueryEditor, WelcomeScreen wrapped in `memo()`                            |
+| Memoized derivations | ✅ Done (v0.2.3) | `useMemo` for `.find()` / `.filter()` operations across all components    |
+| Stable effect deps   | ✅ Done (v0.2.3) | Primitive values as `useEffect` deps, not object references               |
+| Stable callbacks     | ✅ Done (v0.2.3) | `useCallback` for handlers passed as props or used in effects             |
+| Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                    |
+| Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
+| Virtual scrolling    | 📋 Planned       | Render only visible rows for large result sets                            |
+| Lazy tab loading     | 📋 Planned       | Don't render inactive tabs until switched                                 |
 
 ---
 
@@ -256,7 +261,7 @@ Security improvements for production readiness.
 | Broad Tauri capability permissions | Low      | 🟡 Review   |
 | No AI data guardrails              | Low      | 🟢 Deferred |
 
-### Completed
+### Completed (v0.2.3)
 
 - [x] Migrate state persistence from `localStorage` to `tauri-plugin-store` (`app_settings.json`)
 - [x] Set up `tauri-plugin-stronghold` for encrypted credential vault (Argon2id + XChaCha20-Poly1305)
@@ -264,7 +269,7 @@ Security improvements for production readiness.
 - [x] Register store and stronghold permissions in Tauri capabilities
 - [x] Query safety validation — block DELETE/UPDATE without WHERE, tautological WHERE clauses (e.g., `WHERE 1=1`, `OR 1=1`)
 
-### Tasks
+### Upcoming Tasks (v0.2.4 & Beyond)
 
 - [ ] Implement strict CSP in `tauri.conf.json`
 - [ ] Audit Tauri capabilities (remove unused permissions)
@@ -327,7 +332,8 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 | Version | Target  | Focus                | Status         |
 | ------- | ------- | -------------------- | -------------- |
 | v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete    |
-| v0.2.x  | Q1 2026 | Security + UX polish | 🔜 In Progress |
+| v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete    |
+| v0.2.4  | Q1 2026 | Security + UX polish | 🔜 In Progress |
 | v0.3    | Q2 2026 | Turso support        | 📋 Planned     |
 | v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned     |
 | v0.5    | Q4 2026 | MySQL                | 📋 Planned     |
