@@ -188,16 +188,16 @@ export default function App() {
     switch (activeTab.type) {
       case 'data':
         return activeTab.tableName ? (
-          <TableView tableName={activeTab.tableName} tabId={activeTab.id} />
+          <TableView key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
         ) : null;
       case 'structure':
         return activeTab.tableName ? (
-          <TableStructure tableName={activeTab.tableName} tabId={activeTab.id} />
+          <TableStructure key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
         ) : null;
       case 'query':
-        return <QueryEditor tabId={activeTab.id} />;
+        return <QueryEditor key={activeTab.id} tabId={activeTab.id} />;
       case 'create-table':
-        return <CreateTable tabId={activeTab.id} />;
+        return <CreateTable key={activeTab.id} tabId={activeTab.id} />;
       default:
         return null;
     }

@@ -44,16 +44,33 @@ const OPERATORS = [
 const UNARY_OPERATORS = ['IS NULL', 'IS NOT NULL'];
 const BETWEEN_OPERATORS = ['BETWEEN', 'NOT BETWEEN'];
 
+const formatDateForInput = (value: any): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const str = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) return str.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(str)) return str.slice(0, 10);
+  return '';
+};
+
 interface CellInputProps {
   initialValue: string;
   onValueChange: (val: string) => void;
   onSave: (val: string) => void;
   onCancel: () => void;
   disabled?: boolean;
+  inputType?: 'text' | 'date';
 }
 
-function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled }: CellInputProps) {
+function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled, inputType = 'text' }: CellInputProps) {
   const [localValue, setLocalValue] = useState(initialValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (inputType === 'date' && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [inputType]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -61,15 +78,54 @@ function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled }: 
     onValueChange(val);
   };
 
+  if (inputType === 'date') {
+    return (
+      <div className="flex items-center w-full h-full p-0 relative">
+        <input
+          ref={inputRef}
+          type="date"
+          className="flex-1 h-full bg-transparent outline-none px-2 py-0.5 text-xs font-mono text-foreground cursor-pointer"
+          value={localValue}
+          onChange={handleChange}
+          onBlur={() => onCancel()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              onSave(localValue);
+            } else if (e.key === 'Escape') {
+              onCancel();
+            }
+          }}
+          disabled={disabled}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 mr-1 shrink-0"
+          onClick={onCancel}
+          disabled={disabled}
+        >
+          <XIcon className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center w-full h-full p-0 relative bg-background border border-primary/50 shadow-sm overflow-hidden">
+    <div className="flex items-center w-full h-full p-0 relative">
       <input
+        ref={inputRef}
         autoFocus
-        className="flex-1 h-full bg-transparent outline-none px-2 py-1.5 text-sm font-mono text-foreground"
+        type={inputType}
+        className="flex-1 h-full bg-transparent outline-none px-2 py-0.5 text-xs font-mono text-foreground"
         value={localValue}
         onChange={handleChange}
-        onFocus={(e) => e.currentTarget.select()}
+        onBlur={() => onCancel()}
         onKeyDown={(e) => {
+          if (e.key === 'a' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            inputRef.current?.select();
+            return;
+          }
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             onSave(localValue);
           } else if (e.key === 'Escape') {
@@ -77,6 +133,10 @@ function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled }: 
           }
         }}
         disabled={disabled}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
       />
     </div>
   );
@@ -424,44 +484,12 @@ export default function TableView({ tableName, tabId }: Props) {
             </span>
           </div>
         ),
-        cell: (info) => {
-          const rowIndex = info.row.index;
-          const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colName === colName;
-          const value = info.getValue();
-
-          if (isEditing) {
-            return (
-              <CellInput
-                initialValue={value === null ? '' : String(value)}
-                onValueChange={setEditValue}
-                onSave={(val) => handleSaveCell(rowIndex, colName, val)}
-                onCancel={() => setEditingCell(null)}
-                disabled={saving}
-              />
-            );
-          }
-
-          const { text, className } = formatCellValue(value);
-          return (
-            <div 
-              className="px-2 py-1 cell-content truncate w-full h-full cursor-text group-hover:bg-accent/10 transition-colors select-none" 
-              title={text}
-              onDoubleClick={() => {
-                if (newRowDataRef.current) return;
-                setEditValue(value === null ? '' : String(value));
-                setEditingCell({ rowIndex, colName });
-              }}
-            >
-              <span className={className}>{text}</span>
-            </div>
-          );
-        },
         size: 150,
       });
     });
 
     return cols;
-  }, [data, structure, gridCols, sortCol, sortDir, page, pageSize, editingCell, saving]);
+  }, [data, structure, gridCols, sortCol, sortDir]);
 
   const tableData = useMemo(() => {
     if (!data) return [];
@@ -555,21 +583,14 @@ export default function TableView({ tableName, tabId }: Props) {
                 size="sm" 
                 onClick={() => newRowData ? handleSaveNewRow() : handleSaveCell(editingCell!.rowIndex, editingCell!.colName, editValue)} 
                 disabled={saving} 
-                className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground" 
-                title="Save Changes (⌘+Enter)"
+                className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground font-semibold" 
               >
                 {saving ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Check size={14} className="mr-2" />}
-                {saving ? 'Saving...' : (
-                  <span className="flex items-center">
-                    Save Changes
-                    <span className="ml-2 flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary-foreground/30 bg-primary-foreground/10 text-[9px] font-bold tracking-tighter">
-                      <span className="text-[10px]">⌘</span>
-                      <span className="opacity-50">+</span>
-                      <span>ENTER</span>
-                    </span>
-                  </span>
-                )}
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+                ⌘ + Enter
+              </span>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -653,42 +674,76 @@ export default function TableView({ tableName, tabId }: Props) {
 
                 {/* Value input(s) */}
                 {!UNARY_OPERATORS.includes(filter.operator) && (
-                  BETWEEN_OPERATORS.includes(filter.operator) ? (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={filter.value}
-                        onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
-                        placeholder="From..."
-                        className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
-                        autoFocus={idx === filters.length - 1}
-                      />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">and</span>
-                      <input
-                        type="text"
-                        value={filter.valueTo}
-                        onChange={(e) => handleUpdateFilter(filter.id, { valueTo: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
-                        placeholder="To..."
-                        className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
-                      />
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={filter.value}
-                      onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleApplyFilters();
-                        }
-                      }}
-                      placeholder="Value..."
-                      className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors min-w-[160px] flex-1 max-w-[260px]"
-                      autoFocus={idx === filters.length - 1}
-                    />
-                  )
+                  (() => {
+                    const colInfo = structure.find(c => c.name === filter.field);
+                    const isDateCol = colInfo ? (colInfo.col_type.toLowerCase().includes('date') || colInfo.col_type.toLowerCase().includes('time')) : false;
+                    return BETWEEN_OPERATORS.includes(filter.operator) ? (
+                      <div className="flex items-center gap-1.5">
+                        {isDateCol ? (
+                          <input
+                            type="date"
+                            value={filter.value}
+                            onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                            className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={filter.value}
+                            onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                            placeholder="From..."
+                            className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
+                            autoFocus={idx === filters.length - 1}
+                          />
+                        )}
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">and</span>
+{isDateCol ? (
+                           <input
+                             type="date"
+                             value={filter.valueTo}
+                             onChange={(e) => handleUpdateFilter(filter.id, { valueTo: e.target.value })}
+                             onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                             className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
+                           />
+                         ) : (
+                          <input
+                            type="text"
+                            value={filter.valueTo}
+                            onChange={(e) => handleUpdateFilter(filter.id, { valueTo: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                            placeholder="To..."
+                            className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors w-[120px]"
+                          />
+                        )}
+                      </div>
+                    ) : (
+isDateCol ? (
+                         <input
+                           type="date"
+                           value={filter.value}
+                           onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
+                           onKeyDown={(e) => { if (e.key === 'Enter') handleApplyFilters(); }}
+                           className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors min-w-[160px] flex-1 max-w-[260px]"
+                         />
+                       ) : (
+                        <input
+                          type="text"
+                          value={filter.value}
+                          onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleApplyFilters();
+                            }
+                          }}
+                          placeholder="Value..."
+                          className="h-8 px-2.5 text-xs font-mono bg-background border border-border rounded-md text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 hover:border-primary/50 transition-colors min-w-[160px] flex-1 max-w-[260px]"
+                          autoFocus={idx === filters.length - 1}
+                        />
+                      )
+                    );
+                  })()
                 )}
 
                 {/* Remove filter */}
@@ -750,7 +805,7 @@ export default function TableView({ tableName, tabId }: Props) {
       )}
 
       {/* Grid wrapper */}
-      <div className="flex-1 overflow-auto custom-scrollbar relative bg-background">
+      <div className="flex-1 overflow-auto custom-scrollbar relative bg-background" style={{ isolation: 'isolate' }}>
         {data && gridCols.length > 0 ? (
           <table 
             className="w-full border-collapse table-fixed text-left min-w-max"
@@ -800,31 +855,51 @@ export default function TableView({ tableName, tabId }: Props) {
                   {gridCols.map((colName) => {
                     const columnInfo = structure.find(s => s.name === colName);
                     const col = table.getColumn(colName);
+                    const colType = columnInfo?.col_type.toLowerCase() || 'text';
+                    const isDateCol = colType.includes('date') || colType.includes('time');
                     return (
                       <td 
                         key={colName}
                         style={{ width: col?.getSize() }}
                         className="border-r border-border/50 p-0 relative group"
                       >
-                        <input
-                          className="w-full h-full min-h-[32px] bg-transparent outline-none px-2 py-1.5 text-sm font-mono focus:ring-1 focus:ring-inset focus:ring-primary text-foreground placeholder:text-muted-foreground/30 transition-all placeholder:italic"
-                          placeholder={columnInfo?.dflt_value || 'NULL'}
-                          value={newRowData[colName] || ''}
-                          onChange={(e) => setNewRowData({ ...newRowData, [colName]: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                              handleSaveNewRow();
-                            } else if (e.key === 'Escape') {
-                              handleDiscardNewRow();
-                            }
-                          }}
-                          disabled={saving}
-                          autoFocus={colName === gridCols[0]}
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck={false}
-                        />
+{isDateCol ? (
+                           <input
+                             type="date"
+                             className="w-full h-full min-h-[32px] bg-transparent outline-none px-2 py-1.5 text-sm font-mono focus:ring-1 focus:ring-inset focus:ring-primary text-foreground placeholder:text-muted-foreground/30 transition-all placeholder:italic"
+                             value={newRowData[colName] || ''}
+                             onChange={(e) => setNewRowData({ ...newRowData, [colName]: e.target.value })}
+                             onKeyDown={(e) => {
+                               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                 handleSaveNewRow();
+                               } else if (e.key === 'Escape') {
+                                 handleDiscardNewRow();
+                               }
+                             }}
+                             disabled={saving}
+                           />
+                         ) : (
+                          <input
+                            type="text"
+                            className="w-full h-full min-h-[32px] bg-transparent outline-none px-2 py-1.5 text-sm font-mono focus:ring-1 focus:ring-inset focus:ring-primary text-foreground placeholder:text-muted-foreground/30 transition-all placeholder:italic"
+                            placeholder={columnInfo?.dflt_value || 'NULL'}
+                            value={newRowData[colName] || ''}
+                            onChange={(e) => setNewRowData({ ...newRowData, [colName]: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                handleSaveNewRow();
+                              } else if (e.key === 'Escape') {
+                                handleDiscardNewRow();
+                              }
+                            }}
+                            disabled={saving}
+                            autoFocus={colName === gridCols[0]}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                          />
+                        )}
                       </td>
                     );
                   })}
@@ -832,22 +907,75 @@ export default function TableView({ tableName, tabId }: Props) {
               )}
 
               {table.getRowModel().rows.map((row, i) => (
-                <tr key={row.id} className={cn(
-                  "border-b border-border/20 transition-colors hover:bg-accent/40 group",
-                  i % 2 === 0 ? "bg-transparent" : "bg-secondary/20"
-                )}>
-                  {row.getVisibleCells().map(cell => (
-                    <td 
-                      key={cell.id}
-                      className={cn(
-                        "border-r border-border/30 overflow-hidden text-ellipsis whitespace-nowrap",
-                        cell.column.id === 'rowNum' && "bg-background/20 group-hover:bg-transparent transition-colors"
-                      )}
-                      style={{ width: cell.column.getSize() }}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                <tr 
+                  key={row.id} 
+                  className={cn(
+                    "border-b border-border/20 transition-colors hover:bg-accent/40 group",
+                    i % 2 === 0 ? "bg-transparent" : "bg-secondary/20"
+                  )}
+                >
+                  {row.getVisibleCells().map(cell => {
+                    const colId = cell.column.id;
+                    const cellValue = cell.getValue();
+                    
+                    if (colId === 'rowNum') {
+                      return (
+                        <td 
+                          key={cell.id}
+                          className="border-r border-border/30 bg-background/20 group-hover:bg-transparent transition-colors"
+                          style={{ width: cell.column.getSize() }}
+                        >
+                          <div className="flex items-center justify-center py-1.5 px-2 w-full h-full font-mono text-muted-foreground/50 text-[10px]">
+                            {page * pageSize + cell.row.index + 1}
+                          </div>
+                        </td>
+                      );
+                    }
+                    
+                    const isEditing = editingCell?.rowIndex === cell.row.index && editingCell?.colName === colId;
+                    const columnInfo = structure.find(s => s.name === colId);
+                    const colType = columnInfo?.col_type.toLowerCase() || 'text';
+                    const isDateCol = colType.includes('date') || colType.includes('time');
+                    
+                    if (isEditing) {
+                      const formattedValue = isDateCol ? formatDateForInput(cellValue) : (cellValue === null ? '' : String(cellValue));
+                      return (
+                        <td 
+                          key={cell.id}
+                          className="border-r border-border/30 p-0 relative outline outline-2 outline-primary -outline-offset-[-2px]"
+                          style={{ width: cell.column.getSize() }}
+                        >
+                          <CellInput
+                            initialValue={formattedValue}
+                            inputType={isDateCol ? 'date' : 'text'}
+                            onValueChange={setEditValue}
+                            onSave={(val) => handleSaveCell(cell.row.index, colId, val)}
+                            onCancel={() => setEditingCell(null)}
+                            disabled={saving}
+                          />
+                        </td>
+                      );
+                    }
+                    
+                    const { text, className } = formatCellValue(cellValue);
+                    return (
+                      <td 
+                        key={cell.id}
+                        className="border-r border-border/30 overflow-hidden text-ellipsis whitespace-nowrap"
+                        style={{ width: cell.column.getSize() }}
+                        onDoubleClick={() => {
+                          if (newRowDataRef.current) return;
+                          const formattedValue = isDateCol ? formatDateForInput(cellValue) : (cellValue === null ? '' : String(cellValue));
+                          setEditValue(formattedValue);
+                          setEditingCell({ rowIndex: cell.row.index, colName: colId });
+                        }}
+                      >
+                        <div className="px-2 py-1 cell-content truncate w-full h-full cursor-text group-hover:bg-accent/10 transition-colors select-none" title={text}>
+                          <span className={className}>{text}</span>
+                        </div>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
               {table.getRowModel().rows.length === 0 && !newRowData && (
