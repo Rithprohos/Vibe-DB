@@ -86,6 +86,16 @@ interface AppState {
 - Wrap handlers in `useCallback`, expensive computations in `useMemo`
 - Components like `QueryEditor`, `WelcomeScreen` are wrapped in `memo()`
 
+### Performance Rules
+
+- Fetch table structure and row counts separately from paged data fetches.
+- Build lookup maps once (`useMemo`) for hot render paths instead of repeated linear scans.
+- Avoid repeated formatter calls in cell renders; compute once and reuse.
+- Keep `useMemo` / `useCallback` dependency arrays minimal and accurate.
+- Pass stable callbacks to memoized children to avoid invalidating memoization.
+- When deriving multiple lists from one dataset, do it in one memoized pass.
+- Virtualize long lists (logs, tables, rows) when item count becomes large.
+
 ### UI Architecture
 
 Layout components in `App.tsx`:

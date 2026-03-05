@@ -62,6 +62,16 @@ bun vitest run --testNamePattern "addConnection"
 
 - Functional components with hooks, `useCallback` for handlers, `useMemo` for expensive ops
 
+### Performance Rules
+
+- **Fetch metadata separately from row data** — avoid re-fetching table structure and total row count on every page/sort update.
+- **Memoize lookup maps** — for repeated cell rendering, build maps once (for example column-name → column-info) instead of repeated `Array.find` calls.
+- **Avoid duplicated per-cell work** — compute formatted cell values once per render path and reuse.
+- **Keep memo dependencies minimal** — only include values actually used by the memoized computation.
+- **Use stable callbacks for list items** — pass `useCallback` handlers to memoized children to prevent avoidable rerenders.
+- **Prefer single-pass filtering/partitioning** — when deriving multiple filtered lists from the same source, compute them together in one memoized pass.
+- **Virtualize long lists/tables** — use row virtualization when rendering large result sets (tables, logs, sidebar objects).
+
 ### Naming & Imports
 
 | Element | Convention | Example |
