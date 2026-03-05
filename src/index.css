@@ -55,6 +55,14 @@
     --border: var(--border-primary);
     --input: var(--border-secondary);
     --ring: var(--accent-primary);
+
+    --warning: #f59e0b;
+    --warning-foreground: var(--bg-primary);
+    --info: #3b82f6;
+    --info-foreground: #ffffff;
+    --glass-bg: rgba(0, 0, 0, 0.4);
+    --glass-elevated-bg: rgba(0, 0, 0, 0.6);
+    --glow-color: 0, 229, 153;
   }
 
   /* Light Theme */
@@ -98,6 +106,14 @@
     --border: var(--border-primary);
     --input: var(--border-secondary);
     --ring: var(--accent-primary);
+
+    --warning: #d97706;
+    --warning-foreground: #ffffff;
+    --info: #2563eb;
+    --info-foreground: #ffffff;
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-elevated-bg: rgba(255, 255, 255, 0.9);
+    --glow-color: 0, 179, 119;
   }
 
   /* Dark Modern Theme */
@@ -141,6 +157,14 @@
     --border: var(--border-primary);
     --input: var(--border-secondary);
     --ring: var(--accent-primary);
+
+    --warning: #d29922;
+    --warning-foreground: var(--bg-primary);
+    --info: #58a6ff;
+    --info-foreground: var(--bg-primary);
+    --glass-bg: rgba(0, 0, 0, 0.4);
+    --glass-elevated-bg: rgba(0, 0, 0, 0.6);
+    --glow-color: 88, 166, 255;
   }
 
   /* Purple Solarized Theme */
@@ -184,6 +208,14 @@
     --border: var(--border-primary);
     --input: var(--border-secondary);
     --ring: var(--accent-primary);
+
+    --warning: #fbbf24;
+    --warning-foreground: var(--bg-primary);
+    --info: #818cf8;
+    --info-foreground: var(--bg-primary);
+    --glass-bg: rgba(26, 22, 37, 0.6);
+    --glass-elevated-bg: rgba(26, 22, 37, 0.8);
+    --glow-color: 167, 139, 250;
   }
 
   * {
@@ -221,15 +253,23 @@
   }
   
   .glass-panel {
-    @apply bg-black/40 backdrop-blur-md border border-border;
+    background: var(--glass-bg, rgba(0, 0, 0, 0.4));
+    backdrop-filter: blur(12px);
+    @apply border border-border;
   }
   
   .glass-panel-elevated {
-    @apply bg-black/60 backdrop-blur-lg border border-border shadow-lg;
+    background: var(--glass-elevated-bg, rgba(0, 0, 0, 0.6));
+    backdrop-filter: blur(16px);
+    @apply border border-border shadow-lg;
   }
 
   .neon-text {
     text-shadow: 0 0 10px var(--accent-primary);
+  }
+
+  .glow-shadow {
+    box-shadow: 0 0 10px rgba(var(--glow-color), 0.4);
   }
 }
 

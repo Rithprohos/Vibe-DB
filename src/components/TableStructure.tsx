@@ -49,7 +49,7 @@ export default function TableStructure({ tableName, tabId }: Props) {
 
   return (
     <div className="flex-1 overflow-auto bg-background p-6 relative w-full h-full custom-scrollbar-hide">
-      <div className="rounded-xl border border-border bg-surface/[0.3] overflow-hidden shadow-2xl glass-panel relative z-10 w-full mb-8 max-w-6xl mx-auto">
+      <div className="rounded-xl border border-border bg-surface/[0.3] overflow-hidden shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 glass-panel relative z-10 w-full mb-8 max-w-6xl mx-auto">
         <Table className="w-full text-left">
           <TableHeader className="bg-secondary/40 sticky top-0 backdrop-blur-md border-b border-border/50">
             <TableRow className="border-border/50 hover:bg-transparent">

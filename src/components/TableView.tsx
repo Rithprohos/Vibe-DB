@@ -793,7 +793,7 @@ export default function TableView({ tableName, tabId }: Props) {
             <tbody className="bg-background">
               {/* Virtual New Row */}
               {newRowData && (
-                <tr className="bg-primary/5 hover:bg-primary/10 transition-colors border-b border-border/50 shadow-[inset_0_2px_10px_rgba(0,229,153,0.05)]">
+                <tr className="bg-primary/5 hover:bg-primary/10 transition-colors border-b border-border/50 glow-shadow">
                   <td className="border-r border-border/50 p-2 text-center text-primary">
                     <Plus size={12} className="mx-auto" />
                   </td>

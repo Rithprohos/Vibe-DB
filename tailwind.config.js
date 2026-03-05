@@ -29,6 +29,14 @@ export default {
           DEFAULT: "var(--text-error)",
           foreground: "var(--bg-primary)",
         },
+        warning: {
+          DEFAULT: "var(--warning)",
+          foreground: "var(--warning-foreground)",
+        },
+        info: {
+          DEFAULT: "var(--info)",
+          foreground: "var(--info-foreground)",
+        },
         muted: {
           DEFAULT: "var(--bg-secondary)",
           foreground: "var(--text-secondary)",
@@ -57,7 +65,7 @@ export default {
         mono: ["JetBrains Mono", "monospace"],
       },
       boxShadow: {
-        glow: "0 0 20px 2px rgba(0, 229, 153, 0.2)",
+        glow: "0 0 20px 2px rgba(var(--glow-color), 0.25)",
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",

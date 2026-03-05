@@ -3,6 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Database, FileText, ChevronUp, ChevronDown, Download, RefreshCw, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUpdater } from '@/hooks/useUpdater';
+import { listen } from '@tauri-apps/api/event';
 
 export default function StatusBar() {
   const connections = useAppStore(s => s.connections);
@@ -41,6 +42,13 @@ export default function StatusBar() {
     }
   }, [updateInfo]);
 
+  useEffect(() => {
+    const unlisten = listen('vibedb:check-updates', () => {
+      checkForUpdates();
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, [checkForUpdates]);
+
   return (
     <>
       {showUpdateBanner && updateInfo?.available && (
@@ -76,7 +84,7 @@ export default function StatusBar() {
       <div className="flex items-center space-x-2 mr-6">
         <span className={cn(
           "w-2 h-2 rounded-full",
-          activeConnection ? "bg-primary shadow-[0_0_6px_rgba(0,229,153,0.4)]" : "bg-muted-foreground"
+          activeConnection ? "bg-primary glow-shadow" : "bg-muted-foreground"
         )} />
         <span className="font-medium tracking-wide uppercase">{activeConnection ? 'Connected' : 'Disconnected'}</span>
       </div>

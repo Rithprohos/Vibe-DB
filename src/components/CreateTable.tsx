@@ -327,7 +327,7 @@ export default function CreateTable({ tabId }: Props) {
           )}
 
           {/* Columns Grid */}
-          <div className="rounded-xl border border-border bg-surface/[0.3] overflow-hidden shadow-2xl glass-panel">
+          <div className="rounded-xl border border-border bg-surface/[0.3] overflow-hidden shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 glass-panel">
             <Table className="w-full text-left">
               <TableHeader className="bg-secondary/40 sticky top-0 backdrop-blur-md border-b border-border/50">
                 <TableRow className="border-border/50 hover:bg-transparent">
@@ -450,7 +450,7 @@ export default function CreateTable({ tabId }: Props) {
                           }
                           disabled={!col.primaryKey || col.type !== 'INTEGER'}
                           className={cn(
-                            'data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500',
+                            'data-[state=checked]:bg-warning data-[state=checked]:border-warning',
                             (!col.primaryKey || col.type !== 'INTEGER') &&
                               'opacity-30',
                           )}
@@ -466,7 +466,7 @@ export default function CreateTable({ tabId }: Props) {
                           onCheckedChange={v =>
                             updateColumn(col.id, { notNull: !!v })
                           }
-                          className="data-[state=checked]:bg-rose-500 data-[state=checked]:border-rose-500"
+                          className="data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
                         />
                       </div>
                     </TableCell>
@@ -479,7 +479,7 @@ export default function CreateTable({ tabId }: Props) {
                           onCheckedChange={v =>
                             updateColumn(col.id, { unique: !!v })
                           }
-                          className="data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                          className="data-[state=checked]:bg-info data-[state=checked]:border-info"
                         />
                       </div>
                     </TableCell>

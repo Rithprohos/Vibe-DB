@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "VibeDB",
+  "productName": "Vibe DB",
   "version": "0.2.4",
   "identifier": "kh.com.vibedb.app",
   "build": {

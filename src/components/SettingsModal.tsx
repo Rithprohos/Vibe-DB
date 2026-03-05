@@ -247,7 +247,7 @@ export default function SettingsModal() {
 
   return (
     <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
-      <DialogContent className="sm:max-w-[680px] h-[480px] bg-card border-border shadow-2xl p-0 overflow-hidden flex">
+      <DialogContent className="sm:max-w-[680px] h-[480px] bg-card border-border shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 p-0 overflow-hidden flex">
         <div className="w-[180px] bg-secondary/30 border-r border-border flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-2">

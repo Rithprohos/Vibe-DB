@@ -4,6 +4,8 @@ use engines::{
     ColumnInfo, ConnectionConfig, DatabaseEngine, EngineRegistry, QueryResult, TableInfo,
 };
 use std::sync::Arc;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
 
 /// Global application state shared across Tauri commands.
@@ -223,8 +225,43 @@ pub fn run() {
             create_database,
             get_database_version
         ])
+        .setup(|app| {
+            let handle = app.handle();
+            setup_menu(handle)?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         // PANIC: Application cannot continue without Tauri runtime.
         // This only fails due to misconfiguration or missing resources.
         .expect("Failed to start Tauri application - check configuration");
+}
+
+fn setup_menu(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let about = MenuItem::with_id(app, "about", "About VibeDB", true, None::<&str>)?;
+    let check_updates = MenuItem::with_id(app, "check_updates", "Check for Updates", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
+
+    let app_submenu = Submenu::with_items(app, "VibeDB", true, &[
+        &about,
+        &separator,
+        &check_updates,
+    ])?;
+
+    let menu = Menu::with_items(app, &[
+        &app_submenu,
+        &Submenu::new(app, "File", true)?,
+        &Submenu::new(app, "Edit", true)?,
+        &Submenu::new(app, "View", true)?,
+    ])?;
+
+    app.set_menu(menu)?;
+
+    let app_handle = app.clone();
+    app.on_menu_event(move |_app, event| {
+        if event.id() == "check_updates" {
+            let _ = app_handle.emit("vibedb:check-updates", ());
+        }
+    });
+
+    Ok(())
 }

@@ -56,7 +56,7 @@ const WelcomeScreen = memo(function WelcomeScreen() {
               {recentConnections.map((conn) => (
                 <div
                   key={conn.id}
-                  className="flex items-center p-4 rounded-xl bg-secondary/30 border border-border/50 cursor-pointer hover:bg-secondary hover:border-primary/50 hover:shadow-[0_0_15px_rgba(0,229,153,0.1)] transition-all group"
+                  className="flex items-center p-4 rounded-xl bg-secondary/30 border border-border/50 cursor-pointer hover:bg-secondary hover:border-primary/50 hover:glow-shadow transition-all group"
                   onClick={() => handleConnect(conn)}
                 >
                   <div className="w-12 h-12 rounded-lg bg-background flex items-center justify-center mr-4 group-hover:text-primary transition-colors border border-border shadow-sm">

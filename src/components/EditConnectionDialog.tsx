@@ -41,7 +41,7 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] bg-card border-border shadow-2xl p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[400px] bg-card border-border shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 p-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent-secondary via-primary to-accent-secondary" />
 
         <div className="p-6">
@@ -86,7 +86,7 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                       tag === t
                         ? t === 'production'
                           ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(248,113,113,0.15)]'
-                          : 'bg-primary/20 border-primary text-primary shadow-[0_0_10px_rgba(0,229,153,0.15)]'
+                          : 'bg-primary/20 border-primary text-primary glow-shadow'
                         : 'bg-background hover:bg-secondary border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
