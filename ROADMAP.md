@@ -1,5 +1,14 @@
 # VibeDB Engine Roadmap
 
+<p align="center">
+  <a href="./README.md">🏠 Overview</a> &nbsp;•&nbsp;
+  <a href="./ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;•&nbsp;
+  <a href="https://github.com/Rithprohos/vibe-db/releases">🚀 Releases</a> &nbsp;•&nbsp;
+  <a href="./LICENSE">⚖️ License</a>
+</p>
+
+---
+
 Multi-database engine support for VibeDB.
 
 ## Current State (v0.2.4)
@@ -173,8 +182,8 @@ Essential SQLite management features before multi-engine support.
 | Memoized derivations | ✅ Done (v0.2.3) | `useMemo` for `.find()` / `.filter()` operations across all components    |
 | Stable effect deps   | ✅ Done (v0.2.3) | Primitive values as `useEffect` deps, not object references               |
 | Stable callbacks     | ✅ Done (v0.2.3) | `useCallback` for handlers passed as props or used in effects             |
-| Stable callback refs | ✅ Done (v0.2.4) | `useRef` pattern for callbacks to avoid stale closures                   |
-| Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                  |
+| Stable callback refs | ✅ Done (v0.2.4) | `useRef` pattern for callbacks to avoid stale closures                    |
+| Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                   |
 | Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                    |
 | Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
 | Virtual scrolling    | 📋 Planned       | Render only visible rows for large result sets                            |
@@ -342,14 +351,14 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 
 ## Timeline (Estimated)
 
-| Version | Target  | Focus                | Status         |
-| ------- | ------- | -------------------- | -------------- |
-| v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete    |
-| v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete    |
-| v0.2.4  | Q1 2026 | Bug fixes + Alerts   | ✅ Complete    |
-| v0.3    | Q2 2026 | Turso support        | 📋 Planned     |
-| v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned     |
-| v0.5    | Q4 2026 | MySQL                | 📋 Planned     |
+| Version | Target  | Focus                | Status      |
+| ------- | ------- | -------------------- | ----------- |
+| v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete |
+| v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete |
+| v0.2.4  | Q1 2026 | Bug fixes + Alerts   | ✅ Complete |
+| v0.3    | Q2 2026 | Turso support        | 📋 Planned  |
+| v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned  |
+| v0.5    | Q4 2026 | MySQL                | 📋 Planned  |
 
 ---
 

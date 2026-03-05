@@ -4,11 +4,21 @@
   <img src="./app-icon.png" alt="VibeDB Logo" width="120" height="120">
 </p>
 
+<p align="center">
+  <a href="./README.md"><b>🏠 Overview</b></a> &nbsp;•&nbsp;
+  <a href="./ROADMAP.md">🗺️ Roadmap</a> &nbsp;•&nbsp;
+  <a href="https://github.com/Rithprohos/vibe-db/releases">🚀 Releases</a> &nbsp;•&nbsp;
+  <a href="./LICENSE">⚖️ License</a>
+</p>
+
+---
+
 A modern, cross-platform SQLite database manager built with Tauri v2 and React.
 
 ![VibeDB](https://img.shields.io/badge/version-0.2.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
+[![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet)](./ROADMAP.md)
 
 ## Why VibeDB?
 
@@ -31,7 +41,7 @@ VibeDB is a sleek, high-performance SQLite database management tool designed for
   <img src="./screenshot/screen-shot-2.png" alt="VibeDB Create Table GUI" width="100%">
 </p>
 
-**[📚 Roadmap](./ROADMAP.md)** — See planned features and release timeline.
+**[🗺️ View Roadmap](./ROADMAP.md)**
 
 ## Features
 
