@@ -116,6 +116,7 @@ Essential SQLite management features before multi-engine support.
 | Keyboard Shortcuts     | ✅ Done (v0.2.3) | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute (selected or all) |
 | Settings Modal         | ✅ Done (v0.2.3) | Keybindings reference panel accessible via ⌘, or settings icon                                           |
 | Theme Switching        | ✅ Done (v0.2.3) | Dark, Light, Purple Solarized themes with persisted preference                                           |
+| Global Alert Modal     | ✅ Done (v0.2.4) | Theme-matched alert system for user feedback (success, error, warning, info) with store-based state      |
 
 ### Completed (v0.2.3)
 
@@ -137,8 +138,11 @@ Essential SQLite management features before multi-engine support.
 - [x] Tabs cleared when closing connections (disconnect, close all, close others)
 - [x] Invalid paths no longer auto-create databases (file existence check before connect)
 - [x] Failed connections not persisted to store (addConnection after successful connect)
+- [x] Global alert modal component with theme-matched styling (success, error, warning, info types)
+- [x] Update check shows "up to date" alert when no updates available
+- [x] Alert modal uses performance-optimized patterns (useRef for callbacks, proper cleanup)
 
-### Upcoming Tasks (v0.2.4)
+### Upcoming Tasks
 
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
@@ -169,6 +173,8 @@ Essential SQLite management features before multi-engine support.
 | Memoized derivations | ✅ Done (v0.2.3) | `useMemo` for `.find()` / `.filter()` operations across all components    |
 | Stable effect deps   | ✅ Done (v0.2.3) | Primitive values as `useEffect` deps, not object references               |
 | Stable callbacks     | ✅ Done (v0.2.3) | `useCallback` for handlers passed as props or used in effects             |
+| Stable callback refs | ✅ Done (v0.2.4) | `useRef` pattern for callbacks to avoid stale closures                   |
+| Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                  |
 | Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                    |
 | Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
 | Virtual scrolling    | 📋 Planned       | Render only visible rows for large result sets                            |
@@ -340,7 +346,7 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 | ------- | ------- | -------------------- | -------------- |
 | v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete    |
 | v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete    |
-| v0.2.4  | Q1 2026 | Bug fixes            | 🔜 In Progress |
+| v0.2.4  | Q1 2026 | Bug fixes + Alerts   | ✅ Complete    |
 | v0.3    | Q2 2026 | Turso support        | 📋 Planned     |
 | v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned     |
 | v0.5    | Q4 2026 | MySQL                | 📋 Planned     |
