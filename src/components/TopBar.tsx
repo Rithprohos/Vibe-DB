@@ -43,7 +43,7 @@ export default function TopBar() {
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-[12px] font-medium text-muted-foreground/80 gap-1.5" 
         data-tauri-drag-region
       >
-        <span>vibe-db {activeConnection ? `— ${activeConnection.name}` : ''}</span>
+        <span>Vibe DB {activeConnection ? `— ${activeConnection.name}` : ''}</span>
         {databaseVersion && (
           <span className="text-[10px] text-muted-foreground/40 font-mono tracking-widest bg-secondary/50 px-1.5 py-0.5 rounded ml-1">
             v{databaseVersion}

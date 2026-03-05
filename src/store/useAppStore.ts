@@ -57,7 +57,7 @@ export interface SqlLog {
 
 export type TabType = "data" | "structure" | "query";
 
-export type Theme = "dark" | "light" | "purple";
+export type Theme = "dark" | "dark-modern" | "light" | "purple";
 
 export interface Tab {
   id: string;

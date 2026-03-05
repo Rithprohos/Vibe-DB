@@ -100,6 +100,49 @@
     --ring: var(--accent-primary);
   }
 
+  /* Dark Modern Theme */
+  [data-theme="dark-modern"] {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --bg-surface: #161b22;
+    --bg-elevated: #30363d;
+    --bg-hover: #30363d;
+    --bg-active: #3b424b;
+
+    --accent-primary: #58a6ff;
+    --accent-secondary: #39d353;
+
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-tertiary: #6e7681;
+    --text-error: #f85149;
+    --text-warning: #d29922;
+
+    --border-primary: #30363d;
+    --border-secondary: #21262d;
+
+    --background: var(--bg-primary);
+    --foreground: var(--text-primary);
+    --card: var(--bg-surface);
+    --card-foreground: var(--text-primary);
+    --popover: var(--bg-surface);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--accent-primary);
+    --primary-foreground: var(--bg-primary);
+    --secondary: var(--bg-tertiary);
+    --secondary-foreground: var(--text-secondary);
+    --muted: var(--bg-secondary);
+    --muted-foreground: var(--text-secondary);
+    --accent: var(--bg-active);
+    --accent-foreground: var(--text-primary);
+    --destructive: var(--text-error);
+    --destructive-foreground: var(--bg-primary);
+    --border: var(--border-primary);
+    --input: var(--border-secondary);
+    --ring: var(--accent-primary);
+  }
+
   /* Purple Solarized Theme */
   [data-theme="purple"] {
     --bg-primary: #1a1625;

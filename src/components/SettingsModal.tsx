@@ -47,6 +47,13 @@ const themeOptions: ThemeOption[] = [
     color: '#0a0a0f'
   },
   { 
+    id: 'dark-modern', 
+    name: 'Dark Modern', 
+    description: 'Sleek dark theme with cyan accents', 
+    icon: <Moon size={16} />,
+    color: '#0d1117'
+  },
+  { 
     id: 'light', 
     name: 'Light', 
     description: 'Clean light theme for daytime use', 
