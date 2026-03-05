@@ -6,7 +6,7 @@
 
 A modern, cross-platform SQLite database manager built with Tauri v2 and React.
 
-![VibeDB](https://img.shields.io/badge/version-0.2.0-blue)
+![VibeDB](https://img.shields.io/badge/version-0.2.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 
@@ -26,6 +26,7 @@ VibeDB is a sleek, high-performance SQLite database management tool designed for
 - **Multi-Engine Architecture** — Extensible database engine system (SQLite now, Turso/PostgreSQL/MySQL coming soon)
 - **SQL Query Editor** — Syntax highlighting, autocomplete, and keyboard shortcuts (⌘+Enter to run)
 - **Table Browser** — View table structure, browse data, and manage schemas
+- **Create Table GUI** — Visual table builder with column types, constraints (PK, AI, NN, UQ), defaults, and SQL preview with syntax highlighting
 - **Multi-Tab Interface** — Work with multiple queries and tables simultaneously with persistent state
 - **Query AI Assistant** — Powered by Pollinations AI for intelligent query suggestions
 - **Dark-First UI** — Easy on the eyes with a carefully crafted dark theme

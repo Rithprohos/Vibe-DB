@@ -13,6 +13,7 @@ import LogDrawer from './components/LogDrawer';
 import TableView from './components/TableView';
 import TableStructure from './components/TableStructure';
 import QueryEditor from './components/QueryEditor';
+import CreateTable from './components/CreateTable';
 import TopBar from './components/TopBar';
 import AiPanel from './components/AiPanel';
 import './index.css';
@@ -197,6 +198,8 @@ export default function App() {
         ) : null;
       case 'query':
         return <QueryEditor tabId={activeTab.id} />;
+      case 'create-table':
+        return <CreateTable tabId={activeTab.id} />;
       default:
         return null;
     }

@@ -55,7 +55,7 @@ export interface SqlLog {
   message: string;
 }
 
-export type TabType = "data" | "structure" | "query";
+export type TabType = "data" | "structure" | "query" | "create-table";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
 
@@ -174,7 +174,7 @@ export const useAppStore = create<AppState>()(
       logs: [],
       showLogDrawer: false,
       showSettingsModal: false,
-      theme: 'dark',
+      theme: "dark",
       isAiPanelOpen: false,
       databaseVersion: null,
 

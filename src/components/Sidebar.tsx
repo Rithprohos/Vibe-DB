@@ -124,6 +124,17 @@ export default function Sidebar() {
     });
   };
 
+  const handleCreateTable = () => {
+    if (!activeConnection) return;
+    const id = `create-table-${Date.now()}`;
+    addTab({
+      id,
+      connectionId: activeConnection.id,
+      type: 'create-table',
+      title: 'Create Table',
+    });
+  };
+
   return (
     <div 
       className={cn(
@@ -262,9 +273,12 @@ export default function Sidebar() {
               <Plus size={14} />
               <span>Query</span>
             </Button>
-            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-accent/50" onClick={handleRefresh}>
+            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/30" onClick={handleCreateTable}>
+              <Plus size={14} />
+              <span>Table</span>
+            </Button>
+            <Button variant="outline" size="sm" className="space-x-1 border-border/50 bg-background/50 hover:bg-accent/50 px-2" onClick={handleRefresh}>
               <RefreshCw size={14} />
-              <span>Refresh</span>
             </Button>
           </div>
 

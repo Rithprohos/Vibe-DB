@@ -269,3 +269,59 @@ async fn test_sqlite_engine_execute_query_error() {
     engine.disconnect().await;
     let _ = std::fs::remove_file(&temp_path);
 }
+
+#[test]
+fn test_validate_query_safety_delete_with_tautology() {
+    let result = SqliteEngine::validate_query_safety("DELETE FROM users WHERE 1=1");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("tautology"));
+
+    let result = SqliteEngine::validate_query_safety("DELETE FROM users WHERE 1 = 1");
+    assert!(result.is_err());
+
+    let result = SqliteEngine::validate_query_safety("delete from users where 1=1");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_validate_query_safety_update_with_tautology() {
+    let result = SqliteEngine::validate_query_safety("UPDATE users SET name = 'x' WHERE 1=1");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("tautology"));
+}
+
+#[test]
+fn test_validate_query_safety_delete_without_where() {
+    let result = SqliteEngine::validate_query_safety("DELETE FROM users");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("without WHERE"));
+}
+
+#[test]
+fn test_validate_query_safety_update_without_where() {
+    let result = SqliteEngine::validate_query_safety("UPDATE users SET name = 'x'");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("without WHERE"));
+}
+
+#[test]
+fn test_validate_query_safety_valid_queries() {
+    assert!(SqliteEngine::validate_query_safety("SELECT * FROM users").is_ok());
+    assert!(SqliteEngine::validate_query_safety("DELETE FROM users WHERE id = 5").is_ok());
+    assert!(SqliteEngine::validate_query_safety("UPDATE users SET name = 'x' WHERE id = 1").is_ok());
+    assert!(SqliteEngine::validate_query_safety("INSERT INTO users (name) VALUES ('test')").is_ok());
+    assert!(SqliteEngine::validate_query_safety("CREATE TABLE test (id INT)").is_ok());
+}
+
+#[test]
+fn test_validate_query_safety_or_tautology() {
+    let result = SqliteEngine::validate_query_safety("DELETE FROM users WHERE id = 1 OR 1=1");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("tautology"));
+}
+
+#[test]
+fn test_validate_query_safety_with_comments() {
+    let result = SqliteEngine::validate_query_safety("-- This deletes all\nDELETE FROM users WHERE 1=1");
+    assert!(result.is_err());
+}

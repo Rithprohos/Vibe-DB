@@ -2,7 +2,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.1)
+## Current State (v0.2.2)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -70,13 +70,13 @@ Essential SQLite management features before multi-engine support.
 
 ### Table Management
 
-| Feature              | Priority | Description                                                   |
-| -------------------- | -------- | ------------------------------------------------------------- |
-| Create Table Wizard  | High     | Visual table builder with column types, constraints, defaults |
-| Inline Data Edit     | ✅ Done  | Click cell → edit → save directly in table view               |
-| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints                    |
-| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships                    |
-| Index Manager        | Low      | View existing indexes, create new ones                        |
+| Feature              | Priority | Description                                                                                         |
+| -------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| Create Table Wizard  | ✅ Done  | Visual table builder with column types, constraints, defaults, SQL preview with syntax highlighting |
+| Inline Data Edit     | ✅ Done  | Click cell → edit → save directly in table view                                                     |
+| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints                                                          |
+| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships                                                          |
+| Index Manager        | Low      | View existing indexes, create new ones                                                              |
 
 ### Data Operations
 
@@ -120,7 +120,7 @@ Essential SQLite management features before multi-engine support.
 - [x] Keyboard shortcuts (⌘N, ⌘W, ⌘T, ⌘L, ⌘,, ⌘↵)
 - [x] Settings modal with keybindings reference
 - [x] Theme switching (Dark, Light, Purple Solarized)
-- [ ] Create Table Wizard component
+- [x] Create Table Wizard component with SQL preview and syntax highlighting
 - [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
