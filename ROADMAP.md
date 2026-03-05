@@ -15,10 +15,17 @@ Multi-database engine support for VibeDB.
 - `set_active_connection` — Set active connection for queries
 - `list_tables` — Get all tables/views
 - `get_table_structure` — Column definitions
-- `execute_query` — Run SQL queries
+- `execute_query` — Run SQL queries (with safety validation)
 - `get_table_row_count` — Pagination support
 - `create_database` — Create new SQLite file
 - `get_database_version` — Retrieve SQLite version
+
+### Query Safety (Implemented)
+
+Blocked patterns:
+- `DELETE` / `UPDATE` without `WHERE` clause
+- Tautological `WHERE` conditions (`1=1`, `'a'='a'`, `TRUE`)
+- `OR` injection patterns (`OR 1=1`)
 
 ### Architecture (Implemented)
 
@@ -244,6 +251,7 @@ Security improvements for production readiness.
 | Issue                              | Severity | Status      |
 | ---------------------------------- | -------- | ----------- |
 | No Content Security Policy (CSP)   | High     | 🔴 Critical |
+| Unsafe query execution             | Medium   | ✅ Fixed    |
 | Connection paths in localStorage   | Low      | ✅ Fixed    |
 | Broad Tauri capability permissions | Low      | 🟡 Review   |
 | No AI data guardrails              | Low      | 🟢 Deferred |
@@ -254,6 +262,7 @@ Security improvements for production readiness.
 - [x] Set up `tauri-plugin-stronghold` for encrypted credential vault (Argon2id + XChaCha20-Poly1305)
 - [x] Add connection environment tags (local, testing, development, production)
 - [x] Register store and stronghold permissions in Tauri capabilities
+- [x] Query safety validation — block DELETE/UPDATE without WHERE, tautological WHERE clauses (e.g., `WHERE 1=1`, `OR 1=1`)
 
 ### Tasks
 
