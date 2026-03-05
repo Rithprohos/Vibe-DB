@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { useAppStore } from '@/store/useAppStore';
 
 interface UpdateInfo {
   available: boolean;
@@ -27,6 +28,7 @@ export function useUpdater() {
     updateInfo: null,
     progress: 0,
   });
+  const showAlert = useAppStore(s => s.showAlert);
 
   const checkForUpdates = useCallback(async () => {
     setState(s => ({ ...s, checking: true, error: null }));
@@ -55,14 +57,24 @@ export function useUpdater() {
           updateInfo: { available: false },
         }));
         console.log('No updates available');
+        showAlert({
+          title: 'You\'re up to date!',
+          message: 'VibeDB is already running the latest version.',
+          type: 'success',
+        });
         return null;
       }
     } catch (e: any) {
       setState(s => ({ ...s, checking: false, error: e.message }));
       console.error('Update check failed:', e.message);
+      showAlert({
+        title: 'Update Check Failed',
+        message: e.message || 'Could not check for updates.',
+        type: 'error',
+      });
       return null;
     }
-  }, []);
+  }, [showAlert]);
 
   const downloadAndInstall = useCallback(async () => {
     setState(s => ({ ...s, downloading: true, error: null, progress: 0 }));
@@ -101,8 +113,13 @@ export function useUpdater() {
     } catch (e: any) {
       setState(s => ({ ...s, downloading: false, error: e.message }));
       console.error('Update failed:', e.message);
+      showAlert({
+        title: 'Update Failed',
+        message: e.message || 'Failed to download and install update.',
+        type: 'error',
+      });
     }
-  }, []);
+  }, [showAlert]);
 
   return {
     ...state,

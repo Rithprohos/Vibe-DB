@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Database, FileText, ChevronUp, ChevronDown, Download, RefreshCw, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -42,12 +42,28 @@ export default function StatusBar() {
     }
   }, [updateInfo]);
 
+  const checkForUpdatesRef = useRef(checkForUpdates);
+  checkForUpdatesRef.current = checkForUpdates;
+
   useEffect(() => {
-    const unlisten = listen('vibedb:check-updates', () => {
-      checkForUpdates();
+    let mounted = true;
+    let unsub: (() => void) | null = null;
+
+    listen('vibedb:check-updates', () => {
+      checkForUpdatesRef.current();
+    }).then((fn) => {
+      if (mounted) {
+        unsub = fn;
+      } else {
+        fn();
+      }
     });
-    return () => { unlisten.then(fn => fn()); };
-  }, [checkForUpdates]);
+
+    return () => {
+      mounted = false;
+      unsub?.();
+    };
+  }, []);
 
   return (
     <>

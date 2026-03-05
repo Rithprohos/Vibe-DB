@@ -59,6 +59,16 @@ export type TabType = "data" | "structure" | "query" | "create-table";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
 
+export type AlertType = "info" | "success" | "warning" | "error";
+
+export interface AlertOptions {
+  title: string;
+  message?: string;
+  type?: AlertType;
+  confirmText?: string;
+  onConfirm?: () => void;
+}
+
 export interface Tab {
   id: string;
   connectionId: string;
@@ -91,6 +101,9 @@ interface AppState {
 
   // Settings Modal
   showSettingsModal: boolean;
+
+  // Alert Modal
+  alertOptions: AlertOptions | null;
 
   // Theme
   theme: Theme;
@@ -138,6 +151,10 @@ interface AppState {
   clearLogs: () => void;
   setShowLogDrawer: (val: boolean) => void;
   setShowSettingsModal: (val: boolean) => void;
+
+  // Alert actions
+  showAlert: (options: AlertOptions) => void;
+  hideAlert: () => void;
 }
 
 let tabCounter = 0;
@@ -174,6 +191,7 @@ export const useAppStore = create<AppState>()(
       logs: [],
       showLogDrawer: false,
       showSettingsModal: false,
+      alertOptions: null,
       theme: "dark",
       isAiPanelOpen: false,
       databaseVersion: null,
@@ -372,6 +390,9 @@ export const useAppStore = create<AppState>()(
           selectedTable: tableName,
         }));
       },
+
+      showAlert: (options) => set({ alertOptions: options }),
+      hideAlert: () => set({ alertOptions: null }),
     }),
     {
       name: "vibedb-storage",

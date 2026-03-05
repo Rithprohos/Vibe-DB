@@ -16,6 +16,7 @@ import QueryEditor from './components/QueryEditor';
 import CreateTable from './components/CreateTable';
 import TopBar from './components/TopBar';
 import AiPanel from './components/AiPanel';
+import AlertModal from './components/AlertModal';
 import './index.css';
 
 export default function App() {
@@ -217,6 +218,7 @@ export default function App() {
       <StatusBar />
       {showConnectionDialog && <ConnectionDialog />}
       <SettingsModal />
+      <AlertModal />
       <LogDrawer />
     </div>
   );
