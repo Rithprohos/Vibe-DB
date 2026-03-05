@@ -308,8 +308,12 @@ fn test_validate_query_safety_update_without_where() {
 fn test_validate_query_safety_valid_queries() {
     assert!(SqliteEngine::validate_query_safety("SELECT * FROM users").is_ok());
     assert!(SqliteEngine::validate_query_safety("DELETE FROM users WHERE id = 5").is_ok());
-    assert!(SqliteEngine::validate_query_safety("UPDATE users SET name = 'x' WHERE id = 1").is_ok());
-    assert!(SqliteEngine::validate_query_safety("INSERT INTO users (name) VALUES ('test')").is_ok());
+    assert!(
+        SqliteEngine::validate_query_safety("UPDATE users SET name = 'x' WHERE id = 1").is_ok()
+    );
+    assert!(
+        SqliteEngine::validate_query_safety("INSERT INTO users (name) VALUES ('test')").is_ok()
+    );
     assert!(SqliteEngine::validate_query_safety("CREATE TABLE test (id INT)").is_ok());
 }
 
@@ -322,6 +326,7 @@ fn test_validate_query_safety_or_tautology() {
 
 #[test]
 fn test_validate_query_safety_with_comments() {
-    let result = SqliteEngine::validate_query_safety("-- This deletes all\nDELETE FROM users WHERE 1=1");
+    let result =
+        SqliteEngine::validate_query_safety("-- This deletes all\nDELETE FROM users WHERE 1=1");
     assert!(result.is_err());
 }

@@ -1,6 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ColumnDef } from "./createTableConstants";
 import type { TableInfo, ColumnInfo, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
+
+export interface QueryFilter {
+  field: string;
+  operator: string;
+  value: string;
+  valueTo: string;
+}
 
 export async function connectDatabase(
   path: string,
@@ -60,15 +68,12 @@ export async function executeTransaction(
 export async function getTableRowCount(
   tableName: string,
   connId?: string,
-  whereClause?: string,
+  filters?: QueryFilter[],
 ): Promise<number> {
-  if (whereClause) {
-    const query = `SELECT COUNT(*) as count FROM "${tableName}" WHERE ${whereClause}`;
-    const result = await executeQuery(query, connId);
-    if (result.rows.length > 0) {
-      return Number(result.rows[0][0]) || 0;
-    }
-    return 0;
+  if (filters && filters.length > 0) {
+    return measureDevFetch("get_filtered_row_count", () =>
+      invoke<number>("get_filtered_row_count", { tableName, connId, filters }),
+    );
   }
   return measureDevFetch("get_table_row_count", () =>
     invoke<number>("get_table_row_count", { tableName, connId }),
@@ -82,17 +87,19 @@ export async function getTableData(
   offset = 0,
   orderBy?: string,
   orderDir: "ASC" | "DESC" = "ASC",
-  whereClause?: string,
+  filters?: QueryFilter[],
 ): Promise<QueryResult> {
-  let query = `SELECT * FROM "${tableName}"`;
-  if (whereClause) {
-    query += ` WHERE ${whereClause}`;
-  }
-  if (orderBy) {
-    query += ` ORDER BY "${orderBy}" ${orderDir}`;
-  }
-  query += ` LIMIT ${limit} OFFSET ${offset}`;
-  return executeQuery(query, connId);
+  return measureDevFetch("get_table_data", () =>
+    invoke<QueryResult>("get_table_data", {
+      tableName,
+      connId,
+      limit,
+      offset,
+      orderBy,
+      orderDir,
+      filters,
+    }),
+  );
 }
 
 export async function createDatabase(dbPath: string): Promise<string> {
@@ -104,5 +111,15 @@ export async function createDatabase(dbPath: string): Promise<string> {
 export async function getDatabaseVersion(connId?: string): Promise<string> {
   return measureDevFetch("get_database_version", () =>
     invoke<string>("get_database_version", { connId }),
+  );
+}
+
+export async function buildCreateTableSQL(
+  tableName: string,
+  columns: ColumnDef[],
+  ifNotExists: boolean,
+): Promise<string> {
+  return measureDevFetch("build_create_table_sql", () =>
+    invoke<string>("build_create_table_sql", { tableName, columns, ifNotExists }),
   );
 }

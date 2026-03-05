@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback, useRef, useState } from 'react';
+import { memo, useMemo, useEffect, useCallback, useRef, useState } from 'react';
 import { formatCellValue } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,6 +21,163 @@ import { useCellEditing } from './hooks/useCellEditing';
 import { OPERATORS, UNARY_OPERATORS, BETWEEN_OPERATORS } from './types';
 import type { TableViewProps } from './types';
 import { useDevRenderCounter } from '@/lib/dev-performance';
+import type { ColumnInfo } from '@/store/useAppStore';
+
+interface EditingCellState {
+  rowIndex: number;
+  colName: string;
+}
+
+interface VirtualCellProps {
+  cellId: string;
+  colName: string;
+  rowIndex: number;
+  cellValue: unknown;
+  pendingValue: unknown;
+  hasPendingEdit: boolean;
+  isEditing: boolean;
+  isRowNum: boolean;
+  isDateCol: boolean;
+  hasActiveEditingCell: boolean;
+  editValue: string;
+  saving: boolean;
+  onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
+  onSaveCell: (rowIndex: number, colName: string, value: string) => void;
+  onCancelEdit: () => void;
+  onEditValueChange: (value: string) => void;
+}
+
+const VirtualCell = memo(function VirtualCell({
+  cellId,
+  colName,
+  rowIndex,
+  cellValue,
+  pendingValue,
+  hasPendingEdit,
+  isEditing,
+  isRowNum,
+  isDateCol,
+  hasActiveEditingCell,
+  editValue,
+  saving,
+  onBeginEdit,
+  onSaveCell,
+  onCancelEdit,
+  onEditValueChange,
+}: VirtualCellProps) {
+  const displayValue = pendingValue ?? cellValue;
+  const formattedCell = useMemo(() => formatCellValue(displayValue), [displayValue]);
+
+  return (
+    <td
+      key={cellId}
+      className={cn(
+        "border-r border-border/60 p-0 text-xs relative overflow-hidden",
+        isRowNum && "bg-muted/10 font-mono text-muted-foreground/50",
+        isEditing && "ring-1 ring-inset ring-primary bg-primary/5 z-10",
+        hasPendingEdit && !isEditing && "bg-amber-500/10"
+      )}
+      style={{ borderBottom: '1px solid var(--border)' }}
+      onMouseDown={() => {
+        if (hasActiveEditingCell && !isRowNum && !isEditing) {
+          onBeginEdit(rowIndex, colName, displayValue);
+        }
+      }}
+      onDoubleClick={() => {
+        onBeginEdit(rowIndex, colName, displayValue);
+      }}
+    >
+      {isEditing ? (
+        <CellInput
+          key={`${rowIndex}:${colName}`}
+          initialValue={editValue}
+          onValueChange={onEditValueChange}
+          onSave={(val) => onSaveCell(rowIndex, colName, val)}
+          onCancel={onCancelEdit}
+          disabled={saving}
+          inputType={isDateCol ? 'date' : 'text'}
+        />
+      ) : (
+        <div className={cn(
+          "px-2 py-1.5 h-full w-full min-h-[32px] font-mono break-all line-clamp-2",
+          formattedCell.className
+        )}>
+          {formattedCell.text}
+        </div>
+      )}
+    </td>
+  );
+});
+
+interface VirtualRowProps {
+  row: any;
+  rowIndex: number;
+  editingCell: EditingCellState | null;
+  editValue: string;
+  saving: boolean;
+  columnInfoByName: Record<string, ColumnInfo>;
+  getPendingCellValue: (rowIndex: number, colName: string) => unknown;
+  isCellPending: (rowIndex: number, colName: string) => boolean;
+  onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
+  onSaveCell: (rowIndex: number, colName: string, value: string) => void;
+  onCancelEdit: () => void;
+  onEditValueChange: (value: string) => void;
+}
+
+const VirtualRow = memo(function VirtualRow({
+  row,
+  rowIndex,
+  editingCell,
+  editValue,
+  saving,
+  columnInfoByName,
+  getPendingCellValue,
+  isCellPending,
+  onBeginEdit,
+  onSaveCell,
+  onCancelEdit,
+  onEditValueChange,
+}: VirtualRowProps) {
+  return (
+    <tr
+      key={row.id}
+      className={cn(
+        "transition-colors group",
+        rowIndex % 2 === 0 ? "bg-background" : "bg-muted/30",
+        "hover:bg-accent hover:shadow-md"
+      )}
+    >
+      {row.getVisibleCells().map((cell: any) => {
+        const colName = cell.column.id;
+        const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colName === colName;
+        const columnInfo = columnInfoByName[colName];
+        const colType = columnInfo?.col_type.toLowerCase() || 'text';
+        const isDateCol = colType.includes('date') || colType.includes('time');
+        return (
+          <VirtualCell
+            key={cell.id}
+            cellId={cell.id}
+            colName={colName}
+            rowIndex={rowIndex}
+            cellValue={cell.getValue()}
+            pendingValue={getPendingCellValue(rowIndex, colName)}
+            hasPendingEdit={isCellPending(rowIndex, colName)}
+            isEditing={isEditing}
+            isRowNum={cell.column.id === 'rowNum'}
+            isDateCol={isDateCol}
+            hasActiveEditingCell={Boolean(editingCell)}
+            editValue={editValue}
+            saving={saving}
+            onBeginEdit={onBeginEdit}
+            onSaveCell={onSaveCell}
+            onCancelEdit={onCancelEdit}
+            onEditValueChange={onEditValueChange}
+          />
+        );
+      })}
+    </tr>
+  );
+});
 
 export default function TableView({ tableName, tabId }: TableViewProps) {
   useDevRenderCounter('TableView', `${tableName}:${tabId}`);
@@ -53,29 +210,29 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     setShowFilterPanel,
     filters,
     appliedFilters,
-    whereClause,
+    activeFilterCount,
     handleAddFilter,
     handleUpdateFilter,
     handleRemoveFilter,
     handleApplyFilters,
     handleClearAllFilters
-  } = useFilters(structure, setPage);
+  } = useFilters(setPage);
 
   const refreshVisibleData = useCallback(
-    () => fetchData(whereClause),
-    [fetchData, whereClause],
+    () => fetchData(appliedFilters),
+    [fetchData, appliedFilters],
   );
 
   // Trigger data fetching for rows (page/sort/filter)
   useEffect(() => {
-    fetchData(whereClause);
-  }, [fetchData, whereClause]);
+    fetchData(appliedFilters);
+  }, [fetchData, appliedFilters]);
 
   // Fetch structure and total count only when filter/connection/table context changes
   useEffect(() => {
     fetchStructure();
-    fetchRowCount(whereClause);
-  }, [fetchStructure, fetchRowCount, whereClause]);
+    fetchRowCount(appliedFilters);
+  }, [fetchStructure, fetchRowCount, appliedFilters]);
 
   const {
     newRowData,
@@ -128,9 +285,9 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   const handleRefreshAll = useCallback(() => {
     fetchStructure();
-    fetchRowCount(whereClause);
-    fetchData(whereClause);
-  }, [fetchStructure, fetchRowCount, fetchData, whereClause]);
+    fetchRowCount(appliedFilters);
+    fetchData(appliedFilters);
+  }, [fetchStructure, fetchRowCount, fetchData, appliedFilters]);
 
   const commitPendingWithFeedback = useCallback(async () => {
     const activeEdit =
@@ -178,6 +335,18 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     },
     [editingCell, editValue, handleSaveCell, newRowData, saving, setEditingCell, setEditValue],
   );
+
+  const handleBeginCellEdit = useCallback((rowIndex: number, colName: string, value: unknown) => {
+    void beginCellEdit(rowIndex, colName, value);
+  }, [beginCellEdit]);
+
+  const handleSaveCellForRow = useCallback((rowIndex: number, colName: string, value: string) => {
+    void handleSaveCell(rowIndex, colName, value);
+  }, [handleSaveCell]);
+
+  const handleCancelCellEdit = useCallback(() => {
+    setEditingCell(null);
+  }, [setEditingCell]);
 
   // Build columns for TanStack Table
   const columns = useMemo<ColumnDef<any>[]>(() => {
@@ -377,16 +546,16 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             className={cn(
               "h-8 transition-colors font-medium px-2.5",
-              appliedFilters.length > 0 || showFilterPanel 
+              activeFilterCount > 0 || showFilterPanel 
                 ? "text-primary bg-primary/10 hover:bg-primary/20" 
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             <Filter size={14} className="mr-1.5" />
             Filter
-            {appliedFilters.length > 0 && (
+            {activeFilterCount > 0 && (
               <span className="ml-1.5 bg-primary text-primary-foreground text-[10px] h-4 w-4 rounded-full flex items-center justify-center font-bold">
-                {appliedFilters.length}
+                {activeFilterCount}
               </span>
             )}
           </Button>
@@ -394,7 +563,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
         <div className="flex items-center space-x-4">
           <div className="text-[11px] text-muted-foreground/60 font-mono tracking-wider tabular-nums uppercase">
-            {appliedFilters.length > 0 ? (
+            {activeFilterCount > 0 ? (
               <span className="text-primary font-bold">Filtered: </span>
             ) : null}
             {totalRows.toLocaleString()} rows total
@@ -669,7 +838,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                         <p className="text-lg font-semibold tracking-tight">No data found</p>
                         <p className="text-sm">Try refreshing or adjusting your filters</p>
                       </div>
-                      <Button variant="outline" onClick={() => fetchData(whereClause)} size="sm">
+                      <Button variant="outline" onClick={() => fetchData(appliedFilters)} size="sm">
                         <RefreshCw size={14} className="mr-2" /> Reload Table
                       </Button>
                     </div>
@@ -696,66 +865,21 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                       {virtualRows.map((virtualRow) => {
                         const row = rows[virtualRow.index];
                         return (
-                  <tr 
-                    key={row.id} 
-                    className={cn(
-                      "transition-colors group",
-                      virtualRow.index % 2 === 0 ? "bg-background" : "bg-muted/30",
-                      "hover:bg-accent hover:shadow-md"
-                    )}
-                  >
-                    {row.getVisibleCells().map(cell => {
-                      const colName = cell.column.id;
-                      const isEditing = editingCell?.rowIndex === row.index && editingCell?.colName === colName;
-                      const columnInfo = columnInfoByName[colName];
-                      const colType = columnInfo?.col_type.toLowerCase() || 'text';
-                      const isDateCol = colType.includes('date') || colType.includes('time');
-                      const pendingValue = getPendingCellValue(row.index, colName);
-                      const displayValue = pendingValue ?? cell.getValue();
-                      const formattedCell = formatCellValue(displayValue);
-                      const hasPendingEdit = isCellPending(row.index, colName);
-
-                      return (
-                        <td 
-                          key={cell.id}
-                          className={cn(
-                            "border-r border-border/60 p-0 text-xs relative overflow-hidden",
-                            cell.column.id === 'rowNum' && "bg-muted/10 font-mono text-muted-foreground/50",
-                            isEditing && "ring-1 ring-inset ring-primary bg-primary/5 z-10",
-                            hasPendingEdit && !isEditing && "bg-amber-500/10"
-                          )}
-                          style={{ borderBottom: '1px solid var(--border)' }}
-                          onMouseDown={() => {
-                            if (editingCell && !isEditing && colName !== 'rowNum') {
-                              void beginCellEdit(row.index, colName, displayValue);
-                            }
-                          }}
-                          onDoubleClick={() => {
-                            void beginCellEdit(row.index, colName, displayValue);
-                          }}
-                        >
-                          {isEditing ? (
-                            <CellInput
-                              key={`${row.index}:${colName}`}
-                              initialValue={editValue}
-                              onValueChange={setEditValue}
-                              onSave={(val) => handleSaveCell(row.index, colName, val)}
-                              onCancel={() => setEditingCell(null)}
-                              disabled={saving}
-                              inputType={isDateCol ? 'date' : 'text'}
-                            />
-                          ) : (
-                            <div className={cn(
-                              "px-2 py-1.5 h-full w-full min-h-[32px] font-mono break-all line-clamp-2",
-                              formattedCell.className
-                            )}>
-                              {formattedCell.text}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          <VirtualRow
+                            key={row.id}
+                            row={row}
+                            rowIndex={virtualRow.index}
+                            editingCell={editingCell}
+                            editValue={editValue}
+                            saving={saving}
+                            columnInfoByName={columnInfoByName}
+                            getPendingCellValue={getPendingCellValue}
+                            isCellPending={isCellPending}
+                            onBeginEdit={handleBeginCellEdit}
+                            onSaveCell={handleSaveCellForRow}
+                            onCancelEdit={handleCancelCellEdit}
+                            onEditValueChange={setEditValue}
+                          />
                         );
                       })}
 

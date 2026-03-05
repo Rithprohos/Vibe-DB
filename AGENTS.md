@@ -72,6 +72,14 @@ bun vitest run --testNamePattern "addConnection"
 - **Prefer single-pass filtering/partitioning** — when deriving multiple filtered lists from the same source, compute them together in one memoized pass.
 - **Virtualize long lists/tables** — use row virtualization when rendering large result sets (tables, logs, sidebar objects).
 
+### Refactor Safety Rules
+
+- **Preserve interaction semantics during refactors** — performance/memoization changes must not alter click/double-click/keyboard behavior.
+- **Do not simplify input handlers without parity checks** — avoid changing `onMouseDown`/`onClick`/`onDoubleClick` logic unless behavior is explicitly approved.
+- **Run behavior parity checklist after table-editing changes** — verify: double-click enters edit, single click only behaves as designed, `Escape` cancels, `Cmd/Ctrl+Enter` commits.
+- **Add or update regression tests for critical interactions** — when touching editable grid logic, include tests for edit entry and commit/cancel flow.
+- **Only mark perf tasks done after behavior validation** — roadmap/readme status updates require passing interaction smoke checks first.
+
 ### Naming & Imports
 
 | Element | Convention | Example |

@@ -1,6 +1,11 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { getTableData, getTableRowCount, getTableStructure } from "@/lib/db";
+import {
+  getTableData,
+  getTableRowCount,
+  getTableStructure,
+  type QueryFilter,
+} from "@/lib/db";
 import type { QueryResult, ColumnInfo } from "@/store/useAppStore";
 
 export const useTableData = (tableName: string, tabId: string) => {
@@ -37,15 +42,11 @@ export const useTableData = (tableName: string, tabId: string) => {
   }, [tableName, activeConnection?.connId]);
 
   const fetchRowCount = useCallback(
-    async (whereClause?: string) => {
+    async (filters?: QueryFilter[]) => {
       if (!activeConnection?.connId) return;
       const requestId = ++countRequestIdRef.current;
       try {
-        const count = await getTableRowCount(
-          tableName,
-          activeConnection.connId,
-          whereClause,
-        );
+        const count = await getTableRowCount(tableName, activeConnection.connId, filters);
         if (requestId !== countRequestIdRef.current) return;
         setTotalRows(count);
       } catch (e: any) {
@@ -56,7 +57,7 @@ export const useTableData = (tableName: string, tabId: string) => {
   );
 
   const fetchData = useCallback(
-    async (whereClause?: string) => {
+    async (filters?: QueryFilter[]) => {
       if (!activeConnection?.connId) return;
       const requestId = ++dataRequestIdRef.current;
       setLoading(true);
@@ -68,7 +69,7 @@ export const useTableData = (tableName: string, tabId: string) => {
           page * pageSize,
           sortCol || undefined,
           sortDir,
-          whereClause,
+          filters,
         );
         if (requestId !== dataRequestIdRef.current) return;
         setData(result);

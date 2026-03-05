@@ -1,6 +1,6 @@
 {
   "name": "vibe-db",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "description": "Cross-platform SQLite database manager built with Tauri v2, React, and Rust",
@@ -22,7 +22,8 @@
     "version:major": "scripts/bump-version.sh major",
     "release:patch": "scripts/bump-version.sh patch --push",
     "release:minor": "scripts/bump-version.sh minor --push",
-    "release:major": "scripts/bump-version.sh major --push"
+    "release:major": "scripts/bump-version.sh major --push",
+    "updater:generate": "node scripts/generate-latest-json.mjs"
   },
   "dependencies": {
     "@codemirror/lang-sql": "^6.10.0",

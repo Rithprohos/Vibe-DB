@@ -1,73 +1,24 @@
-import { useState, useCallback, useMemo } from "react";
-import type { FilterCondition, ColumnInfo } from "../types";
+import { useState, useMemo } from "react";
+import type { FilterCondition } from "../types";
 import { BETWEEN_OPERATORS, UNARY_OPERATORS } from "../types";
 
-export const useFilters = (
-  structure: ColumnInfo[],
-  setPage: (p: number) => void,
-) => {
+export const useFilters = (setPage: (p: number) => void) => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [filters, setFilters] = useState<FilterCondition[]>([]);
   const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
-
-  const buildWhereClause = useCallback(
-    (filterList: FilterCondition[]): string | undefined => {
-      const validFilters = filterList.filter((f) => {
+  const activeFilterCount = useMemo(
+    () =>
+      appliedFilters.filter((f) => {
         if (!f.field || !f.operator) return false;
-        if (BETWEEN_OPERATORS.includes(f.operator))
-          return !!f.value && !!f.valueTo;
-        if (!UNARY_OPERATORS.includes(f.operator) && !f.value) return false;
-        return true;
-      });
-      if (validFilters.length === 0) return undefined;
-
-      const conditions = validFilters.map((f) => {
-        if (f.operator === "IS NULL") return `"${f.field}" IS NULL`;
-        if (f.operator === "IS NOT NULL") return `"${f.field}" IS NOT NULL`;
-        if (f.operator === "LIKE" || f.operator === "NOT LIKE") {
-          return `"${f.field}" ${f.operator} '${f.value.replace(/'/g, "''")}'`;
-        }
         if (BETWEEN_OPERATORS.includes(f.operator)) {
-          const colInfo = structure.find((c) => c.name === f.field);
-          const colType = colInfo?.col_type.toLowerCase() || "";
-          const isNum =
-            colType.includes("int") ||
-            colType.includes("real") ||
-            colType.includes("double") ||
-            colType.includes("float");
-          const fromVal =
-            isNum && !isNaN(Number(f.value))
-              ? f.value
-              : `'${f.value.replace(/'/g, "''")}'`;
-          const toVal =
-            isNum && !isNaN(Number(f.valueTo))
-              ? f.valueTo
-              : `'${f.valueTo.replace(/'/g, "''")}'`;
-          return `"${f.field}" ${f.operator} ${fromVal} AND ${toVal}`;
+          return !!f.value && !!f.valueTo;
         }
-        // Check if value is numeric
-        const colInfo = structure.find((c) => c.name === f.field);
-        const colType = colInfo?.col_type.toLowerCase() || "";
-        const isNum =
-          colType.includes("int") ||
-          colType.includes("real") ||
-          colType.includes("double") ||
-          colType.includes("float");
-        const val =
-          isNum && !isNaN(Number(f.value))
-            ? f.value
-            : `'${f.value.replace(/'/g, "''")}'`;
-        return `"${f.field}" ${f.operator} ${val}`;
-      });
-
-      return conditions.join(" AND ");
-    },
-    [structure],
-  );
-
-  const whereClause = useMemo(
-    () => buildWhereClause(appliedFilters),
-    [appliedFilters, buildWhereClause],
+        if (UNARY_OPERATORS.includes(f.operator)) {
+          return true;
+        }
+        return !!f.value;
+      }).length,
+    [appliedFilters],
   );
 
   const handleAddFilter = (gridCols: string[]) => {
@@ -125,7 +76,7 @@ export const useFilters = (
     setShowFilterPanel,
     filters,
     appliedFilters,
-    whereClause,
+    activeFilterCount,
     handleAddFilter,
     handleUpdateFilter,
     handleRemoveFilter,

@@ -1,11 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { executeQuery, listTables } from '../lib/db';
+import { buildCreateTableSQL, executeQuery, listTables } from '../lib/db';
 import { highlightSQL } from '../lib/highlightSQL';
-import {
-  generateCreateTableSQL,
-  validateCreateTable,
-} from '../lib/generateCreateTableSQL';
 import {
   SQLITE_TYPES,
   DEFAULT_OPTIONS,
@@ -75,12 +71,10 @@ export default function CreateTable({ tabId }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [sql, setSql] = useState('');
+  const sqlPreviewRequestIdRef = useRef(0);
 
   // ── Derived values ──
-  const sql = useMemo(
-    () => generateCreateTableSQL(tableName, columns, ifNotExists),
-    [tableName, columns, ifNotExists],
-  );
   const pkCount = useMemo(
     () => columns.filter(c => c.primaryKey).length,
     [columns],
@@ -133,35 +127,52 @@ export default function CreateTable({ tabId }: Props) {
     closeTab(tabId);
   }, [closeTab, tabId]);
 
-  const handleSave = useCallback(async () => {
-    const validationError = validateCreateTable(tableName, columns, connId);
-    if (validationError) {
-      setError(validationError);
+  useEffect(() => {
+    const hasTableName = tableName.trim().length > 0;
+    const hasNamedColumn = columns.some(col => col.name.trim().length > 0);
+    if (!hasTableName || !hasNamedColumn) {
+      setSql('');
       return;
     }
 
-    if (!sql) {
-      setError('Cannot generate valid SQL');
+    const requestId = ++sqlPreviewRequestIdRef.current;
+    void (async () => {
+      try {
+        const generatedSql = await buildCreateTableSQL(tableName, columns, ifNotExists);
+        if (requestId !== sqlPreviewRequestIdRef.current) return;
+        setSql(generatedSql);
+      } catch {
+        if (requestId !== sqlPreviewRequestIdRef.current) return;
+        setSql('');
+      }
+    })();
+  }, [tableName, columns, ifNotExists]);
+
+  const handleSave = useCallback(async () => {
+    if (!connId) {
+      setError('No active database connection');
       return;
     }
 
     setSaving(true);
     setError('');
     const startTime = Date.now();
+    let sqlToRun = '';
 
     try {
-      const result = await executeQuery(sql, connId!);
+      sqlToRun = await buildCreateTableSQL(tableName, columns, ifNotExists);
+      const result = await executeQuery(sqlToRun, connId);
       const duration = Date.now() - startTime;
 
       addLog({
-        sql,
+        sql: sqlToRun,
         status: 'success',
         duration,
         message: result.message || `Table "${tableName}" created successfully`,
       });
 
       // Refresh the tables list
-      const tables = await listTables(connId!);
+      const tables = await listTables(connId);
       if (activeConnection) {
         setTables(activeConnection.id, tables);
       }
@@ -177,7 +188,7 @@ export default function CreateTable({ tabId }: Props) {
       const errMsg = e?.toString() || 'Unknown error';
       setError(errMsg);
       addLog({
-        sql,
+        sql: sqlToRun || `CREATE TABLE "${tableName.trim()}" ...`,
         status: 'error',
         duration,
         message: errMsg,
@@ -189,7 +200,7 @@ export default function CreateTable({ tabId }: Props) {
     connId,
     tableName,
     columns,
-    sql,
+    ifNotExists,
     addLog,
     setTables,
     activeConnection,

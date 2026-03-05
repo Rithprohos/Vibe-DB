@@ -8,8 +8,6 @@ import StatusBar from './components/StatusBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import EmptyTabScreen from './components/EmptyTabScreen';
 import TopBar from './components/TopBar';
-import AiPanel from './components/AiPanel';
-import AlertModal from './components/AlertModal';
 import { useDevRenderCounter } from './lib/dev-performance';
 import './index.css';
 
@@ -20,6 +18,8 @@ const TableView = lazy(() => import('./components/TableView/index'));
 const TableStructure = lazy(() => import('./components/TableStructure'));
 const QueryEditor = lazy(() => import('./components/QueryEditor'));
 const CreateTable = lazy(() => import('./components/CreateTable'));
+const AiPanel = lazy(() => import('./components/AiPanel'));
+const AlertModal = lazy(() => import('./components/AlertModal'));
 
 function ContentLoading() {
   return (
@@ -245,7 +245,9 @@ export default function App() {
           <TabBar />
           {renderContent()}
         </div>
-        <AiPanel />
+        <Suspense fallback={null}>
+          <AiPanel />
+        </Suspense>
       </div>
       <StatusBar />
       {showConnectionDialog && (
@@ -258,7 +260,9 @@ export default function App() {
           <SettingsModal />
         </Suspense>
       )}
-      <AlertModal />
+      <Suspense fallback={null}>
+        <AlertModal />
+      </Suspense>
       {hasLoadedLogDrawer && (
         <Suspense fallback={null}>
           <LogDrawer />
