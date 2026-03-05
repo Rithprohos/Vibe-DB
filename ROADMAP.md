@@ -11,7 +11,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.4)
+## Current State (v0.2.5)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -166,6 +166,13 @@ Essential SQLite management features before multi-engine support.
 - [x] `execute_transaction` constrained to DML batch statements (`INSERT`/`UPDATE`/`DELETE`) for safer cross-engine behavior
 - [x] Commit success animation timer cleanup added to prevent UI timer leaks on unmount
 
+### Completed in v0.2.5
+
+- [x] Comprehensive code-splitting for heavy UI chunks (Views, Dialogs, Drawers, AI Panel, Alerts)
+- [x] TableView virtual row/cell optimization via memoized sub-components and stable callbacks
+- [x] Dev-mode instrumentation for measuring render counts and fetch latency
+- [x] Reduced initial bundle size by lazy-loading non-critical UI segments
+
 ### Upcoming Tasks
 
 - [ ] ALTER TABLE support for structure changes
@@ -213,6 +220,27 @@ Essential SQLite management features before multi-engine support.
 - [x] Add render/fetch instrumentation in dev mode (measure rerender counts and fetch latency)
 - [x] Apply code-splitting for heavy UI chunks to reduce initial bundle size
 - [ ] Add frontend performance tests (Vitest + RTL) for large table/log datasets
+
+### Backend-First Performance Plan (Added)
+
+- [ ] Cache table schema in Rust by `conn_id + table_name` to avoid repeated `get_table_structure` calls on every filtered fetch/count.
+- [ ] Keep pagination/filter/sort execution fully in Rust commands, with frontend passing only structured params.
+- [ ] Add prepared statements for repeated table browse/query patterns to reduce parse/plan overhead.
+- [ ] Return typed rows with reusable column metadata maps so frontend avoids repeated per-cell lookup/type work.
+- [ ] Ensure virtualization covers all large lists/tables/logs consistently (TableView, Sidebar objects, LogDrawer, and future heavy panels).
+- [ ] Debounce UI-triggered query refreshes (filter/search input paths) to reduce query burst load.
+- [ ] Keep metadata fetches separate from row fetches; refresh schema/count only on context changes (connection/table/filter apply), not page/sort.
+- [ ] Add index recommendation flow (based on common filter/sort columns) with one-click `CREATE INDEX` assistance.
+- [ ] Expand Rust-side performance instrumentation (command timing breakdowns) and track before/after benchmarks for each optimization.
+
+### App Performance Status (UI-Focused)
+
+| Item                                                               | Status           | Notes                                                                                    |
+| ------------------------------------------------------------------ | ---------------- | ---------------------------------------------------------------------------------------- |
+| More code-splitting/lazy loading for heavy UI panels               | ✅ Done (v0.2.5) | Main views, dialogs, drawers, AI panel, and alert modal are lazy-loaded                  |
+| Debounce filter/search state updates                               | 📋 Planned       | Apply debounce to filter/search-driven refresh paths                                     |
+| Reduce rerenders in large views (memoized row/cell + stable props) | ✅ Done (v0.2.5) | TableView virtual row/cell path extracted into memoized components with stable callbacks |
+| Move expensive formatting/highlighting off hot render paths        | 📋 Planned       | Shift repeated per-cell formatting/highlight work out of render loops                    |
 
 ---
 
@@ -381,6 +409,7 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 | v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete |
 | v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete |
 | v0.2.4  | Q1 2026 | Bug fixes + Alerts   | ✅ Complete |
+| v0.2.5  | Q1 2026 | Optimization + Lazy  | ✅ Complete |
 | v0.3    | Q2 2026 | Turso support        | 📋 Planned  |
 | v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned  |
 | v0.5    | Q4 2026 | MySQL                | 📋 Planned  |
