@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import packageJson from '../../package.json';
 
 type SettingsTab = 'general' | 'appearance' | 'keybindings' | 'about';
 
@@ -205,7 +206,7 @@ function AboutSettings() {
         </div>
         <h2 className="text-xl font-bold text-foreground">VibeDB</h2>
         <p className="text-sm text-muted-foreground mt-1">Cross-platform SQLite Manager</p>
-        <div className="text-xs font-mono text-muted-foreground/60 mt-2">Version 0.2.1</div>
+        <div className="text-xs font-mono text-muted-foreground/60 mt-2">Version {packageJson.version}</div>
       </div>
 
       <div className="p-4 rounded-lg bg-secondary/30 border border-border">
@@ -216,7 +217,7 @@ function AboutSettings() {
 
       <div className="text-center">
         <a 
-          href="https://github.com/vibedb/vibedb" 
+          href="https://github.com/Rithprohos/Vibe-DB" 
           className="text-xs text-primary hover:underline"
           target="_blank"
           rel="noopener noreferrer"

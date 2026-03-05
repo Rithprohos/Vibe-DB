@@ -1,8 +1,15 @@
 {
   "name": "vibe-db",
+  "version": "0.2.4",
   "private": true,
-  "version": "0.2.3",
   "type": "module",
+  "description": "Cross-platform SQLite database manager built with Tauri v2, React, and Rust",
+"repository": {
+    "type": "git",
+    "url": "https://github.com/Rithprohos/Vibe-DB"
+  },
+  "bugs": "https://github.com/Rithprohos/Vibe-DB/issues",
+  "homepage": "https://github.com/Rithprohos/Vibe-DB",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
