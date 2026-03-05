@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { getTableData, getTableRowCount, getTableStructure, executeQuery } from '../lib/db';
 import { formatCellValue } from '../lib/formatters';
@@ -84,10 +84,8 @@ function CellInput({ initialValue, onValueChange, onSave, onCancel, disabled }: 
 
 
 export default function TableView({ tableName, tabId }: Props) {
-  const tabs = useAppStore(s => s.tabs);
-  const connections = useAppStore(s => s.connections);
-  const tab = tabs.find(t => t.id === tabId);
-  const activeConnection = connections.find(c => c.id === tab?.connectionId);
+  const tab = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId), [tabId]));
+  const activeConnection = useAppStore(useCallback(s => s.connections.find(c => c.id === tab?.connectionId), [tab?.connectionId]));
   const [data, setData] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,6 +100,8 @@ export default function TableView({ tableName, tabId }: Props) {
   
   // In-place row state
   const [newRowData, setNewRowData] = useState<Record<string, string> | null>(null);
+  const newRowDataRef = useRef(newRowData);
+  newRowDataRef.current = newRowData;
 
   // Inline editing state: only track which cell is being edited
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; colName: string } | null>(null);
@@ -111,6 +111,11 @@ export default function TableView({ tableName, tabId }: Props) {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [filters, setFilters] = useState<FilterCondition[]>([]);
   const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
+
+  const gridCols = useMemo(() => {
+    if (data && data.columns.length > 0) return data.columns;
+    return structure.map(s => s.name);
+  }, [data, structure]);
 
   // Build WHERE clause from applied filters
   const buildWhereClause = useCallback((filterList: FilterCondition[]): string | undefined => {
@@ -203,7 +208,7 @@ export default function TableView({ tableName, tabId }: Props) {
 
   // --- Filter handlers ---
   const handleAddFilter = () => {
-    const defaultField = data?.columns[0] || '';
+    const defaultField = gridCols[0] || '';
     setFilters(prev => [...prev, { id: crypto.randomUUID(), field: defaultField, operator: '=', value: '', valueTo: '' }]);
     if (!showFilterPanel) setShowFilterPanel(true);
   };
@@ -395,7 +400,7 @@ export default function TableView({ tableName, tabId }: Props) {
       }
     ];
 
-    data.columns.forEach((colName) => {
+    gridCols.forEach((colName) => {
       const columnInfo = structure.find(s => s.name === colName);
       const type = columnInfo?.col_type.toLowerCase() || 'text';
       
@@ -442,7 +447,7 @@ export default function TableView({ tableName, tabId }: Props) {
               className="px-2 py-1 cell-content truncate w-full h-full cursor-text group-hover:bg-accent/10 transition-colors select-none" 
               title={text}
               onDoubleClick={() => {
-                if (newRowData) return;
+                if (newRowDataRef.current) return;
                 setEditValue(value === null ? '' : String(value));
                 setEditingCell({ rowIndex, colName });
               }}
@@ -456,18 +461,18 @@ export default function TableView({ tableName, tabId }: Props) {
     });
 
     return cols;
-  }, [data, structure, sortCol, sortDir, page, pageSize, editingCell, saving, newRowData]);
+  }, [data, structure, gridCols, sortCol, sortDir, page, pageSize, editingCell, saving]);
 
   const tableData = useMemo(() => {
     if (!data) return [];
     return data.rows.map(row => {
       const obj: Record<string, any> = {};
-      data.columns.forEach((col, i) => {
+      gridCols.forEach((col, i) => {
         obj[col] = row[i];
       });
       return obj;
     });
-  }, [data]);
+  }, [data, gridCols]);
 
   const table = useReactTable({
     data: tableData,
@@ -619,7 +624,7 @@ export default function TableView({ tableName, tabId }: Props) {
                     onChange={(e) => handleUpdateFilter(filter.id, { field: e.target.value })}
                     className="h-8 pl-2.5 pr-7 text-xs font-mono bg-background border border-border rounded-md text-foreground appearance-none cursor-pointer hover:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-colors min-w-[140px]"
                   >
-                    {data?.columns.map(col => (
+                    {gridCols.map(col => (
                       <option key={col} value={col}>{col}</option>
                     ))}
                   </select>
@@ -746,7 +751,7 @@ export default function TableView({ tableName, tabId }: Props) {
 
       {/* Grid wrapper */}
       <div className="flex-1 overflow-auto custom-scrollbar relative bg-background">
-        {data && data.columns.length > 0 ? (
+        {data && gridCols.length > 0 ? (
           <table 
             className="w-full border-collapse table-fixed text-left min-w-max"
             style={{ width: table.getCenterTotalSize() }}
@@ -792,7 +797,7 @@ export default function TableView({ tableName, tabId }: Props) {
                   <td className="border-r border-border/50 p-2 text-center text-primary">
                     <Plus size={12} className="mx-auto" />
                   </td>
-                  {data.columns.map((colName) => {
+                  {gridCols.map((colName) => {
                     const columnInfo = structure.find(s => s.name === colName);
                     const col = table.getColumn(colName);
                     return (
@@ -814,7 +819,7 @@ export default function TableView({ tableName, tabId }: Props) {
                             }
                           }}
                           disabled={saving}
-                          autoFocus={colName === data.columns[0]}
+                          autoFocus={colName === gridCols[0]}
                           autoComplete="off"
                           autoCorrect="off"
                           autoCapitalize="off"
@@ -845,6 +850,18 @@ export default function TableView({ tableName, tabId }: Props) {
                   ))}
                 </tr>
               ))}
+              {table.getRowModel().rows.length === 0 && !newRowData && (
+                <tr>
+                  <td colSpan={columns.length} className="text-center p-16 text-muted-foreground bg-accent/5">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+                        <Database size={24} className="opacity-40" />
+                      </div>
+                      <div className="text-sm font-medium">No records found</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         ) : (
