@@ -508,11 +508,11 @@ export default function TableView({ tableName, tabId }: Props) {
         <div className="flex items-center space-x-2">
           {!newRowData && !editingCell ? (
             <>
-              <Button variant="ghost" size="sm" onClick={() => fetchData()} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground" title="Refresh">
+              <Button variant="ghost" size="sm" onClick={() => fetchData()} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50" title="Refresh">
                 <RefreshCw size={14} />
                 Refresh
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleAddRow} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:bg-primary/10 hover:text-primary" title="Add New Row">
+              <Button variant="ghost" size="sm" onClick={handleAddRow} className="h-8 gap-1.5 text-muted-foreground hover:text-foreground hover:bg-accent/50" title="Add New Row">
                 <Plus size={14} />
                 Add Record
               </Button>
@@ -531,7 +531,7 @@ export default function TableView({ tableName, tabId }: Props) {
                   "h-8 gap-1.5 relative",
                   appliedFilters.length > 0
                     ? "bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                 )}
                 title="Filter rows"
               >

@@ -82,6 +82,20 @@ VibeDB's visual identity is inspired by **Neon DB's** dark, developer-centric ae
 - **Ghost** (tab close, small actions): transparent bg, visible on hover only
 - All buttons: `font-family: inherit`, `cursor: pointer`, `var(--transition-fast)` on hover
 
+### Toolbar Buttons
+
+Toolbar action buttons (Refresh, Add Record, Filter, etc.) must use a **consistent hover pattern**:
+
+```
+text-muted-foreground hover:text-foreground hover:bg-accent/50
+```
+
+- **Default**: muted text, transparent background
+- **Hover**: text brightens + subtle background pill appears (`accent/50`)
+- **Active/toggled state** (e.g. active filter): use `bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25`
+
+This gives buttons a tactile, clickable feel without being visually heavy — similar to VS Code and TablePlus toolbars.
+
 ### Inputs
 
 - Background: `--bg-tertiary`
