@@ -12,6 +12,9 @@
     "dialog:default",
     "store:default",
     "stronghold:default",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "updater:default",
+    "process:default",
+    "process:allow-restart"
   ]
 }

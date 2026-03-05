@@ -1,7 +1,8 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Database, FileText, ChevronUp, ChevronDown } from 'lucide-react';
+import { Database, FileText, ChevronUp, ChevronDown, Download, RefreshCw, Check, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useUpdater } from '@/hooks/useUpdater';
 
 export default function StatusBar() {
   const connections = useAppStore(s => s.connections);
@@ -10,6 +11,16 @@ export default function StatusBar() {
   const showLogDrawer = useAppStore(s => s.showLogDrawer);
   const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
   const logCount = useAppStore(s => s.logs.length);
+  const {
+    checking,
+    downloading,
+    downloaded,
+    updateInfo,
+    progress,
+    checkForUpdates,
+    downloadAndInstall
+  } = useUpdater();
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
 
   const activeConnection = useMemo(
     () => connections.find(c => c.id === activeSidebarConnectionId),
@@ -24,8 +35,44 @@ export default function StatusBar() {
     [setShowLogDrawer, showLogDrawer]
   );
 
+  useEffect(() => {
+    if (updateInfo?.available) {
+      setShowUpdateBanner(true);
+    }
+  }, [updateInfo]);
+
   return (
-    <footer className="h-[var(--statusbar-height)] flex items-center px-4 bg-secondary border-t border-border text-[11px] text-muted-foreground select-none flex-shrink-0 relative z-20">
+    <>
+      {showUpdateBanner && updateInfo?.available && (
+        <div className="h-[var(--statusbar-height)] flex items-center px-4 bg-primary/10 border-b border-primary/30 text-[11px] text-primary">
+          <Sparkles size={12} className="mr-2" />
+          <span className="font-medium">Update available: v{updateInfo.version}</span>
+          <button
+            className="ml-3 px-2 py-0.5 rounded bg-primary text-primary-foreground text-[10px] font-bold hover:bg-primary/90 transition-colors flex items-center gap-1"
+            onClick={downloadAndInstall}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <>
+                <RefreshCw size={10} className="animate-spin" />
+                <span>{progress}%</span>
+              </>
+            ) : (
+              <>
+                <Download size={10} />
+                <span>Install</span>
+              </>
+            )}
+          </button>
+          <button
+            className="ml-2 text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setShowUpdateBanner(false)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      <footer className="h-[var(--statusbar-height)] flex items-center px-4 bg-secondary border-t border-border text-[11px] text-muted-foreground select-none flex-shrink-0 relative z-20">
       <div className="flex items-center space-x-2 mr-6">
         <span className={cn(
           "w-2 h-2 rounded-full",
@@ -61,6 +108,20 @@ export default function StatusBar() {
       <div className="flex-1" />
       
       <button 
+        className="flex items-center gap-1.5 px-2 h-full hover:bg-accent hover:text-foreground transition-all cursor-pointer outline-none"
+        onClick={checkForUpdates}
+        disabled={checking}
+      >
+        {updateInfo?.available ? (
+          <Download size={12} className="text-primary" />
+        ) : downloaded ? (
+          <Check size={12} className="text-primary" />
+        ) : (
+          <RefreshCw size={12} className={cn(checking && "animate-spin")} />
+        )}
+      </button>
+      
+      <button 
         className={cn(
           "flex items-center gap-1.5 px-3 h-full hover:bg-accent hover:text-foreground transition-all cursor-pointer outline-none",
           showLogDrawer && "bg-accent/50 text-foreground"
@@ -80,5 +141,6 @@ export default function StatusBar() {
         {showLogDrawer ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
     </footer>
+    </>
   );
 }

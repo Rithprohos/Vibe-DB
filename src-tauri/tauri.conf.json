@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "VibeDB",
-  "version": "0.1.0",
+  "version": "0.2.3",
   "identifier": "kh.com.vibedb.app",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -38,6 +38,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "publisher": "VibeDB",
+    "shortDescription": "Cross-platform SQLite database manager",
+    "longDescription": "Open source database management app built with Tauri",
+    "category": "DeveloperTool"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ1RDVERTlEMTZEMEUzN0MKUldSODQ5QVduZDdWMWRHT3VMNzhpWFhpRzBBTUNaZVQ3a1o5Y2ZzUFRyejN0a3ZvbXdlRHpJQjIK",
+      "endpoints": [
+        "https://github.com/yourusername/vibedb/releases/download/v__VERSION__"
+      ]
+    }
   }
 }
