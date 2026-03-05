@@ -100,6 +100,7 @@ Essential SQLite management features before multi-engine support.
 | Feature              | Priority         | Description                                                           |
 | -------------------- | ---------------- | --------------------------------------------------------------------- |
 | Filter Query Builder | ✅ Done (v0.2.3) | Visual WHERE clause builder with multiple conditions, BETWEEN support |
+| Multi Cell/Row Edit  | ✅ Done (v0.2.4) | Stage multiple edits and commit in a single transaction               |
 | Import Data          | Medium           | CSV, JSON, SQL file import                                            |
 | Export Data          | Medium           | Export table/query results as CSV, JSON, SQL                          |
 | Backup/Restore       | Low              | One-click database backup and restore                                 |
@@ -150,6 +151,20 @@ Essential SQLite management features before multi-engine support.
 - [x] Global alert modal component with theme-matched styling (success, error, warning, info types)
 - [x] Update check shows "up to date" alert when no updates available
 - [x] Alert modal uses performance-optimized patterns (useRef for callbacks, proper cleanup)
+- [x] Virtualized row rendering in TableView via TanStack Virtual
+- [x] Virtualized list rendering in LogDrawer and Sidebar object lists
+- [x] Stale request protection for table data/count/structure fetches
+- [x] Separated metadata/count fetching from paged row-data fetch path
+- [x] Transaction command for atomic multi-statement commit (`execute_transaction`)
+- [x] Multi-cell edit staging with pending highlight and single Commit action
+- [x] One-click Commit includes active cell edit (no extra save step)
+- [x] Clicking outside edited cell auto-stages the change (immediate pending highlight)
+- [x] Unified Commit supports pending edits + new-row insert in one transaction
+- [x] New-row form auto-detects integer PK auto-increment columns and marks them as `AUTO` (no manual input)
+- [x] Transaction commit flow hardened: insert-only commits allowed without PK, PK required only for row updates
+- [x] Shared SQL helper utilities added (identifier quoting, value escaping/formatting, numeric detection, auto-PK detection)
+- [x] `execute_transaction` constrained to DML batch statements (`INSERT`/`UPDATE`/`DELETE`) for safer cross-engine behavior
+- [x] Commit success animation timer cleanup added to prevent UI timer leaks on unmount
 
 ### Upcoming Tasks
 
@@ -186,8 +201,18 @@ Essential SQLite management features before multi-engine support.
 | Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                   |
 | Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                    |
 | Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
-| Virtual scrolling    | 📋 Planned       | Render only visible rows for large result sets                            |
+| Virtual scrolling    | ✅ Done (v0.2.4) | TanStack Virtual applied to TableView rows, LogDrawer logs, Sidebar lists |
+| Stale fetch guard    | ✅ Done (v0.2.4) | Ignore out-of-order async responses for structure/count/data fetches      |
+| Split fetch strategy | ✅ Done (v0.2.4) | Separate schema/count fetch from paginated row data fetches               |
 | Lazy tab loading     | 📋 Planned       | Don't render inactive tabs until switched                                 |
+
+### Next Actions (post-v0.2.4)
+
+- [ ] Tune virtualization for UX quality (overscan and estimated row heights per view)
+- [ ] Add QueryEditor performance pass (debounced syntax highlight + memoized parse path)
+- [x] Add render/fetch instrumentation in dev mode (measure rerender counts and fetch latency)
+- [x] Apply code-splitting for heavy UI chunks to reduce initial bundle size
+- [ ] Add frontend performance tests (Vitest + RTL) for large table/log datasets
 
 ---
 

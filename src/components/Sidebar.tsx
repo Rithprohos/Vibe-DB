@@ -7,8 +7,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useDevRenderCounter } from '@/lib/dev-performance';
 
 export default function Sidebar() {
+  useDevRenderCounter('Sidebar');
   const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
   const connections = useAppStore(s => s.connections);
   const isConnected = useAppStore(s => s.isConnected);
@@ -37,6 +40,8 @@ export default function Sidebar() {
   const currentWidthRef = useRef(260);
   const rafIdRef = useRef<number | null>(null);
   const targetWidthRef = useRef(260);
+  const tablesListRef = useRef<HTMLDivElement>(null);
+  const viewsListRef = useRef<HTMLDivElement>(null);
 
   const startResizing = useCallback(() => {
     isResizingRef.current = true;
@@ -88,19 +93,40 @@ export default function Sidebar() {
     };
   }, [isResizing, resize, stopResizing]);
 
-  const filteredTables = useMemo(() => 
-    tables.filter(
-      (t) =>
-        t.table_type === 'table' &&
-        t.name.toLowerCase().includes(search.toLowerCase())
-    ), [tables, search]);
+  const normalizedSearch = useMemo(() => search.trim().toLowerCase(), [search]);
 
-  const filteredViews = useMemo(() =>
-    tables.filter(
-      (t) =>
-        t.table_type === 'view' &&
-        t.name.toLowerCase().includes(search.toLowerCase())
-    ), [tables, search]);
+  const { filteredTables, filteredViews } = useMemo(() => {
+    const nextTables: typeof tables = [];
+    const nextViews: typeof tables = [];
+
+    tables.forEach((table) => {
+      if (normalizedSearch && !table.name.toLowerCase().includes(normalizedSearch)) {
+        return;
+      }
+
+      if (table.table_type === 'view') {
+        nextViews.push(table);
+      } else if (table.table_type === 'table') {
+        nextTables.push(table);
+      }
+    });
+
+    return { filteredTables: nextTables, filteredViews: nextViews };
+  }, [tables, normalizedSearch]);
+
+  const tableVirtualizer = useVirtualizer({
+    count: tablesOpen ? filteredTables.length : 0,
+    getScrollElement: () => tablesListRef.current,
+    estimateSize: () => 34,
+    overscan: 12,
+  });
+
+  const viewVirtualizer = useVirtualizer({
+    count: viewsOpen ? filteredViews.length : 0,
+    getScrollElement: () => viewsListRef.current,
+    estimateSize: () => 34,
+    overscan: 12,
+  });
 
   const handleRefresh = async () => {
     if (!activeConnection?.connId) return;
@@ -310,23 +336,39 @@ export default function Sidebar() {
                 </div>
                 
                 {tablesOpen && (
-                  <div className="space-y-0.5">
-                    {filteredTables.map((t) => (
-                      <div
-                        key={t.name}
-                        className={cn(
-                          "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                          selectedTable === t.name 
-                            ? "bg-primary/10 text-primary border border-primary/20" 
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                        )}
-                        onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
-                        onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
-                      >
-                        <LayoutTemplate size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
-                        <span className="truncate">{t.name}</span>
-                      </div>
-                    ))}
+                  <div ref={tablesListRef} className="max-h-80 overflow-auto pr-1">
+                    <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {tableVirtualizer.getVirtualItems().map((virtualItem) => {
+                        const t = filteredTables[virtualItem.index];
+                        return (
+                          <div
+                            key={t.name}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualItem.start}px)`,
+                              paddingBottom: '2px',
+                            }}
+                          >
+                            <div
+                              className={cn(
+                                "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
+                                selectedTable === t.name
+                                  ? "bg-primary/10 text-primary border border-primary/20"
+                                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                              )}
+                              onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
+                              onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
+                            >
+                              <LayoutTemplate size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
+                              <span className="truncate">{t.name}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -348,22 +390,38 @@ export default function Sidebar() {
                   </div>
                   
                   {viewsOpen && (
-                    <div className="space-y-0.5">
-                      {filteredViews.map((t) => (
-                        <div
-                          key={t.name}
-                          className={cn(
-                            "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                            selectedTable === t.name 
-                              ? "bg-primary/10 text-primary border border-primary/20" 
-                              : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                          )}
-                          onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
-                        >
-                          <Eye size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
-                          <span className="truncate">{t.name}</span>
-                        </div>
-                      ))}
+                    <div ref={viewsListRef} className="max-h-64 overflow-auto pr-1">
+                      <div style={{ height: `${viewVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                        {viewVirtualizer.getVirtualItems().map((virtualItem) => {
+                          const t = filteredViews[virtualItem.index];
+                          return (
+                            <div
+                              key={t.name}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                transform: `translateY(${virtualItem.start}px)`,
+                                paddingBottom: '2px',
+                              }}
+                            >
+                              <div
+                                className={cn(
+                                  "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
+                                  selectedTable === t.name
+                                    ? "bg-primary/10 text-primary border border-primary/20"
+                                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                )}
+                                onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
+                              >
+                                <Eye size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
+                                <span className="truncate">{t.name}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -12,6 +12,7 @@ import { sql } from '@codemirror/lang-sql';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { keymap } from '@codemirror/view';
 import { Prec } from '@codemirror/state';
+import { useDevRenderCounter } from '@/lib/dev-performance';
 
 interface Props {
   tabId: string;
@@ -42,6 +43,7 @@ const BASIC_SETUP = {
 } as const;
 
 const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
+  useDevRenderCounter('QueryEditor', tabId);
   const tab = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId), [tabId]));
   const activeConnection = useAppStore(useCallback(s => s.connections.find(c => c.id === tab?.connectionId), [tab?.connectionId]));
   const tablesOptions = useAppStore(useCallback(s => s.tablesByConnection[tab?.connectionId || ''], [tab?.connectionId]));

@@ -36,6 +36,11 @@ pub trait DatabaseEngine: Send + Sync {
     /// For DML/DDL queries, returns the number of affected rows.
     async fn execute_query(&self, query: &str) -> EngineResult<QueryResult>;
 
+    /// Executes multiple SQL statements in a single transaction.
+    ///
+    /// The implementation must commit only if all statements succeed.
+    async fn execute_transaction(&self, queries: &[String]) -> EngineResult<QueryResult>;
+
     /// Gets the total number of rows in a table.
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64>;
 

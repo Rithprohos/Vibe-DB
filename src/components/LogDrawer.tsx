@@ -4,6 +4,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronDown, Trash2, Copy, AlertCircle, CheckCircle2, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useMemo, memo, useRef, useCallback, useEffect } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useDevRenderCounter } from '@/lib/dev-performance';
 
 const selectors = {
   logs: (s: ReturnType<typeof useAppStore.getState>) => s.logs,
@@ -67,12 +69,14 @@ const LogItem = memo(function LogItem({ log, onCopy }: LogItemProps) {
 });
 
 export default function LogDrawer() {
+  useDevRenderCounter('LogDrawer');
   const logs = useAppStore(selectors.logs);
   const showLogDrawer = useAppStore(selectors.showLogDrawer);
   const setShowLogDrawer = useAppStore(selectors.setShowLogDrawer);
   const clearLogs = useAppStore(selectors.clearLogs);
   const [height, setHeight] = useState(200);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const heightRef = useRef(200);
   const isDraggingRef = useRef(false);
 
@@ -80,13 +84,20 @@ export default function LogDrawer() {
     return [...logs].reverse();
   }, [logs]);
 
-  const handleCopy = (sql: string) => {
+  const handleCopy = useCallback((sql: string) => {
     navigator.clipboard.writeText(sql);
-  };
+  }, []);
 
-  const toggleDrawer = () => {
+  const toggleDrawer = useCallback(() => {
     setShowLogDrawer(!showLogDrawer);
-  };
+  }, [setShowLogDrawer, showLogDrawer]);
+
+  const logVirtualizer = useVirtualizer({
+    count: reversedLogs.length,
+    getScrollElement: () => viewportRef.current,
+    estimateSize: () => 64,
+    overscan: 8,
+  });
 
   useEffect(() => {
     return () => {
@@ -156,7 +167,7 @@ export default function LogDrawer() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 bg-background">
+      <ScrollArea className="flex-1 bg-background" viewportRef={viewportRef}>
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
             <Database size={24} className="opacity-40 mb-2" />
@@ -164,10 +175,27 @@ export default function LogDrawer() {
             <span className="text-xs text-muted-foreground/70 mt-1">Execute a query to see logs</span>
           </div>
         ) : (
-          <div className="p-2 space-y-1.5">
-            {reversedLogs.map((log) => (
-              <LogItem key={log.id} log={log} onCopy={handleCopy} />
-            ))}
+          <div className="p-2" style={{ height: `${logVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {logVirtualizer.getVirtualItems().map((virtualItem) => {
+              const log = reversedLogs[virtualItem.index];
+              return (
+                <div
+                  key={log.id}
+                  data-index={virtualItem.index}
+                  ref={logVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                    paddingBottom: '6px',
+                  }}
+                >
+                  <LogItem log={log} onCopy={handleCopy} />
+                </div>
+              );
+            })}
           </div>
         )}
       </ScrollArea>

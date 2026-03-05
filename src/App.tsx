@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useEffect, useCallback, useRef, useState } from 'react';
 import { useAppStore, type Connection } from './store/useAppStore';
 import { listTables, connectDatabase, getDatabaseVersion } from './lib/db';
 import DatabaseBar from './components/DatabaseBar';
@@ -7,19 +7,31 @@ import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import EmptyTabScreen from './components/EmptyTabScreen';
-import ConnectionDialog from './components/ConnectionDialog';
-import SettingsModal from './components/SettingsModal';
-import LogDrawer from './components/LogDrawer';
-import TableView from './components/TableView';
-import TableStructure from './components/TableStructure';
-import QueryEditor from './components/QueryEditor';
-import CreateTable from './components/CreateTable';
 import TopBar from './components/TopBar';
 import AiPanel from './components/AiPanel';
 import AlertModal from './components/AlertModal';
+import { useDevRenderCounter } from './lib/dev-performance';
 import './index.css';
 
+const ConnectionDialog = lazy(() => import('./components/ConnectionDialog'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const LogDrawer = lazy(() => import('./components/LogDrawer'));
+const TableView = lazy(() => import('./components/TableView/index'));
+const TableStructure = lazy(() => import('./components/TableStructure'));
+const QueryEditor = lazy(() => import('./components/QueryEditor'));
+const CreateTable = lazy(() => import('./components/CreateTable'));
+
+function ContentLoading() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-muted-foreground w-full">
+      <span className="text-sm font-medium tracking-wide">Loading view...</span>
+    </div>
+  );
+}
+
 export default function App() {
+  useDevRenderCounter('App');
+
   // Use granular selectors to prevent unnecessary re-renders
   const connections = useAppStore(s => s.connections);
   const isConnected = useAppStore(s => s.isConnected);
@@ -125,10 +137,12 @@ export default function App() {
   // Selectors for keybindings
   const showLogDrawer = useAppStore(s => s.showLogDrawer);
   const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
+  const showSettingsModal = useAppStore(s => s.showSettingsModal);
   const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
   const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
   const closeTab = useAppStore(s => s.closeTab);
   const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const [hasLoadedLogDrawer, setHasLoadedLogDrawer] = useState(() => useAppStore.getState().showLogDrawer);
 
   // Keep a ref for showLogDrawer so the effect doesn't re-register on every toggle
   const showLogDrawerRef = useRef(showLogDrawer);
@@ -175,6 +189,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTabId, activeSidebarConnectionId, setShowConnectionDialog, closeTab, addTab, setShowLogDrawer, setShowSettingsModal]);
 
+  useEffect(() => {
+    if (showLogDrawer) {
+      setHasLoadedLogDrawer(true);
+    }
+  }, [showLogDrawer]);
+
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const renderContent = () => {
@@ -188,16 +208,28 @@ export default function App() {
     switch (activeTab.type) {
       case 'data':
         return activeTab.tableName ? (
-          <TableView key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
+          <Suspense fallback={<ContentLoading />}>
+            <TableView key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
+          </Suspense>
         ) : null;
       case 'structure':
         return activeTab.tableName ? (
-          <TableStructure key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
+          <Suspense fallback={<ContentLoading />}>
+            <TableStructure key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
+          </Suspense>
         ) : null;
       case 'query':
-        return <QueryEditor key={activeTab.id} tabId={activeTab.id} />;
+        return (
+          <Suspense fallback={<ContentLoading />}>
+            <QueryEditor key={activeTab.id} tabId={activeTab.id} />
+          </Suspense>
+        );
       case 'create-table':
-        return <CreateTable key={activeTab.id} tabId={activeTab.id} />;
+        return (
+          <Suspense fallback={<ContentLoading />}>
+            <CreateTable key={activeTab.id} tabId={activeTab.id} />
+          </Suspense>
+        );
       default:
         return null;
     }
@@ -216,10 +248,22 @@ export default function App() {
         <AiPanel />
       </div>
       <StatusBar />
-      {showConnectionDialog && <ConnectionDialog />}
-      <SettingsModal />
+      {showConnectionDialog && (
+        <Suspense fallback={null}>
+          <ConnectionDialog />
+        </Suspense>
+      )}
+      {showSettingsModal && (
+        <Suspense fallback={null}>
+          <SettingsModal />
+        </Suspense>
+      )}
       <AlertModal />
-      <LogDrawer />
+      {hasLoadedLogDrawer && (
+        <Suspense fallback={null}>
+          <LogDrawer />
+        </Suspense>
+      )}
     </div>
   );
 }

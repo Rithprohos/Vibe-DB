@@ -320,6 +320,72 @@ impl DatabaseEngine for SqliteEngine {
         }
     }
 
+    async fn execute_transaction(&self, queries: &[String]) -> EngineResult<QueryResult> {
+        if queries.is_empty() {
+            return Err(EngineError::QueryError(
+                "No queries provided for transaction".to_string(),
+            ));
+        }
+
+        let pool = self.pool.read().await;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
+
+        let mut tx = pool
+            .begin()
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        let mut rows_affected_total = 0_u64;
+        let mut statements_executed = 0_u64;
+
+        for query in queries {
+            let trimmed = query.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            Self::validate_query_safety(trimmed)?;
+
+            let stripped = trimmed
+                .lines()
+                .filter(|line| !line.trim().starts_with("--"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let normalized = stripped.trim().to_uppercase();
+            let first_keyword = normalized.split_whitespace().next().unwrap_or_default();
+
+            if !matches!(first_keyword, "INSERT" | "UPDATE" | "DELETE") {
+                return Err(EngineError::QueryError(
+                    "Transaction only supports INSERT/UPDATE/DELETE statements".to_string(),
+                ));
+            }
+
+            let result = sqlx::query(trimmed)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+            statements_executed += 1;
+            rows_affected_total += result.rows_affected();
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        Ok(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            rows_affected: rows_affected_total,
+            message: format!(
+                "Committed {} statement(s), {} row(s) affected",
+                statements_executed, rows_affected_total
+            ),
+        })
+    }
+
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64> {
         Self::validate_table_name(table_name)?;
 

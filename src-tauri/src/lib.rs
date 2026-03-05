@@ -124,6 +124,25 @@ async fn execute_query(
         .map_err(|e| e.to_string())
 }
 
+/// Executes multiple SQL queries in a single transaction.
+#[tauri::command]
+async fn execute_transaction(
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+    queries: Vec<String>,
+) -> Result<QueryResult, String> {
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+    engine
+        .execute_transaction(&queries)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Gets the row count of a table.
 #[tauri::command]
 async fn get_table_row_count(
@@ -221,6 +240,7 @@ pub fn run() {
             list_tables,
             get_table_structure,
             execute_query,
+            execute_transaction,
             get_table_row_count,
             create_database,
             get_database_version
