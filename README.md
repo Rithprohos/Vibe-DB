@@ -28,25 +28,17 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
   <img src="./screenshot/screen-shot-1.png" alt="VibeDB Screenshot" width="100%">
 </p>
 
-## ✨ What's New (v0.2.5)
+## 🛠️ Core Features
 
-With the completion of **Phase 1.5**, VibeDB is now stable and performance-hardened:
-
-- **🚀 Code-Splitting** — Comprehensive lazy-loading for heavy UI chunks (Views, Dialogs, Drawers, AI Panel, Alerts) for faster initial loads and reduced bundle size.
-- **⚡ TableView Optimization** — Further refined virtual row and cell paths into highly memoized sub-components with stable callbacks to eliminate unnecessary rerenders.
-- **🛠️ Dev Instrumentation** — Added internal tools to measure render counts and fetch latency in development mode for easier performance monitoring.
+- **🚀 High Performance** — Full virtualization (TanStack) and code-splitting across the entire app; browse 10,000+ rows with zero lag.
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction.
-- **🚨 Global Alert System** — Unified, theme-matched notification system for instant feedback on success, errors, and warnings.
-
-## 🛠️ Features
-
-- **Multi-Engine Ready** — Trait-based abstraction (SQLite active; Turso, Postgres, MySQL coming soon).
-- **Visual Table Builder** — Create tables with a polished GUI including real-time SQL preview and syntax highlighting.
-- **Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions.
-- **Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
-- **Workflow Mastery** — Multi-tab interface, persistent state, and keyboard-first design (`⌘N`, `⌘T`, `⌘↵`).
-- **Pollinations AI** — Intelligent SQL assistance built right into the query editor.
-- **Premium Themes** — Switch between **Dark**, **Light**, and **Purple Solarized** modes.
+- **🌍 Multi-Engine Ready** — Trait-based abstraction (SQLite active; Turso, Postgres, MySQL coming soon).
+- **🏗️ Visual Table Builder** — Create tables with a polished GUI including real-time, syntax-highlighted SQL preview.
+- **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions.
+- **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
+- **✨ Pollinations AI** — Intelligent SQL assistance built right into the query editor.
+- **🎨 Premium Themes** — Switch between **Dark**, **Light**, and **Purple Solarized** modes.
+- **⌨️ Workflow Mastery** — Multi-tab interface, persistent state, and keyboard-first design (`⌘N`, `⌘T`, `⌘↵`).
 
 ## 🚀 Getting Started
 
