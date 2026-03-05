@@ -18,6 +18,10 @@ VibeDB is a sleek, high-performance SQLite database management tool designed for
   <img src="./screenshot/screen-shot-1.png" alt="VibeDB Screenshot" width="100%">
 </p>
 
+<p align="center">
+  <img src="./screenshot/screen-shot-2.png" alt="VibeDB Create Table GUI" width="100%">
+</p>
+
 **[📚 Roadmap](./ROADMAP.md)** — See planned features and release timeline.
 
 ## Features
