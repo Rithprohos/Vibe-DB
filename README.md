@@ -15,7 +15,7 @@
 
 A modern, high-performance SQLite database manager built with Tauri v2 and React. Engineered for speed, security, and a premium developer experience.
 
-![VibeDB](https://img.shields.io/badge/version-0.2.4-blue)
+![VibeDB](https://img.shields.io/badge/version-0.2.5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 [![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet)](./ROADMAP.md)
@@ -28,15 +28,15 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
   <img src="./screenshot/screen-shot-1.png" alt="VibeDB Screenshot" width="100%">
 </p>
 
-## ✨ What's New (v0.2.4)
+## ✨ What's New (v0.2.5)
 
 With the completion of **Phase 1.5**, VibeDB is now stable and performance-hardened:
 
-- **🚀 Extreme Performance** — Full virtualization across Table Views, Logs, and Sidebar via `TanStack Virtual`. Effortlessly browse tables with 10k+ rows.
-- **⚡ UI Render Optimization** — Heavy TableView body rendering now uses memoized virtual row/cell components with stable callbacks to reduce avoidable rerenders.
+- **🚀 Code-Splitting** — Comprehensive lazy-loading for heavy UI chunks (Views, Dialogs, Drawers, AI Panel, Alerts) for faster initial loads and reduced bundle size.
+- **⚡ TableView Optimization** — Further refined virtual row and cell paths into highly memoized sub-components with stable callbacks to eliminate unnecessary rerenders.
+- **🛠️ Dev Instrumentation** — Added internal tools to measure render counts and fetch latency in development mode for easier performance monitoring.
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction.
 - **🚨 Global Alert System** — Unified, theme-matched notification system for instant feedback on success, errors, and warnings.
-- **🛡️ Backend Hardening** — Stale fetch guards, SQL identifier safety, and automatic primary key detection for smarter forms.
 
 ## 🛠️ Features
 
