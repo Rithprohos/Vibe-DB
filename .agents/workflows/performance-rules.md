@@ -322,3 +322,95 @@ const ext = useMemo(
 ```
 
 **Why:** Recreating extensions forces the library to diff and reconfigure, causing performance issues and subtle bugs (e.g., lost selection state).
+
+---
+
+## 16. 🔴 Virtualize Large Render Lists
+
+**Rule:** Any potentially large scrolling list (table rows, logs, sidebar objects) MUST use virtualization.
+
+```tsx
+// ✅ GOOD — virtualized rows
+const rowVirtualizer = useVirtualizer({
+  count: rows.length,
+  getScrollElement: () => scrollRef.current,
+  estimateSize: () => 34,
+  overscan: 8,
+});
+
+const virtualRows = rowVirtualizer.getVirtualItems();
+```
+
+**Where in VibeDB:**
+- `TableView` row list
+- `LogDrawer` logs list
+- `Sidebar` tables/views list when connection has many objects
+
+---
+
+## 17. 🔴 Paginated Table Fetch Strategy
+
+**Rule:** For paged table data, DO NOT fetch schema/row-count on every page or sort update.
+
+```tsx
+// ✅ GOOD
+// 1) Structure fetch: table/connection change
+// 2) Count fetch: filter/table/connection change
+// 3) Data fetch: page/sort/filter change
+```
+
+**Why:** Schema and total row count change far less frequently than page data. Re-fetching all three on every page interaction creates avoidable latency and UI stalls.
+
+---
+
+## 18. 🟡 Precompute Lookup Maps for Hot Paths
+
+**Rule:** Never do repeated `.find()` inside row/cell render loops. Build a map once and reuse.
+
+```tsx
+// ✅ GOOD
+const columnInfoByName = useMemo(() => {
+  const map: Record<string, ColumnInfo> = {};
+  structure.forEach((c) => {
+    map[c.name] = c;
+  });
+  return map;
+}, [structure]);
+```
+
+**Why:** Cell rendering is a hot path; repeated linear scans multiply quickly with row × column count.
+
+---
+
+## 19. 🟡 Compute Cell Formatting Once
+
+**Rule:** In a cell renderer, call expensive formatter utilities once and reuse both style + text outputs.
+
+```tsx
+// ❌ BAD
+formatCellValue(value).className;
+formatCellValue(value).text;
+
+// ✅ GOOD
+const formatted = formatCellValue(value);
+formatted.className;
+formatted.text;
+```
+
+**Why:** Avoids duplicated work in high-frequency render loops.
+
+---
+
+## 20. 🟡 React Table Memo Discipline
+
+**Rule:** `columns`/`data` configs passed into TanStack Table MUST be memoized with minimal dependency arrays.
+
+```tsx
+// ❌ BAD — unrelated deps trigger full table config rebuild
+useMemo(() => buildColumns(), [sortCol, page, pageSize, theme]);
+
+// ✅ GOOD — only include values used to build columns
+useMemo(() => buildColumns(), [sortCol, sortDir, structure]);
+```
+
+**Why:** Rebuilding table config too often invalidates internal memoization and increases render cost.
