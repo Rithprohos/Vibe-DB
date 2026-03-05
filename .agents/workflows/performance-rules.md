@@ -24,17 +24,11 @@ const { tabs, activeTabId, connections } = useAppStore();
 // ✅ GOOD — re-renders only when specific value changes
 const tabs = useAppStore((s) => s.tabs);
 const activeTabId = useAppStore((s) => s.activeTabId);
-const connections = useAppStore((s) => s.connections);
 ```
 
-**Why:** Zustand's `useStore()` with no selector subscribes to the **entire** store. Every state change (typing in an editor, adding a log, resizing a panel) triggers a re-render in every component that destructures the store. With granular selectors, each component only re-renders when _its_ subscribed slice changes.
+**Why:** `useStore()` with no selector subscribes to the **entire** store. Every state change triggers a re-render in every component that destructures it.
 
-**For derived values from the store**, use a selector that computes it:
-
-```tsx
-// ✅ Only re-renders when logs.length changes, not on every log mutation
-const logCount = useAppStore((s) => s.logs.length);
-```
+For derived values, compute in the selector: `const logCount = useAppStore((s) => s.logs.length);`
 
 ---
 
@@ -43,116 +37,89 @@ const logCount = useAppStore((s) => s.logs.length);
 **Rule:** Use primitive or stable values as `useEffect` dependencies, not object references.
 
 ```tsx
-// ❌ BAD — activeConnection is a new object reference on every render
+// ❌ BAD — new object reference on every render
 useEffect(() => {
-  if (!activeConnection?.connId) return;
   fetchData(activeConnection.connId);
 }, [activeConnection]);
 
-// ✅ GOOD — connId is a primitive string, stable reference
+// ✅ GOOD — primitive string, stable reference
 const connId = activeConnection?.connId;
 useEffect(() => {
-  if (!connId) return;
-  fetchData(connId);
+  if (connId) fetchData(connId);
 }, [connId]);
 ```
 
-**Why:** Objects are compared by reference in React's dependency array. Even if the object's contents haven't changed, a new reference (from a store update, for example) will trigger the effect again, causing unnecessary API calls and re-renders.
+**Why:** Objects are compared by reference. A new reference triggers the effect even if contents haven't changed.
 
 ---
 
 ## 3. 🟡 Memoize Derived Values
 
-**Rule:** Use `useMemo` for derived computations that involve `.find()`, `.filter()`, or other array operations.
+**Rule:** Use `useMemo` for derived computations involving `.find()`, `.filter()`, or array operations.
 
 ```tsx
 // ❌ BAD — runs .find() on every render
-const activeConnection = connections.find(
-  (c) => c.id === activeSidebarConnectionId,
-);
+const conn = connections.find((c) => c.id === activeId);
 
 // ✅ GOOD — only re-computes when dependencies change
-const activeConnection = useMemo(
-  () => connections.find((c) => c.id === activeSidebarConnectionId),
-  [connections, activeSidebarConnectionId],
+const conn = useMemo(
+  () => connections.find((c) => c.id === activeId),
+  [connections, activeId],
 );
 ```
 
-**Exception:** Simple property access or primitives don't need memo:
-
-```tsx
-// This is fine without useMemo
-const isDataTabActive = activeTab?.type === "data";
-```
+**Exception:** Simple property access doesn't need memo: `const isActive = tab?.type === "data";`
 
 ---
 
 ## 4. 🟡 Stabilize Callbacks with useCallback
 
-**Rule:** Wrap event handlers in `useCallback` when they are:
-
-- Passed as props to child components
-- Used as dependencies in `useEffect`
-- Used in `.map()` or list rendering contexts
+**Rule:** Wrap handlers in `useCallback` when passed as props, used in `useEffect` deps, or in list rendering.
 
 ```tsx
-// ❌ BAD — new function reference every render
-<button onClick={() => setIsAiPanelOpen(!isAiPanelOpen)}>
+// ❌ BAD — new function every render
+<button onClick={() => setOpen(!open)}>
 
 // ✅ GOOD — stable reference
-const toggleAiPanel = useCallback(
-  () => setIsAiPanelOpen(!isAiPanelOpen),
-  [setIsAiPanelOpen, isAiPanelOpen]
-);
-<button onClick={toggleAiPanel}>
+const toggle = useCallback(() => setOpen(!open), [open]);
+<button onClick={toggle}>
 ```
 
-**Exception:** Inline handlers in simple event handlers that don't get passed as props are fine:
-
-```tsx
-// This is OK — the handler stays within the same component
-<input onChange={(e) => setSearch(e.target.value)} />
-```
+**Exception:** Inline handlers not passed as props are fine: `<input onChange={(e) => setVal(e.target.value)} />`
 
 ---
 
 ## 5. 🟡 Use Refs for High-Frequency Values
 
-**Rule:** For values that update very frequently (mouse position, resize state, animation frames), use `useRef` instead of `useState` to avoid triggering re-renders.
+**Rule:** For values updating frequently (mouse position, resize), use `useRef` instead of `useState`.
 
 ```tsx
-// ❌ BAD — triggers re-render on every mouse move
+// ❌ BAD — re-render on every mouse move
 const [width, setWidth] = useState(260);
 const resize = (e: MouseEvent) => setWidth(e.clientX);
 
-// ✅ GOOD — updates DOM directly, syncs state on mouse up
+// ✅ GOOD — update DOM directly, sync state on mouse up
 const widthRef = useRef(260);
 const resize = (e: MouseEvent) => {
   widthRef.current = e.clientX;
-  sidebarRef.current!.style.width = `${e.clientX}px`;
+  el.style.width = `${e.clientX}px`;
 };
-const stopResize = () => setSidebarWidth(widthRef.current); // sync to state once
+const stopResize = () => setWidth(widthRef.current);
 ```
 
 ---
 
-## 6. 🟡 Use requestAnimationFrame for Resize/Drag Operations
+## 6. 🟡 Use requestAnimationFrame for Resize/Drag
 
-**Rule:** Throttle resize and drag handlers with `requestAnimationFrame` to prevent layout thrashing.
+**Rule:** Throttle resize/drag handlers with `requestAnimationFrame` to prevent layout thrashing.
 
 ```tsx
-// ❌ BAD — can fire faster than the browser can paint
-const resize = (e: MouseEvent) => {
-  element.style.width = `${e.clientX}px`;
-};
-
-// ✅ GOOD — one update per frame
 const rafId = useRef<number | null>(null);
 const resize = (e: MouseEvent) => {
-  targetWidth.current = e.clientX;
+  target.current = e.clientX;
   if (!rafId.current) {
     rafId.current = requestAnimationFrame(() => {
-      element.style.width = `${targetWidth.current}px`;
+      el.style.width = `${target.current}px`;
       rafId.current = null;
     });
   }
@@ -163,20 +130,15 @@ const resize = (e: MouseEvent) => {
 
 ## 7. 🔴 Parallel Data Fetching
 
-**Rule:** When fetching multiple independent pieces of data, use `Promise.all()` instead of sequential awaits.
+**Rule:** Use `Promise.all()` for multiple independent fetches instead of sequential awaits.
 
 ```tsx
-// ❌ BAD — sequential, total time = sum of all
-const data = await getTableData(tableName, connId);
-const count = await getTableRowCount(tableName, connId);
-const structure = await getTableStructure(tableName, connId);
+// ❌ BAD — sequential, total = sum of all
+const data = await getData(id);
+const count = await getCount(id);
 
-// ✅ GOOD — parallel, total time = max of all
-const [data, count, structure] = await Promise.all([
-  getTableData(tableName, connId),
-  getTableRowCount(tableName, connId),
-  getTableStructure(tableName, connId),
-]);
+// ✅ GOOD — parallel, total = max of all
+const [data, count] = await Promise.all([getData(id), getCount(id)]);
 ```
 
 ---
@@ -188,7 +150,6 @@ const [data, count, structure] = await Promise.all([
 ```rust
 // ❌ BAD
 fn process(name: String) { ... }
-
 // ✅ GOOD
 fn process(name: &str) { ... }
 ```
@@ -228,26 +189,24 @@ export default function DatabaseBar() {
 }
 ```
 
-This ensures selector identity stability and makes the component's store dependencies self-documenting.
-
 ---
 
 ## 11. 🔴 Cleanup Async Effects (Prevent State-After-Unmount)
 
-**Rule:** Every `useEffect` that triggers an async operation MUST return a cleanup function with a `cancelled` flag to prevent `setState` calls on unmounted components.
+**Rule:** Every async `useEffect` MUST return a cleanup with a `cancelled` flag.
 
 ```tsx
-// ❌ BAD — if component unmounts during fetch, setState is called on unmounted component
+// ❌ BAD — setState on unmounted component
 useEffect(() => {
   fetchData().then(setData);
 }, [id]);
 
-// ✅ GOOD — stale responses are ignored
+// ✅ GOOD — stale responses ignored
 useEffect(() => {
   let cancelled = false;
   fetchData()
-    .then((result) => {
-      if (!cancelled) setData(result);
+    .then((r) => {
+      if (!cancelled) setData(r);
     })
     .catch((e) => {
       if (!cancelled) setError(e.toString());
@@ -261,28 +220,21 @@ useEffect(() => {
 }, [id]);
 ```
 
-**Why:** When a component unmounts (e.g., user switches tabs) while an async fetch is still in-flight, the `.then()` callback fires after the component is gone, causing React warnings and potential bugs.
-
 ---
 
 ## 12. 🔴 Clean Up Timers with Refs
 
-**Rule:** All `setTimeout` / `setInterval` calls MUST be tracked in a `useRef` and cleared on unmount.
+**Rule:** All `setTimeout`/`setInterval` MUST be tracked in a `useRef` and cleared on unmount.
 
 ```tsx
-// ❌ BAD — timer fires after unmount, calls setState on dead component
-const handleAction = () => {
-  setTimeout(() => setResult("done"), 1000);
-};
-
-// ✅ GOOD — timer is tracked and cleared
 const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-useEffect(() => {
-  return () => {
+useEffect(
+  () => () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-  };
-}, []);
+  },
+  [],
+);
 
 const handleAction = () => {
   if (timerRef.current) clearTimeout(timerRef.current);
@@ -294,29 +246,79 @@ const handleAction = () => {
 
 ## 13. 🔴 Clean Up DOM Side Effects
 
-**Rule:** Every `useEffect` that modifies the DOM (adding classes, event listeners, etc.) MUST return a cleanup function that reverses the modification.
+**Rule:** Every `useEffect` that modifies the DOM MUST return a cleanup function.
 
 ```tsx
-// ❌ BAD — classes leak onto body if component unmounts while resizing
-useEffect(() => {
-  if (isResizing) document.body.classList.add("select-none");
-  else document.body.classList.remove("select-none");
-}, [isResizing]);
-
-// ✅ GOOD — always clean up on unmount
+// ✅ Classes
 useEffect(() => {
   if (isResizing) document.body.classList.add("select-none");
   else document.body.classList.remove("select-none");
   return () => document.body.classList.remove("select-none");
 }, [isResizing]);
-```
 
-**Same applies to event listeners:**
-
-```tsx
-// ✅ Always return removeEventListener
+// ✅ Event listeners
 useEffect(() => {
   window.addEventListener("keydown", handler);
   return () => window.removeEventListener("keydown", handler);
 }, [handler]);
 ```
+
+---
+
+## 14. 🟡 Stabilize Config Objects for Third-Party Components
+
+**Rule:** Static config objects for third-party components MUST be module-level constants.
+
+```tsx
+// ❌ BAD — new object every render, causes reconfiguration
+<CodeMirror basicSetup={{ lineNumbers: true, foldGutter: true }} />;
+
+// ✅ GOOD — stable reference
+const BASIC_SETUP = { lineNumbers: true, foldGutter: true } as const;
+<CodeMirror basicSetup={BASIC_SETUP} />;
+```
+
+**Why:** Inline objects create new references each render, forcing expensive internal reconfiguration.
+
+---
+
+## 15. 🟡 Ref-Based Stable Callbacks for Library Extensions
+
+**Rule:** Library extensions that call component handlers should use a `useRef` + `useMemo([], [])`.
+
+```tsx
+// ❌ BAD — extension recreated on every keystroke
+const ext = useMemo(
+  () =>
+    keymap.of([
+      {
+        key: "Mod-Enter",
+        run: () => {
+          handleRun();
+          return true;
+        },
+      },
+    ]),
+  [handleRun],
+);
+
+// ✅ GOOD — stable extension, latest handler via ref
+const handleRunRef = useRef(handleRun);
+handleRunRef.current = handleRun;
+
+const ext = useMemo(
+  () =>
+    keymap.of([
+      {
+        key: "Mod-Enter",
+        run: (view) => {
+          handleRunRef.current(view);
+          return true;
+        },
+      },
+    ]),
+  [],
+);
+```
+
+**Why:** Recreating extensions forces the library to diff and reconfigure, causing performance issues and subtle bugs (e.g., lost selection state).

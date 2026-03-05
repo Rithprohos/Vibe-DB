@@ -10,12 +10,36 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+import { keymap } from '@codemirror/view';
+import { Prec } from '@codemirror/state';
 
 interface Props {
   tabId: string;
 }
 
 const EMPTY_ARRAY: any[] = [];
+
+const BASIC_SETUP = {
+  lineNumbers: true,
+  foldGutter: true,
+  dropCursor: true,
+  allowMultipleSelections: true,
+  indentOnInput: true,
+  bracketMatching: true,
+  closeBrackets: true,
+  autocompletion: true,
+  rectangularSelection: true,
+  crosshairCursor: true,
+  highlightActiveLine: true,
+  highlightSelectionMatches: true,
+  closeBracketsKeymap: true,
+  defaultKeymap: true,
+  searchKeymap: true,
+  historyKeymap: true,
+  foldKeymap: true,
+  completionKeymap: true,
+  lintKeymap: true,
+} as const;
 
 const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const tab = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId), [tabId]));
@@ -105,10 +129,15 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     };
   }, []);
 
-  const handleRun = useCallback(async () => {
-    let queryToRun = query.trim();
-    if (editorRef.current?.view) {
-      const view = editorRef.current.view;
+  const handleRun = useCallback(async (editorView?: any) => {
+    // Read query from store to avoid stale closure
+    const store = useAppStore.getState();
+    const currentTab = store.tabs.find(t => t.id === tabId);
+    let queryToRun = (currentTab?.query || '').trim();
+
+    // Use the passed EditorView (from keymap) or fallback to ref
+    const view = editorView || editorRef.current?.view;
+    if (view) {
       const selection = view.state.selection.main;
       if (!selection.empty) {
         queryToRun = view.state.sliceDoc(selection.from, selection.to).trim();
@@ -117,7 +146,6 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
 
     if (!activeConnection?.connId || !queryToRun) return;
     setRunning(true);
-    const store = useAppStore.getState();
     store.updateTab(tabId, { error: '', result: null });
     const start = performance.now();
 
@@ -160,19 +188,28 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     } finally {
       setRunning(false);
     }
-  }, [activeConnection, query, tabId]);
+  }, [activeConnection, tabId]);
 
-  // Cmd+Enter to run
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleRun();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleRun]);
+  // Keep a stable ref to the latest handleRun so the keymap never needs to be recreated
+  const handleRunRef = useRef(handleRun);
+  handleRunRef.current = handleRun;
+
+  // Cmd+Enter keymap extension for CodeMirror — stable, never recreated
+  const runKeymap = useMemo(
+    () =>
+      Prec.highest(
+        keymap.of([
+          {
+            key: 'Mod-Enter',
+            run: (view) => {
+              handleRunRef.current(view);
+              return true;
+            },
+          },
+        ])
+      ),
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
 
 
@@ -204,31 +241,11 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
           ref={editorRef}
           value={query}
           height="100%"
-          extensions={[sql({ schema })]}
+          extensions={[sql({ schema }), runKeymap]}
           theme={vscodeDark}
-          onChange={(val) => setQuery(val)}
+          onChange={setQuery}
           className="flex-1 w-full bg-background text-[14px] custom-scrollbar-hide focus-within:ring-inset focus-within:ring-1 focus-within:ring-primary/20 cm-editor-wrapper"
-          basicSetup={{
-            lineNumbers: true,
-            foldGutter: true,
-            dropCursor: true,
-            allowMultipleSelections: true,
-            indentOnInput: true,
-            bracketMatching: true,
-            closeBrackets: true,
-            autocompletion: true,
-            rectangularSelection: true,
-            crosshairCursor: true,
-            highlightActiveLine: true,
-            highlightSelectionMatches: true,
-            closeBracketsKeymap: true,
-            defaultKeymap: true,
-            searchKeymap: true,
-            historyKeymap: true,
-            foldKeymap: true,
-            completionKeymap: true,
-            lintKeymap: true,
-          }}
+          basicSetup={BASIC_SETUP}
         />
         
         {/* Resizer */}

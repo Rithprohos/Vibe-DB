@@ -97,17 +97,17 @@ Essential SQLite management features before multi-engine support.
 
 ### Workspace
 
-| Feature                | Priority | Description                                                                            |
-| ---------------------- | -------- | -------------------------------------------------------------------------------------- |
-| Tabs Context Menu      | ✅ Done  | Right-click on tabs to close, close others, or close all                               |
-| Connection Tags        | ✅ Done  | Environment labels: local, testing, development, production                            |
-| Editable Names         | ✅ Done  | Edit connection names and tags without reconnecting                                    |
-| Database Version       | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar                                   |
-| Disconnect / Reconnect | ✅ Done  | Close connection without losing saved data, reconnect from sidebar                     |
-| Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag)                |
-| Keyboard Shortcuts     | ✅ Done  | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute |
-| Settings Modal         | ✅ Done  | Keybindings reference panel accessible via ⌘, or settings icon                         |
-| Theme Switching        | ✅ Done  | Dark, Light, Purple Solarized themes with persisted preference                         |
+| Feature                | Priority | Description                                                                                              |
+| ---------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| Tabs Context Menu      | ✅ Done  | Right-click on tabs to close, close others, or close all                                                 |
+| Connection Tags        | ✅ Done  | Environment labels: local, testing, development, production                                              |
+| Editable Names         | ✅ Done  | Edit connection names and tags without reconnecting                                                      |
+| Database Version       | ✅ Done  | Display engine version (e.g., SQLite v3.x) in TopBar                                                     |
+| Disconnect / Reconnect | ✅ Done  | Close connection without losing saved data, reconnect from sidebar                                       |
+| Saved Connections List | ✅ Done  | Sidebar shows all saved connections when disconnected (name, type, tag)                                  |
+| Keyboard Shortcuts     | ✅ Done  | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute (selected or all) |
+| Settings Modal         | ✅ Done  | Keybindings reference panel accessible via ⌘, or settings icon                                           |
+| Theme Switching        | ✅ Done  | Dark, Light, Purple Solarized themes with persisted preference                                           |
 
 ### Tasks
 
@@ -151,7 +151,7 @@ Essential SQLite management features before multi-engine support.
 | Stable effect deps   | ✅ Done    | Primitive values as `useEffect` deps, not object references               |
 | Stable callbacks     | ✅ Done    | `useCallback` for handlers passed as props or used in effects             |
 | Tab reuse            | ✅ Done    | Opening same table reuses existing tab                                    |
-| Performance rules    | ✅ Done    | `.agents/workflows/performance-rules.md` — 13 enforceable rules (3 tiers) |
+| Performance rules    | ✅ Done    | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
 | Virtual scrolling    | 📋 Planned | Render only visible rows for large result sets                            |
 | Lazy tab loading     | 📋 Planned | Don't render inactive tabs until switched                                 |
 
