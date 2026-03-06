@@ -58,7 +58,7 @@ jobs:
           ### ⚠️ macOS "App is damaged" fix
           This app is not code-signed. After installing, if macOS says "App is damaged", run this in Terminal:
           ```bash
-          xattr -cr /Applications/VibeDB.app
+          xattr -cr "/Applications/Vibe DB.app"
           ```
           Then open the app again.
           EOF
