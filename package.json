@@ -1,6 +1,6 @@
 {
   "name": "vibe-db",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
   "description": "Cross-platform SQLite database manager built with Tauri v2, React, and Rust",
