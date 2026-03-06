@@ -19,6 +19,7 @@ const TableView = lazy(() => import('./components/TableView/index'));
 const TableStructure = lazy(() => import('./components/TableStructure'));
 const QueryEditor = lazy(() => import('./components/QueryEditor'));
 const CreateTable = lazy(() => import('./components/CreateTable'));
+const EditTable = lazy(() => import('./components/EditTable'));
 const AiPanel = lazy(() => import('./components/AiPanel'));
 const AlertModal = lazy(() => import('./components/AlertModal'));
 const ToastViewport = lazy(() => import('./components/ToastViewport'));
@@ -276,6 +277,12 @@ export default function App() {
             <CreateTable key={activeTab.id} tabId={activeTab.id} />
           </Suspense>
         );
+      case 'edit-table':
+        return activeTab.tableName ? (
+          <Suspense fallback={<ContentLoading />}>
+            <EditTable key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
+          </Suspense>
+        ) : null;
       default:
         return null;
     }

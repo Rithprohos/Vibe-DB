@@ -42,6 +42,8 @@ export default function TabBar() {
         return <Zap size={14} className="text-accent-secondary" />;
       case 'create-table':
         return <TableIcon size={14} className="text-emerald-500" />;
+      case 'edit-table':
+        return <Wrench size={14} className="text-amber-500" />;
       default:
         return <FileText size={14} className="text-muted-foreground" />;
     }

@@ -83,6 +83,30 @@ fn quote_identifier(identifier: &str) -> String {
     format!("\"{}\"", identifier.replace('\"', "\"\""))
 }
 
+fn validate_identifier(name: &str, label: &str) -> Result<(), String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(format!("{label} name is required"));
+    }
+
+    let mut chars = trimmed.chars();
+    let Some(first) = chars.next() else {
+        return Err(format!("{label} name is required"));
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return Err(format!(
+            "{label} name must start with a letter or underscore and contain only letters, numbers, and underscores"
+        ));
+    }
+    if !chars.all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(format!(
+            "{label} name must start with a letter or underscore and contain only letters, numbers, and underscores"
+        ));
+    }
+
+    Ok(())
+}
+
 fn escape_sql_string(value: &str) -> String {
     value.replace('\'', "''")
 }
@@ -213,8 +237,12 @@ fn build_create_table_sql(
     if_not_exists: bool,
 ) -> Result<String, String> {
     let trimmed_table_name = table_name.trim();
-    if trimmed_table_name.is_empty() {
-        return Err("Table name is required".to_string());
+    validate_identifier(trimmed_table_name, "Table")?;
+    if trimmed_table_name
+        .to_ascii_lowercase()
+        .starts_with("sqlite_")
+    {
+        return Err("Table name cannot start with 'sqlite_'".to_string());
     }
 
     let valid_columns: Vec<_> = columns
@@ -227,6 +255,7 @@ fn build_create_table_sql(
 
     let mut seen_names = std::collections::HashSet::new();
     for col in &valid_columns {
+        validate_identifier(col.name.trim(), "Column")?;
         let normalized = col.name.trim().to_ascii_lowercase();
         if !seen_names.insert(normalized.clone()) {
             return Err(format!("Duplicate column name: \"{}\"", normalized));

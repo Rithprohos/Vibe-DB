@@ -218,6 +218,14 @@
     --glow-color: 167, 139, 250;
   }
 
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    box-shadow: 0 0 0 1000px var(--background) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
   * {
     @apply border-border;
   }

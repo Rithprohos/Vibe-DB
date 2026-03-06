@@ -62,6 +62,14 @@ bun vitest run --testNamePattern "addConnection"
 
 - Functional components with hooks, `useCallback` for handlers, `useMemo` for expensive ops
 
+### Shared Logic Rules
+
+- **No duplicated domain logic in components** — if logic/constants are used in 2+ places (for example data-type colors, identifier validation, SQL helper transforms), move them to `src/lib/*` and import from there.
+- **Prefer extending existing shared modules first** — check `src/lib/createTableConstants.ts`, `src/lib/*` helpers, and store utilities before adding new local helpers.
+- **Single source of truth for visual tokens** — reusable mappings (like type → color class) must live in shared constants, not per-component switch statements.
+- **Backend + frontend parity for validation** — user-input rules (table/column naming, safety constraints) must be enforced in frontend UX and backend command paths.
+- **When touching duplicate logic, refactor in the same PR** — do not leave a new duplicate behind even if behavior is correct.
+
 ### Performance Rules
 
 - **Fetch metadata separately from row data** — avoid re-fetching table structure and total row count on every page/sort update.

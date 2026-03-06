@@ -18,29 +18,51 @@ export interface SqliteType {
   color: string;
 }
 
+export type SupportedEngine = "sqlite" | "postgres";
+
 export interface DefaultOption {
   value: string;
   label: string;
 }
 
 /** SQLite data types – covering the main affinities + common aliases */
-export const SQLITE_TYPES: SqliteType[] = [
-  { value: "INTEGER", label: "INTEGER", color: "text-amber-500" },
-  { value: "TEXT", label: "TEXT", color: "text-emerald-500" },
-  { value: "REAL", label: "REAL", color: "text-blue-500" },
-  { value: "BLOB", label: "BLOB", color: "text-purple-500" },
-  { value: "NUMERIC", label: "NUMERIC", color: "text-rose-500" },
-  { value: "BOOLEAN", label: "BOOLEAN", color: "text-cyan-500" },
-  { value: "DATETIME", label: "DATETIME", color: "text-orange-500" },
-  { value: "VARCHAR", label: "VARCHAR", color: "text-teal-500" },
-  { value: "FLOAT", label: "FLOAT", color: "text-indigo-500" },
-  { value: "DOUBLE", label: "DOUBLE", color: "text-indigo-400" },
-  { value: "BIGINT", label: "BIGINT", color: "text-amber-400" },
-  { value: "CHAR", label: "CHAR", color: "text-emerald-400" },
-  { value: "DECIMAL", label: "DECIMAL", color: "text-rose-400" },
-  { value: "DATE", label: "DATE", color: "text-orange-400" },
-  { value: "TIMESTAMP", label: "TIMESTAMP", color: "text-orange-300" },
+interface DataTypeOption extends SqliteType {
+  engines: readonly SupportedEngine[];
+}
+
+const DATA_TYPE_OPTIONS: readonly DataTypeOption[] = [
+  { value: "INTEGER", label: "INTEGER", color: "text-amber-500", engines: ["sqlite", "postgres"] },
+  { value: "TEXT", label: "TEXT", color: "text-emerald-500", engines: ["sqlite", "postgres"] },
+  { value: "REAL", label: "REAL", color: "text-blue-500", engines: ["sqlite"] },
+  { value: "BLOB", label: "BLOB", color: "text-purple-500", engines: ["sqlite"] },
+  { value: "NUMERIC", label: "NUMERIC", color: "text-rose-500", engines: ["sqlite", "postgres"] },
+  { value: "VARCHAR", label: "VARCHAR", color: "text-teal-500", engines: ["sqlite", "postgres"] },
+  { value: "BIGINT", label: "BIGINT", color: "text-amber-400", engines: ["postgres"] },
 ] as const;
+
+const DATA_TYPE_COLOR_MAP: Record<string, string> = DATA_TYPE_OPTIONS.reduce(
+  (acc, type) => {
+    acc[type.value.toUpperCase()] = type.color;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
+export function getSqliteTypeColor(typeName: string): string {
+  return DATA_TYPE_COLOR_MAP[typeName.toUpperCase()] ?? "text-foreground";
+}
+
+export function getDataTypesForEngine(engine: SupportedEngine): readonly SqliteType[] {
+  return DATA_TYPE_OPTIONS
+    .filter((option) => option.engines.includes(engine))
+    .map(({ value, label, color }) => ({ value, label, color }));
+}
+
+export function getEngineTypeLabel(engine: SupportedEngine): string {
+  if (engine === "sqlite") return "SQLite types";
+  if (engine === "postgres") return "PostgreSQL types";
+  return "Types";
+}
 
 /** Common SQLite default value presets */
 export const DEFAULT_OPTIONS: DefaultOption[] = [

@@ -9,6 +9,13 @@ import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDevRenderCounter } from '@/lib/dev-performance';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -160,6 +167,11 @@ export default function Sidebar() {
       title: 'Create Table',
     });
   };
+
+  const handleEditTable = useCallback((tableName: string) => {
+    if (!activeConnection) return;
+    openTableTab(activeConnection.id, tableName, 'edit-table');
+  }, [activeConnection, openTableTab]);
 
   return (
     <div 
@@ -352,19 +364,35 @@ export default function Sidebar() {
                               paddingBottom: '2px',
                             }}
                           >
-                            <div
-                              className={cn(
-                                "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                selectedTable === t.name
-                                  ? "bg-primary/10 text-primary border border-primary/20"
-                                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                              )}
-                              onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
-                              onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
-                            >
-                              <LayoutTemplate size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
-                              <span className="truncate">{t.name}</span>
-                            </div>
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  className={cn(
+                                    "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
+                                    selectedTable === t.name
+                                      ? "bg-primary/10 text-primary border border-primary/20"
+                                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  )}
+                                  onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
+                                  onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
+                                >
+                                  <LayoutTemplate size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
+                                  <span className="truncate">{t.name}</span>
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent className="w-48">
+                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}>
+                                  Open Data
+                                </ContextMenuItem>
+                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}>
+                                  Open Structure
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem onClick={() => handleEditTable(t.name)}>
+                                  Edit Table
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
                           </div>
                         );
                       })}

@@ -61,7 +61,12 @@ export interface ToastItem {
   type: "success" | "error" | "info";
 }
 
-export type TabType = "data" | "structure" | "query" | "create-table";
+export type TabType =
+  | "data"
+  | "structure"
+  | "query"
+  | "create-table"
+  | "edit-table";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
 
@@ -358,8 +363,10 @@ export const useAppStore = create<AppState>()(
           // Update selectedTable to match the new active tab
           const newActiveTab = newTabs.find((t) => t.id === newActiveId);
           const newSelectedTable =
-            newActiveTab?.type === "data" || newActiveTab?.type === "structure"
-              ? newActiveTab.title
+            newActiveTab?.type === "data" ||
+            newActiveTab?.type === "structure" ||
+            newActiveTab?.type === "edit-table"
+              ? (newActiveTab.tableName ?? null)
               : null;
           return {
             tabs: newTabs,
@@ -385,8 +392,10 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const tab = state.tabs.find((t) => t.id === id);
           const newSelectedTable =
-            tab?.type === "data" || tab?.type === "structure"
-              ? tab.title
+            tab?.type === "data" ||
+            tab?.type === "structure" ||
+            tab?.type === "edit-table"
+              ? (tab.tableName ?? null)
               : null;
           return { activeTabId: id, selectedTable: newSelectedTable };
         }),
@@ -412,7 +421,15 @@ export const useAppStore = create<AppState>()(
         const title =
           type === "query"
             ? `Query ${tableName || ""}`
-            : `${tableName} (${type === "data" ? "Data" : "Structure"})`;
+            : `${tableName} (${
+                type === "data"
+                  ? "Data"
+                  : type === "structure"
+                    ? "Structure"
+                    : type === "edit-table"
+                      ? "Edit"
+                      : "Table"
+              })`;
         const tab: Tab = { id, connectionId, type, title, tableName };
         set((state) => ({
           tabs: [...state.tabs, tab].slice(-MAX_TABS),

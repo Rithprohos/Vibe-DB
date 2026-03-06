@@ -11,7 +11,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.6)
+## Current State (v0.2.7)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -191,9 +191,19 @@ Essential SQLite management features before multi-engine support.
 - [x] Global frontend copy helper and toast notifications added for consistent non-blocking "Copied" feedback
 - [x] Log drawer ordering corrected so newest SQL activity appears at the top
 
+### Completed in v0.2.7
+
+- [x] QueryEditor Run action hardened so toolbar clicks and keyboard-triggered execution share the same safe path
+- [x] QueryEditor clipboard/select behavior restored by preserving native editor shortcuts and text selection semantics
+- [x] macOS/Tauri Edit menu now includes standard undo/redo/cut/copy/paste/select-all actions for webview text inputs
+- [x] Table sidebar context menu now includes **Edit Table**, opening a dedicated schema-edit tab
+- [x] ALTER TABLE workflow shipped for SQLite: rename table, add column, rename column, and drop column
+- [x] Inline identifier validation added for table/column names in Create Table and Edit Table with backend parity
+- [x] SQLite schema-change reliability improved by using a single SQLite pool connection (`max_connections = 1`)
+- [x] Engine-scoped data type catalog introduced so type dropdowns are explicit about current engine (SQLite today, extensible for Postgres later)
+
 ### Upcoming Tasks
 
-- [ ] ALTER TABLE support for structure changes
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
 - [ ] Export dialog with format options
@@ -231,7 +241,7 @@ Essential SQLite management features before multi-engine support.
 | Split fetch strategy | ✅ Done (v0.2.4) | Separate schema/count fetch from paginated row data fetches                                    |
 | Lazy tab loading     | ✅ Done (v0.2.6) | Heavy tab views are code-split and only the active tab view is mounted                         |
 
-### Next Actions (post-v0.2.6)
+### Next Actions (post-v0.2.7)
 
 - [ ] Tune virtualization for UX quality (overscan and estimated row heights per view)
 - [ ] Replace TableView spacer-row virtualization with absolutely positioned rows for smoother scrolling
@@ -432,6 +442,7 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 | v0.2.4  | Q1 2026 | Bug fixes + Alerts     | ✅ Complete |
 | v0.2.5  | Q1 2026 | Query UX + Performance | ✅ Complete |
 | v0.2.6  | Q1 2026 | Query UX + Performance | ✅ Complete |
+| v0.2.7  | Q1 2026 | Query Editor Interaction Fixes | ✅ Complete |
 | v0.3    | Q2 2026 | Turso support          | 📋 Planned  |
 | v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
 | v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |

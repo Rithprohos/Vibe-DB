@@ -22,21 +22,28 @@ impl SqliteEngine {
         }
     }
 
-    /// Validates a table name to prevent SQL injection.
-    /// Only allows alphanumeric characters and underscores.
+    /// Validates a table name before embedding it as a quoted SQL identifier.
     pub fn validate_table_name(name: &str) -> EngineResult<()> {
-        if name.is_empty() {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
             return Err(EngineError::QueryError(
                 "Table name cannot be empty".to_string(),
             ));
         }
-        if !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+
+        // Prevent control characters in identifiers while still allowing
+        // legitimate SQLite names such as those containing spaces.
+        if trimmed.chars().any(|c| c.is_control()) {
             return Err(EngineError::QueryError(format!(
-                "Invalid table name '{}': only alphanumeric characters and underscores allowed",
-                name
+                "Invalid table name '{}': contains control characters",
+                trimmed
             )));
         }
         Ok(())
+    }
+
+    fn quote_identifier(identifier: &str) -> String {
+        format!("\"{}\"", identifier.replace('\"', "\"\""))
     }
 
     /// Detects dangerous query patterns like DELETE/UPDATE with tautological WHERE clauses.
@@ -181,8 +188,10 @@ impl DatabaseEngine for SqliteEngine {
 
         let connection_string = format!("sqlite:{}?mode=rw", path);
 
+        // Keep a single SQLite connection to avoid schema visibility races
+        // across pooled connections after ALTER TABLE operations.
         let pool = SqlitePoolOptions::new()
-            .max_connections(5)
+            .max_connections(1)
             .connect(&connection_string)
             .await
             .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
@@ -236,8 +245,10 @@ impl DatabaseEngine for SqliteEngine {
             EngineError::ConnectionFailed("Not connected to database".to_string())
         })?;
 
-        // Safe because we validated the table name
-        let query = format!("PRAGMA table_info(\"{}\")", table_name);
+        let query = format!(
+            "PRAGMA table_info({})",
+            Self::quote_identifier(table_name.trim())
+        );
 
         let rows = sqlx::query(&query)
             .fetch_all(pool)
@@ -407,8 +418,10 @@ impl DatabaseEngine for SqliteEngine {
             EngineError::ConnectionFailed("Not connected to database".to_string())
         })?;
 
-        // Safe because we validated the table name
-        let query = format!("SELECT COUNT(*) as count FROM \"{}\"", table_name);
+        let query = format!(
+            "SELECT COUNT(*) as count FROM {}",
+            Self::quote_identifier(table_name.trim())
+        );
 
         let row = sqlx::query(&query)
             .fetch_one(pool)

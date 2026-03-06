@@ -1,9 +1,11 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { buildCreateTableSQL, executeQuery, listTables } from '../lib/db';
+import { validateColumnName, validateTableName } from '../lib/tableName';
 import { highlightSQL } from '../lib/highlightSQL';
 import {
-  SQLITE_TYPES,
+  getDataTypesForEngine,
+  getEngineTypeLabel,
   DEFAULT_OPTIONS,
   DEFAULT_TABLE_NAME,
   createEmptyColumn,
@@ -16,6 +18,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -46,6 +50,7 @@ interface Props {
 }
 
 export default function CreateTable({ tabId }: Props) {
+  const fieldErrorClass = 'border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive';
   // ── Store selectors (granular per Rule #1) ──
   const tabs = useAppStore(s => s.tabs);
   const connections = useAppStore(s => s.connections);
@@ -62,6 +67,15 @@ export default function CreateTable({ tabId }: Props) {
   );
   // Primitive for effect deps (Rule #2)
   const connId = activeConnection?.connId;
+  const engineType = activeConnection?.type ?? 'sqlite';
+  const engineDataTypes = useMemo(
+    () => getDataTypesForEngine(engineType),
+    [engineType],
+  );
+  const engineTypeLabel = useMemo(
+    () => getEngineTypeLabel(engineType),
+    [engineType],
+  );
 
   // ── Local state ──
   const [tableName, setTableName] = useState(DEFAULT_TABLE_NAME);
@@ -82,6 +96,21 @@ export default function CreateTable({ tabId }: Props) {
     () => columns.filter(c => c.name.trim()).length,
     [columns],
   );
+  const liveTableNameError = useMemo(() => {
+    if (!tableName.trim()) return null;
+    return validateTableName(tableName);
+  }, [tableName]);
+  const liveColumnNameErrors = useMemo(() => {
+    const errorMap: Record<string, string> = {};
+    columns.forEach((col) => {
+      if (!col.name.trim()) return;
+      const maybeError = validateColumnName(col.name);
+      if (maybeError) {
+        errorMap[col.id] = maybeError;
+      }
+    });
+    return errorMap;
+  }, [columns]);
 
   // ── Stabilized callbacks (Rule #4) ──
   const updateColumn = useCallback(
@@ -137,6 +166,19 @@ export default function CreateTable({ tabId }: Props) {
     const requestId = ++sqlPreviewRequestIdRef.current;
     void (async () => {
       try {
+        if (validateTableName(tableName)) {
+          if (requestId !== sqlPreviewRequestIdRef.current) return;
+          setSql('');
+          return;
+        }
+        const invalidColumn = columns.find(
+          (col) => col.name.trim().length > 0 && validateColumnName(col.name),
+        );
+        if (invalidColumn) {
+          if (requestId !== sqlPreviewRequestIdRef.current) return;
+          setSql('');
+          return;
+        }
         const generatedSql = await buildCreateTableSQL(tableName, columns, ifNotExists);
         if (requestId !== sqlPreviewRequestIdRef.current) return;
         setSql(generatedSql);
@@ -150,6 +192,20 @@ export default function CreateTable({ tabId }: Props) {
   const handleSave = useCallback(async () => {
     if (!connId) {
       setError('No active database connection');
+      return;
+    }
+
+    const tableNameError = validateTableName(tableName);
+    if (tableNameError) {
+      setError(tableNameError);
+      return;
+    }
+    const invalidColumn = columns.find(
+      (col) => col.name.trim().length > 0 && validateColumnName(col.name),
+    );
+    if (invalidColumn) {
+      const colError = validateColumnName(invalidColumn.name);
+      setError(colError ?? "Invalid column name");
       return;
     }
 
@@ -234,9 +290,15 @@ export default function CreateTable({ tabId }: Props) {
                   setTableName(e.target.value);
                   setError('');
                 }}
-                className="bg-background border-border placeholder:text-muted-foreground/40 text-sm font-medium focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary h-9"
+                className={cn(
+                  "bg-background border-border placeholder:text-muted-foreground/40 text-sm font-medium focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary h-9",
+                  liveTableNameError && fieldErrorClass,
+                )}
                 autoFocus
               />
+              {liveTableNameError && (
+                <p className="mt-1 text-[11px] text-destructive">{liveTableNameError}</p>
+              )}
             </div>
             <div className="flex items-center gap-2 pt-5">
               <Checkbox
@@ -373,8 +435,16 @@ export default function CreateTable({ tabId }: Props) {
                           updateColumn(col.id, { name: e.target.value })
                         }
                         placeholder="column_name"
-                        className="bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-sm font-medium h-8 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary"
+                        className={cn(
+                          "bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-sm font-medium h-8 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
+                          liveColumnNameErrors[col.id] && fieldErrorClass,
+                        )}
                       />
+                      {liveColumnNameErrors[col.id] && (
+                        <div className="mt-1 text-[10px] text-destructive leading-tight">
+                          {liveColumnNameErrors[col.id]}
+                        </div>
+                      )}
                     </TableCell>
 
                     {/* Data Type */}
@@ -389,18 +459,23 @@ export default function CreateTable({ tabId }: Props) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {SQLITE_TYPES.map(t => (
-                            <SelectItem key={t.value} value={t.value}>
-                              <span
-                                className={cn(
-                                  'font-mono text-xs font-bold',
-                                  t.color,
-                                )}
-                              >
-                                {t.label}
-                              </span>
-                            </SelectItem>
-                          ))}
+                          <SelectGroup>
+                            <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                              {engineTypeLabel}
+                            </SelectLabel>
+                            {engineDataTypes.map(t => (
+                              <SelectItem key={t.value} value={t.value}>
+                                <span
+                                  className={cn(
+                                    'font-mono text-xs font-bold',
+                                    t.color,
+                                  )}
+                                >
+                                  {t.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                     </TableCell>
