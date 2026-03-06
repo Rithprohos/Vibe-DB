@@ -11,7 +11,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.5)
+## Current State (v0.2.6)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -25,9 +25,11 @@ Multi-database engine support for VibeDB.
 - `list_tables` — Get all tables/views
 - `get_table_structure` — Column definitions
 - `execute_query` — Run SQL queries (with safety validation)
+- `execute_transaction` — Run batched DML statements atomically
 - `get_table_row_count` — Pagination support
 - `create_database` — Create new SQLite file
 - `get_database_version` — Retrieve SQLite version
+- `build_create_table_sql` — Generate validated `CREATE TABLE` SQL from structured input
 
 ### Query Safety (Implemented)
 
@@ -173,6 +175,22 @@ Essential SQLite management features before multi-engine support.
 - [x] Dev-mode instrumentation for measuring render counts and fetch latency
 - [x] Reduced initial bundle size by lazy-loading non-critical UI segments
 
+### Completed in v0.2.6
+
+- [x] QueryEditor result workspace reworked with constrained split-pane layout and internal scrolling
+- [x] QueryEditor splitter drag path rebuilt for smoother pointer-based resizing and proper tab-bar/layout clamping
+- [x] QueryEditor result grid upgraded with sticky headers, cell inspector, deterministic column widths, and row virtualization
+- [x] Lazy-loaded active tab views and major dialogs/drawers to reduce initial bundle cost
+- [x] Developer Tools toggle and sample data generator added in Settings with guarded production-safe access
+- [x] TableView footer now supports user-selectable rows per page
+- [x] TableView sticky header background corrected to remain opaque while scrolling
+- [x] TableView scroll path optimized by simplifying body rendering and reducing hot-path per-cell work
+- [x] TableView row inspector added as an internal right-side panel with row selection and full-value inspection
+- [x] TableView filter panel expanded for larger screens and split into smaller local components for maintainability
+- [x] SQL activity logging moved to Rust-emitted events so table browsing, filtering, pagination, and transactions reach the log drawer consistently
+- [x] Global frontend copy helper and toast notifications added for consistent non-blocking "Copied" feedback
+- [x] Log drawer ordering corrected so newest SQL activity appears at the top
+
 ### Upcoming Tasks
 
 - [ ] ALTER TABLE support for structure changes
@@ -195,28 +213,31 @@ Essential SQLite management features before multi-engine support.
 
 ### Performance Optimizations
 
-| Optimization         | Status           | Description                                                               |
-| -------------------- | ---------------- | ------------------------------------------------------------------------- |
-| Tab limit            | ✅ Done (v0.2.3) | Max 20 tabs, oldest auto-removed                                          |
-| Result truncation    | ✅ Done (v0.2.3) | Max 1000 rows stored per result                                           |
-| Zustand selectors    | ✅ Done (v0.2.3) | All components use granular selectors — no full-store destructuring       |
-| Memoized components  | ✅ Done (v0.2.3) | QueryEditor, WelcomeScreen wrapped in `memo()`                            |
-| Memoized derivations | ✅ Done (v0.2.3) | `useMemo` for `.find()` / `.filter()` operations across all components    |
-| Stable effect deps   | ✅ Done (v0.2.3) | Primitive values as `useEffect` deps, not object references               |
-| Stable callbacks     | ✅ Done (v0.2.3) | `useCallback` for handlers passed as props or used in effects             |
-| Stable callback refs | ✅ Done (v0.2.4) | `useRef` pattern for callbacks to avoid stale closures                    |
-| Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                   |
-| Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                    |
-| Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers) |
-| Virtual scrolling    | ✅ Done (v0.2.4) | TanStack Virtual applied to TableView rows, LogDrawer logs, Sidebar lists |
-| Stale fetch guard    | ✅ Done (v0.2.4) | Ignore out-of-order async responses for structure/count/data fetches      |
-| Split fetch strategy | ✅ Done (v0.2.4) | Separate schema/count fetch from paginated row data fetches               |
-| Lazy tab loading     | 📋 Planned       | Don't render inactive tabs until switched                                 |
+| Optimization         | Status           | Description                                                                                    |
+| -------------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
+| Tab limit            | ✅ Done (v0.2.3) | Max 20 tabs, oldest auto-removed                                                               |
+| Result truncation    | ✅ Done (v0.2.3) | Max 1000 rows stored per result                                                                |
+| Zustand selectors    | ✅ Done (v0.2.3) | All components use granular selectors — no full-store destructuring                            |
+| Memoized components  | ✅ Done (v0.2.3) | QueryEditor, WelcomeScreen wrapped in `memo()`                                                 |
+| Memoized derivations | ✅ Done (v0.2.3) | `useMemo` for `.find()` / `.filter()` operations across all components                         |
+| Stable effect deps   | ✅ Done (v0.2.3) | Primitive values as `useEffect` deps, not object references                                    |
+| Stable callbacks     | ✅ Done (v0.2.3) | `useCallback` for handlers passed as props or used in effects                                  |
+| Stable callback refs | ✅ Done (v0.2.4) | `useRef` pattern for callbacks to avoid stale closures                                         |
+| Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                                        |
+| Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                                         |
+| Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers)                      |
+| Virtual scrolling    | ✅ Done (v0.2.6) | TanStack Virtual applied to TableView rows, QueryEditor results, LogDrawer logs, Sidebar lists |
+| Stale fetch guard    | ✅ Done (v0.2.4) | Ignore out-of-order async responses for structure/count/data fetches                           |
+| Split fetch strategy | ✅ Done (v0.2.4) | Separate schema/count fetch from paginated row data fetches                                    |
+| Lazy tab loading     | ✅ Done (v0.2.6) | Heavy tab views are code-split and only the active tab view is mounted                         |
 
-### Next Actions (post-v0.2.4)
+### Next Actions (post-v0.2.6)
 
 - [ ] Tune virtualization for UX quality (overscan and estimated row heights per view)
+- [ ] Replace TableView spacer-row virtualization with absolutely positioned rows for smoother scrolling
 - [ ] Add QueryEditor performance pass (debounced syntax highlight + memoized parse path)
+- [ ] Add QueryEditor result column resizing and responsive inspector behavior
+- [ ] Extend Rust-emitted SQL logging to schema introspection paths (`list_tables`, `get_table_structure`) for complete drawer coverage
 - [x] Add render/fetch instrumentation in dev mode (measure rerender counts and fetch latency)
 - [x] Apply code-splitting for heavy UI chunks to reduce initial bundle size
 - [ ] Add frontend performance tests (Vitest + RTL) for large table/log datasets
@@ -227,7 +248,7 @@ Essential SQLite management features before multi-engine support.
 - [ ] Keep pagination/filter/sort execution fully in Rust commands, with frontend passing only structured params.
 - [ ] Add prepared statements for repeated table browse/query patterns to reduce parse/plan overhead.
 - [ ] Return typed rows with reusable column metadata maps so frontend avoids repeated per-cell lookup/type work.
-- [ ] Ensure virtualization covers all large lists/tables/logs consistently (TableView, Sidebar objects, LogDrawer, and future heavy panels).
+- [x] (0.2.6) Ensure virtualization covers all large lists/tables/logs consistently (TableView, QueryEditor results, Sidebar objects, LogDrawer, and future heavy panels where needed).
 - [ ] Debounce UI-triggered query refreshes (filter/search input paths) to reduce query burst load.
 - [ ] Keep metadata fetches separate from row fetches; refresh schema/count only on context changes (connection/table/filter apply), not page/sort.
 - [ ] Add index recommendation flow (based on common filter/sort columns) with one-click `CREATE INDEX` assistance.
@@ -237,10 +258,11 @@ Essential SQLite management features before multi-engine support.
 
 | Item                                                               | Status           | Notes                                                                                    |
 | ------------------------------------------------------------------ | ---------------- | ---------------------------------------------------------------------------------------- |
-| More code-splitting/lazy loading for heavy UI panels               | ✅ Done (v0.2.5) | Main views, dialogs, drawers, AI panel, and alert modal are lazy-loaded                  |
+| More code-splitting/lazy loading for heavy UI panels               | ✅ Done (v0.2.6) | Main views, dialogs, drawers, AI panel, and alert modal are lazy-loaded                  |
 | Debounce filter/search state updates                               | 📋 Planned       | Apply debounce to filter/search-driven refresh paths                                     |
-| Reduce rerenders in large views (memoized row/cell + stable props) | ✅ Done (v0.2.5) | TableView virtual row/cell path extracted into memoized components with stable callbacks |
+| Reduce rerenders in large views (memoized row/cell + stable props) | ✅ Done (v0.2.6) | TableView virtual row/cell path extracted into memoized components with stable callbacks |
 | Move expensive formatting/highlighting off hot render paths        | 📋 Planned       | Shift repeated per-cell formatting/highlight work out of render loops                    |
+| Centralized copy feedback via global toast + helper                | ✅ Done (v0.2.6) | Copy actions now share one frontend clipboard helper and non-blocking toast feedback     |
 
 ---
 
@@ -398,21 +420,21 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 - [ ] Connection groups/folders
 - [ ] Import/export between engines
 - [ ] Schema migration tools
-- [x] Query builder (visual) — Filter query builder in Data tab with WHERE clause support
 
 ---
 
 ## Timeline (Estimated)
 
-| Version | Target  | Focus                | Status      |
-| ------- | ------- | -------------------- | ----------- |
-| v0.2    | Q1 2026 | Engine abstraction   | ✅ Complete |
-| v0.2.3  | Q1 2026 | Security + UX polish | ✅ Complete |
-| v0.2.4  | Q1 2026 | Bug fixes + Alerts   | ✅ Complete |
-| v0.2.5  | Q1 2026 | Optimization + Lazy  | ✅ Complete |
-| v0.3    | Q2 2026 | Turso support        | 📋 Planned  |
-| v0.4    | Q3 2026 | PostgreSQL           | 📋 Planned  |
-| v0.5    | Q4 2026 | MySQL                | 📋 Planned  |
+| Version | Target  | Focus                  | Status      |
+| ------- | ------- | ---------------------- | ----------- |
+| v0.2    | Q1 2026 | Engine abstraction     | ✅ Complete |
+| v0.2.3  | Q1 2026 | Security + UX polish   | ✅ Complete |
+| v0.2.4  | Q1 2026 | Bug fixes + Alerts     | ✅ Complete |
+| v0.2.5  | Q1 2026 | Query UX + Performance | ✅ Complete |
+| v0.2.6  | Q1 2026 | Query UX + Performance | ✅ Complete |
+| v0.3    | Q2 2026 | Turso support          | 📋 Planned  |
+| v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
+| v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |
 
 ---
 

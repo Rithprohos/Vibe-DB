@@ -55,6 +55,12 @@ export interface SqlLog {
   message: string;
 }
 
+export interface ToastItem {
+  id: string;
+  message: string;
+  type: "success" | "error" | "info";
+}
+
 export type TabType = "data" | "structure" | "query" | "create-table";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
@@ -99,6 +105,9 @@ interface AppState {
   logs: SqlLog[];
   showLogDrawer: boolean;
 
+  // Toasts
+  toasts: ToastItem[];
+
   // Settings Modal
   showSettingsModal: boolean;
 
@@ -108,6 +117,8 @@ interface AppState {
   // Theme
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  developerToolsEnabled: boolean;
+  setDeveloperToolsEnabled: (enabled: boolean) => void;
 
   // AI Panel
   isAiPanelOpen: boolean;
@@ -151,6 +162,8 @@ interface AppState {
   clearLogs: () => void;
   setShowLogDrawer: (val: boolean) => void;
   setShowSettingsModal: (val: boolean) => void;
+  showToast: (toast: Omit<ToastItem, "id">) => void;
+  dismissToast: (id: string) => void;
 
   // Alert actions
   showAlert: (options: AlertOptions) => void;
@@ -190,14 +203,17 @@ export const useAppStore = create<AppState>()(
       activeTabId: null,
       logs: [],
       showLogDrawer: false,
+      toasts: [],
       showSettingsModal: false,
       alertOptions: null,
       theme: "dark",
+      developerToolsEnabled: false,
       isAiPanelOpen: false,
       databaseVersion: null,
 
       setIsAiPanelOpen: (val) => set({ isAiPanelOpen: val }),
       setTheme: (theme) => set({ theme }),
+      setDeveloperToolsEnabled: (enabled) => set({ developerToolsEnabled: enabled }),
       setDatabaseVersion: (version) => set({ databaseVersion: version }),
 
       addConnection: (conn) =>
@@ -305,6 +321,20 @@ export const useAppStore = create<AppState>()(
       clearLogs: () => set({ logs: [] }),
       setShowLogDrawer: (val) => set({ showLogDrawer: val }),
       setShowSettingsModal: (val) => set({ showSettingsModal: val }),
+      showToast: (toast) =>
+        set((state) => ({
+          toasts: [
+            ...state.toasts,
+            {
+              ...toast,
+              id: Math.random().toString(36).slice(2),
+            },
+          ].slice(-4),
+        })),
+      dismissToast: (id) =>
+        set((state) => ({
+          toasts: state.toasts.filter((toast) => toast.id !== id),
+        })),
 
       addTab: (tab) =>
         set((state) => {
@@ -409,6 +439,7 @@ export const useAppStore = create<AppState>()(
         tabs: state.tabs,
         activeTabId: state.activeTabId,
         theme: state.theme,
+        developerToolsEnabled: state.developerToolsEnabled,
       }),
       storage: createJSONStorage(() => storage),
     },

@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { executeQuery } from "@/lib/db";
-import { useAppStore } from "@/store/useAppStore";
 import type { ColumnInfo } from "@/store/useAppStore";
 import {
   escapeSqlString,
@@ -86,32 +85,16 @@ export const useNewRow = (
     if (!activeConnection?.connId || !newRowData) return;
     setSaving(true);
     setError("");
-    const startTime = performance.now();
 
     try {
       const sql = buildInsertSql(newRowData);
 
       await executeQuery(sql, activeConnection.connId);
 
-      const duration = performance.now() - startTime;
-      useAppStore.getState().addLog({
-        sql,
-        status: "success",
-        duration,
-        message: "Row inserted successfully",
-      });
-
       setNewRowData(null);
       await fetchData();
     } catch (e: any) {
-      const duration = performance.now() - startTime;
       setError(e.toString());
-      useAppStore.getState().addLog({
-        sql: `INSERT INTO "${tableName}" ...`,
-        status: "error",
-        duration,
-        message: e.toString(),
-      });
     } finally {
       setSaving(false);
     }

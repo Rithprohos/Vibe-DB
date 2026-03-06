@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { executeTransaction } from "@/lib/db";
-import { useAppStore } from "@/store/useAppStore";
 import type { ColumnInfo } from "@/store/useAppStore";
 import { escapeSqlString, formatSqlValue, quoteIdentifier } from "@/lib/sql-helpers";
 
@@ -178,7 +177,6 @@ export const useCellEditing = (
 
     setSaving(true);
     setError("");
-    const startTime = performance.now();
 
     try {
       const groupedByRow = new Map<number, PendingCellEdit[]>();
@@ -217,32 +215,14 @@ export const useCellEditing = (
       }
 
       const allQueries = [...additionalQueries, ...updateQueries];
-      const result = await executeTransaction(allQueries, activeConnection.connId);
-      const duration = performance.now() - startTime;
-
-      useAppStore.getState().addLog({
-        sql: `BEGIN TRANSACTION; ${additionalQueries.length} INSERT(s), ${updateQueries.length} UPDATE(s); COMMIT;`,
-        status: "success",
-        duration,
-        message:
-          result.message ||
-          `Committed ${allQueries.length} statement(s) successfully`,
-      });
-
+      await executeTransaction(allQueries, activeConnection.connId);
       setPendingEdits({});
       setEditingCell(null);
       setEditValue("");
       await fetchData();
       return true;
     } catch (e: any) {
-      const duration = performance.now() - startTime;
       setError(e.toString());
-      useAppStore.getState().addLog({
-        sql: `BEGIN TRANSACTION; UPDATE "${tableName}" ...; COMMIT;`,
-        status: "error",
-        duration,
-        message: e.toString(),
-      });
       return false;
     } finally {
       setSaving(false);

@@ -17,7 +17,7 @@ export const useTableData = (tableName: string, tabId: string) => {
   const [data, setData] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
-  const [pageSize] = useState(200);
+  const [pageSize, setPageSizeState] = useState(200);
   const [totalRows, setTotalRows] = useState(0);
   const [structure, setStructure] = useState<ColumnInfo[]>([]);
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -93,6 +93,11 @@ export const useTableData = (tableName: string, tabId: string) => {
     setPage(0);
   };
 
+  const setPageSize = useCallback((nextPageSize: number) => {
+    setPage(0);
+    setPageSizeState(nextPageSize);
+  }, []);
+
   const gridCols = useMemo(() => {
     if (data && data.columns.length > 0) return data.columns;
     return structure.map((s) => s.name);
@@ -115,6 +120,7 @@ export const useTableData = (tableName: string, tabId: string) => {
     page,
     setPage,
     pageSize,
+    setPageSize,
     totalRows,
     totalPages: Math.ceil(totalRows / pageSize),
     structure,

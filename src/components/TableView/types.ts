@@ -7,6 +7,11 @@ export interface TableViewProps {
   tabId: string;
 }
 
+export interface EditingCellState {
+  rowIndex: number;
+  colName: string;
+}
+
 export interface FilterCondition {
   id: string;
   field: string;

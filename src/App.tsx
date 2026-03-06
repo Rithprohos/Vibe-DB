@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useCallback, useRef, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { useAppStore, type Connection } from './store/useAppStore';
 import { listTables, connectDatabase, getDatabaseVersion } from './lib/db';
 import DatabaseBar from './components/DatabaseBar';
@@ -20,6 +21,7 @@ const QueryEditor = lazy(() => import('./components/QueryEditor'));
 const CreateTable = lazy(() => import('./components/CreateTable'));
 const AiPanel = lazy(() => import('./components/AiPanel'));
 const AlertModal = lazy(() => import('./components/AlertModal'));
+const ToastViewport = lazy(() => import('./components/ToastViewport'));
 
 function ContentLoading() {
   return (
@@ -27,6 +29,13 @@ function ContentLoading() {
       <span className="text-sm font-medium tracking-wide">Loading view...</span>
     </div>
   );
+}
+
+interface SqlLogEvent {
+  sql: string;
+  status: 'success' | 'error';
+  duration: number;
+  message: string;
 }
 
 export default function App() {
@@ -46,6 +55,7 @@ export default function App() {
   const setActiveSidebarConnection = useAppStore(s => s.setActiveSidebarConnection);
   const addTab = useAppStore(s => s.addTab);
   const setDatabaseVersion = useAppStore(s => s.setDatabaseVersion);
+  const addLog = useAppStore(s => s.addLog);
   const autoConnectAttempted = useRef(false);
 
   // Apply theme on mount and changes
@@ -106,6 +116,32 @@ export default function App() {
     window.addEventListener('vibedb:connect', handler);
     return () => window.removeEventListener('vibedb:connect', handler);
   }, [handleConnect]);
+
+  useEffect(() => {
+    let mounted = true;
+    let unsub: (() => void) | null = null;
+
+    listen<SqlLogEvent>('vibedb:sql-log', (event) => {
+      const payload = event.payload;
+      addLog({
+        sql: payload.sql,
+        status: payload.status,
+        duration: payload.duration,
+        message: payload.message,
+      });
+    }).then((fn) => {
+      if (mounted) {
+        unsub = fn;
+      } else {
+        fn();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsub?.();
+    };
+  }, [addLog]);
 
   // Auto-connect previously active connection after store hydrates
   useEffect(() => {
@@ -243,7 +279,9 @@ export default function App() {
         <Sidebar />
         <div className="content-area flex-1 flex flex-col min-w-0 bg-background relative overflow-hidden">
           <TabBar />
-          {renderContent()}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {renderContent()}
+          </div>
         </div>
         <Suspense fallback={null}>
           <AiPanel />
@@ -262,6 +300,9 @@ export default function App() {
       )}
       <Suspense fallback={null}>
         <AlertModal />
+      </Suspense>
+      <Suspense fallback={null}>
+        <ToastViewport />
       </Suspense>
       {hasLoadedLogDrawer && (
         <Suspense fallback={null}>

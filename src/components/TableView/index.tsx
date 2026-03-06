@@ -1,9 +1,8 @@
-import { memo, useMemo, useEffect, useCallback, useRef, useState } from 'react';
-import { formatCellValue } from '@/lib/formatters';
+import { useMemo, useEffect, useCallback, useRef, useState, startTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Trash2, Database, Key } from 'lucide-react';
+import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Key, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useReactTable,
@@ -13,176 +12,25 @@ import {
 } from '@tanstack/react-table';
 
 import { NewRowTextInput, NewRowDateInput } from './NewRowInputs';
-import { CellInput } from './CellInput';
 import { useTableData } from './hooks/useTableData';
 import { useFilters } from './hooks/useFilters';
 import { useNewRow } from './hooks/useNewRow';
 import { useCellEditing } from './hooks/useCellEditing';
-import { OPERATORS, UNARY_OPERATORS, BETWEEN_OPERATORS } from './types';
 import type { TableViewProps } from './types';
 import { useDevRenderCounter } from '@/lib/dev-performance';
-import type { ColumnInfo } from '@/store/useAppStore';
+import { VirtualRow } from './TableRows';
+import { FilterPanel } from './FilterPanel';
+import { RowInspector } from './RowInspector';
+import { copyToClipboard } from '@/lib/copy';
 
-interface EditingCellState {
-  rowIndex: number;
-  colName: string;
-}
-
-interface VirtualCellProps {
-  cellId: string;
-  colName: string;
-  rowIndex: number;
-  cellValue: unknown;
-  pendingValue: unknown;
-  hasPendingEdit: boolean;
-  isEditing: boolean;
-  isRowNum: boolean;
-  isDateCol: boolean;
-  hasActiveEditingCell: boolean;
-  editValue: string;
-  saving: boolean;
-  onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
-  onSaveCell: (rowIndex: number, colName: string, value: string) => void;
-  onCancelEdit: () => void;
-  onEditValueChange: (value: string) => void;
-}
-
-const VirtualCell = memo(function VirtualCell({
-  cellId,
-  colName,
-  rowIndex,
-  cellValue,
-  pendingValue,
-  hasPendingEdit,
-  isEditing,
-  isRowNum,
-  isDateCol,
-  hasActiveEditingCell,
-  editValue,
-  saving,
-  onBeginEdit,
-  onSaveCell,
-  onCancelEdit,
-  onEditValueChange,
-}: VirtualCellProps) {
-  const displayValue = pendingValue ?? cellValue;
-  const formattedCell = useMemo(() => formatCellValue(displayValue), [displayValue]);
-
-  return (
-    <td
-      key={cellId}
-      className={cn(
-        "border-r border-border/60 p-0 text-xs relative overflow-hidden",
-        isRowNum && "bg-muted/10 font-mono text-muted-foreground/50",
-        isEditing && "ring-1 ring-inset ring-primary bg-primary/5 z-10",
-        hasPendingEdit && !isEditing && "bg-amber-500/10"
-      )}
-      style={{ borderBottom: '1px solid var(--border)' }}
-      onMouseDown={() => {
-        if (hasActiveEditingCell && !isRowNum && !isEditing) {
-          onBeginEdit(rowIndex, colName, displayValue);
-        }
-      }}
-      onDoubleClick={() => {
-        onBeginEdit(rowIndex, colName, displayValue);
-      }}
-    >
-      {isEditing ? (
-        <CellInput
-          key={`${rowIndex}:${colName}`}
-          initialValue={editValue}
-          onValueChange={onEditValueChange}
-          onSave={(val) => onSaveCell(rowIndex, colName, val)}
-          onCancel={onCancelEdit}
-          disabled={saving}
-          inputType={isDateCol ? 'date' : 'text'}
-        />
-      ) : (
-        <div className={cn(
-          "px-2 py-1.5 h-full w-full min-h-[32px] font-mono break-all line-clamp-2",
-          formattedCell.className
-        )}>
-          {formattedCell.text}
-        </div>
-      )}
-    </td>
-  );
-});
-
-interface VirtualRowProps {
-  row: any;
-  rowIndex: number;
-  editingCell: EditingCellState | null;
-  editValue: string;
-  saving: boolean;
-  columnInfoByName: Record<string, ColumnInfo>;
-  getPendingCellValue: (rowIndex: number, colName: string) => unknown;
-  isCellPending: (rowIndex: number, colName: string) => boolean;
-  onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
-  onSaveCell: (rowIndex: number, colName: string, value: string) => void;
-  onCancelEdit: () => void;
-  onEditValueChange: (value: string) => void;
-}
-
-const VirtualRow = memo(function VirtualRow({
-  row,
-  rowIndex,
-  editingCell,
-  editValue,
-  saving,
-  columnInfoByName,
-  getPendingCellValue,
-  isCellPending,
-  onBeginEdit,
-  onSaveCell,
-  onCancelEdit,
-  onEditValueChange,
-}: VirtualRowProps) {
-  return (
-    <tr
-      key={row.id}
-      className={cn(
-        "transition-colors group",
-        rowIndex % 2 === 0 ? "bg-background" : "bg-muted/30",
-        "hover:bg-accent hover:shadow-md"
-      )}
-    >
-      {row.getVisibleCells().map((cell: any) => {
-        const colName = cell.column.id;
-        const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colName === colName;
-        const columnInfo = columnInfoByName[colName];
-        const colType = columnInfo?.col_type.toLowerCase() || 'text';
-        const isDateCol = colType.includes('date') || colType.includes('time');
-        return (
-          <VirtualCell
-            key={cell.id}
-            cellId={cell.id}
-            colName={colName}
-            rowIndex={rowIndex}
-            cellValue={cell.getValue()}
-            pendingValue={getPendingCellValue(rowIndex, colName)}
-            hasPendingEdit={isCellPending(rowIndex, colName)}
-            isEditing={isEditing}
-            isRowNum={cell.column.id === 'rowNum'}
-            isDateCol={isDateCol}
-            hasActiveEditingCell={Boolean(editingCell)}
-            editValue={editValue}
-            saving={saving}
-            onBeginEdit={onBeginEdit}
-            onSaveCell={onSaveCell}
-            onCancelEdit={onCancelEdit}
-            onEditValueChange={onEditValueChange}
-          />
-        );
-      })}
-    </tr>
-  );
-});
+const PAGE_SIZE_OPTIONS = ['50', '100', '200', '500'] as const;
 
 export default function TableView({ tableName, tabId }: TableViewProps) {
   useDevRenderCounter('TableView', `${tableName}:${tabId}`);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const [commitFlash, setCommitFlash] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
   const commitFlashTimerRef = useRef<number | null>(null);
 
   const {
@@ -191,6 +39,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     page,
     setPage,
     pageSize,
+    setPageSize,
     totalRows,
     totalPages,
     structure,
@@ -274,6 +123,48 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   const saving = savingNewRow || savingCell;
   const error = newRowError || cellError;
+
+  const selectedRowData = useMemo(
+    () => (selectedRowIndex !== null ? tableData[selectedRowIndex] ?? null : null),
+    [selectedRowIndex, tableData],
+  );
+
+  useEffect(() => {
+    if (tableData.length === 0) {
+      setSelectedRowIndex(null);
+      return;
+    }
+
+    setSelectedRowIndex((current) => {
+      if (current === null) return 0;
+      return current < tableData.length ? current : tableData.length - 1;
+    });
+  }, [tableData]);
+
+  const handleInspectRow = useCallback((rowIndex: number) => {
+    startTransition(() => {
+      setSelectedRowIndex(rowIndex);
+      setIsInspectorOpen(true);
+    });
+  }, []);
+
+  const toggleInspector = useCallback(() => {
+    startTransition(() => {
+      setIsInspectorOpen((current) => {
+        const next = !current;
+        if (next && selectedRowIndex === null && tableData.length > 0) {
+          setSelectedRowIndex(0);
+        }
+        return next;
+      });
+    });
+  }, [selectedRowIndex, tableData.length]);
+
+  const handleCopyField = useCallback(async (columnName: string, value: unknown) => {
+    await copyToClipboard(value == null ? '' : String(value), {
+      successMessage: `Copied ${columnName}`,
+    });
+  }, []);
 
   const columnInfoByName = useMemo(() => {
     const map: Record<string, (typeof structure)[number]> = {};
@@ -393,7 +284,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   }, [data, columnInfoByName, gridCols, sortCol, sortDir, handleSort]);
 
   const table = useReactTable({
-    data: tableData,
+    data: [],
     columns,
     state: {},
     getCoreRowModel: getCoreRowModel(),
@@ -401,13 +292,14 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   });
 
   const isResizingTable = table.getState().columnSizingInfo.isResizingColumn;
-  const rows = table.getCoreRowModel().rows;
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: tableData.length,
     getScrollElement: () => tableScrollRef.current,
     estimateSize: () => 34,
-    overscan: 12,
+    overscan: 6,
+    isScrollingResetDelay: 120,
   });
+  const isScrolling = rowVirtualizer.isScrolling;
 
   useEffect(() => {
     if (isResizingTable) {
@@ -559,6 +451,21 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
               </span>
             )}
           </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleInspector}
+            className={cn(
+              "h-8 transition-colors font-medium px-2.5",
+              isInspectorOpen
+                ? "text-primary bg-primary/10 hover:bg-primary/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            {isInspectorOpen ? <PanelRightClose size={14} className="mr-1.5" /> : <PanelRightOpen size={14} className="mr-1.5" />}
+            Inspector
+          </Button>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -595,133 +502,16 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
         </div>
       </div>
 
-      {/* Filter Panel */}
-      <div
-        className={cn(
-          "overflow-hidden bg-muted/20 transition-all duration-200 ease-out",
-          showFilterPanel
-            ? "max-h-[520px] opacity-100 border-b border-border"
-            : "max-h-0 opacity-0 border-b-0 pointer-events-none"
-        )}
-      >
-        <div
-          className={cn(
-            "p-4 transition-transform duration-200 ease-out",
-            showFilterPanel ? "translate-y-0" : "-translate-y-2"
-          )}
-        >
-          <div className="max-w-4xl space-y-3">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <Filter size={14} className="mr-2 text-primary" />
-                <h3 className="text-sm font-semibold tracking-tight text-foreground/80 uppercase tracking-widest text-xs">Filter Conditions</h3>
-              </div>
-              <div className="flex items-center space-x-2">
-                {filters.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleClearAllFilters} className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                    Clear All
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => handleAddFilter(gridCols)} className="h-7 text-xs border-primary/20 hover:bg-primary/5 text-primary">
-                  <Plus size={12} className="mr-1" /> Add Rule
-                </Button>
-              </div>
-            </div>
-
-            {filters.length === 0 ? (
-              <div className="text-center py-6 bg-background/50 rounded-xl border border-dashed border-border flex flex-col items-center justify-center">
-                <Filter size={24} className="mb-2 text-muted-foreground/30" />
-                <p className="text-xs text-muted-foreground/60 italic">No active filters. Add a rule to query your data.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filters.map((filter, index) => (
-                  <div key={filter.id} className="flex items-center space-x-2 animate-in fade-in slide-in-from-left-2 duration-200" style={{ animationDelay: `${index * 50}ms` }}>
-                    <div className="flex-1 grid grid-cols-12 gap-2 items-center bg-background p-1 pr-2 rounded-lg border border-border/50 shadow-sm">
-                      <Select
-                        value={filter.field}
-                        onValueChange={(val) => handleUpdateFilter(filter.id, { field: val })}
-                      >
-                        <SelectTrigger className="col-span-4 h-8 bg-transparent border-0 text-xs font-medium text-foreground focus:ring-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {gridCols.map(col => (
-                            <SelectItem key={col} value={col}>{col}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="col-span-3 relative h-full flex items-center border-l border-border/50">
-                        <Select
-                          value={filter.operator}
-                          onValueChange={(val) => handleUpdateFilter(filter.id, { operator: val })}
-                        >
-                          <SelectTrigger className="w-full h-8 bg-transparent border-0 text-[10px] font-bold text-primary focus:ring-0">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {OPERATORS.map(op => (
-                              <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="col-span-5 h-full flex items-center border-l border-border/50 bg-secondary/5 h-8">
-                        {!UNARY_OPERATORS.includes(filter.operator) && (
-                          <div className="flex-1 flex items-center px-2 space-x-2">
-                            <input 
-                              type="text"
-                              autoFocus={!filter.value}
-                              className="flex-1 bg-transparent text-xs outline-none py-1 text-foreground placeholder:text-muted-foreground/20 font-mono"
-                              placeholder="Value..."
-                              value={filter.value}
-                              onChange={(e) => handleUpdateFilter(filter.id, { value: e.target.value })}
-                            />
-                            {BETWEEN_OPERATORS.includes(filter.operator) && (
-                              <>
-                                <span className="text-[10px] font-bold text-muted-foreground/40 px-1">AND</span>
-                                <input 
-                                  type="text"
-                                  className="flex-1 bg-transparent text-xs outline-none py-1 text-foreground placeholder:text-muted-foreground/20 font-mono"
-                                  placeholder="Value..."
-                                  value={filter.valueTo}
-                                  onChange={(e) => handleUpdateFilter(filter.id, { valueTo: e.target.value })}
-                                />
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full flex-shrink-0"
-                      onClick={() => handleRemoveFilter(filter.id)}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {filters.length > 0 && (
-              <div className="flex justify-end pt-2">
-                <Button 
-                  size="sm" 
-                  onClick={handleApplyFilters}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 shadow-md shadow-primary/20"
-                >
-                  Apply Filters
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <FilterPanel
+        showFilterPanel={showFilterPanel}
+        filters={filters}
+        gridCols={gridCols}
+        handleAddFilter={handleAddFilter}
+        handleUpdateFilter={handleUpdateFilter}
+        handleRemoveFilter={handleRemoveFilter}
+        handleApplyFilters={handleApplyFilters}
+        handleClearAllFilters={handleClearAllFilters}
+      />
 
       {error && (
         <div className="m-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start text-destructive animate-in fade-in zoom-in-95 duration-200">
@@ -744,44 +534,49 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       )}
 
       {/* Main Table Content */}
-      <div ref={tableScrollRef} className="flex-1 relative overflow-auto custom-scrollbar bg-grid-white/[0.02]">
-        <div className="min-w-full inline-block align-middle">
-          <table className="w-full border-separate border-spacing-0 table-fixed">
-            <thead className="sticky top-0 z-20 bg-secondary/95 backdrop-blur-md shadow-sm">
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map(header => (
-                    <th 
-                      key={header.id}
-                      className={cn(
-                        "relative border-b-2 border-r border-border/60 border-b-border font-normal p-0 align-bottom",
-                        header.column.id === 'rowNum' && "bg-background/40"
-                      )}
-                      style={{ width: header.getSize() }}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      
-                      {header.column.getCanResize() && (
-                        <div
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
-                          className={cn(
-                            "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary z-30 transition-colors",
-                            header.column.getIsResizing() ? 'bg-primary shadow-glow' : 'bg-transparent'
-                          )}
-                        />
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="bg-background">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div
+          ref={tableScrollRef}
+          className="flex-1 relative overflow-auto custom-scrollbar bg-grid-white/[0.02]"
+          style={{ contain: 'strict', willChange: 'scroll-position' }}
+        >
+          <div className="min-w-full inline-block align-middle">
+            <table className="w-full border-separate border-spacing-0 table-fixed">
+              <thead className="sticky top-0 z-20 bg-background shadow-sm">
+                {table.getHeaderGroups().map(headerGroup => (
+                  <tr key={headerGroup.id} className="bg-background">
+                    {headerGroup.headers.map(header => (
+                      <th 
+                        key={header.id}
+                        className={cn(
+                          "relative border-b-2 border-r border-border/60 border-b-border font-normal p-0 align-bottom bg-background",
+                          header.column.id === 'rowNum' && "bg-muted/30"
+                        )}
+                        style={{ width: header.getSize() }}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                        
+                        {header.column.getCanResize() && (
+                          <div
+                            onMouseDown={header.getResizeHandler()}
+                            onTouchStart={header.getResizeHandler()}
+                            className={cn(
+                              "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none hover:bg-primary z-30 transition-colors",
+                              header.column.getIsResizing() ? 'bg-primary shadow-glow' : 'bg-transparent'
+                            )}
+                          />
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody className="bg-background">
               {/* Virtual New Row */}
               {newRowData && (
                 <tr className="bg-amber-500/10 hover:bg-amber-500/15 transition-colors border-b border-amber-500/30">
@@ -829,7 +624,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                 </tr>
               )}
 
-              {rows.length === 0 ? (
+              {tableData.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length} className="py-20 text-center">
                     <div className="flex flex-col items-center justify-center space-y-4 opacity-30">
@@ -863,22 +658,26 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                       )}
 
                       {virtualRows.map((virtualRow) => {
-                        const row = rows[virtualRow.index];
+                        const rowData = tableData[virtualRow.index];
                         return (
                           <VirtualRow
-                            key={row.id}
-                            row={row}
+                            key={`row-${virtualRow.index}`}
                             rowIndex={virtualRow.index}
+                            rowData={rowData}
+                            gridCols={gridCols}
+                            isSelected={selectedRowIndex === virtualRow.index}
                             editingCell={editingCell}
                             editValue={editValue}
                             saving={saving}
                             columnInfoByName={columnInfoByName}
+                            isScrolling={isScrolling}
                             getPendingCellValue={getPendingCellValue}
                             isCellPending={isCellPending}
                             onBeginEdit={handleBeginCellEdit}
                             onSaveCell={handleSaveCellForRow}
                             onCancelEdit={handleCancelCellEdit}
                             onEditValueChange={setEditValue}
+                            onInspectRow={handleInspectRow}
                           />
                         );
                       })}
@@ -892,9 +691,19 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                   );
                 })()
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        <RowInspector
+          isOpen={isInspectorOpen}
+          gridCols={gridCols}
+          selectedRowData={selectedRowData}
+          columnInfoByName={columnInfoByName}
+          onToggle={toggleInspector}
+          onCopyField={handleCopyField}
+        />
       </div>
 
       {/* Footer Info */}
@@ -908,7 +717,21 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
           <span>{tableName}</span>
         </div>
         <div className="flex items-center space-x-4">
-          <span>{pageSize} rows per page</span>
+          <div className="flex items-center space-x-2">
+            <span>Rows per page</span>
+            <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+              <SelectTrigger className="h-7 w-[88px] border-border/60 bg-background/70 px-2 text-[10px] uppercase tracking-widest text-foreground focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="h-2 w-px bg-border/50" />
         </div>
       </div>

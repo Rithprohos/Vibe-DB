@@ -51,7 +51,6 @@ export default function CreateTable({ tabId }: Props) {
   const connections = useAppStore(s => s.connections);
   const setTables = useAppStore(s => s.setTables);
   const updateTab = useAppStore(s => s.updateTab);
-  const addLog = useAppStore(s => s.addLog);
   const openTableTab = useAppStore(s => s.openTableTab);
   const closeTab = useAppStore(s => s.closeTab);
 
@@ -156,21 +155,11 @@ export default function CreateTable({ tabId }: Props) {
 
     setSaving(true);
     setError('');
-    const startTime = Date.now();
     let sqlToRun = '';
 
     try {
       sqlToRun = await buildCreateTableSQL(tableName, columns, ifNotExists);
-      const result = await executeQuery(sqlToRun, connId);
-      const duration = Date.now() - startTime;
-
-      addLog({
-        sql: sqlToRun,
-        status: 'success',
-        duration,
-        message: result.message || `Table "${tableName}" created successfully`,
-      });
-
+      await executeQuery(sqlToRun, connId);
       // Refresh the tables list
       const tables = await listTables(connId);
       if (activeConnection) {
@@ -184,15 +173,8 @@ export default function CreateTable({ tabId }: Props) {
         openTableTab(activeConnection.id, tableName.trim(), 'data');
       }
     } catch (e: any) {
-      const duration = Date.now() - startTime;
       const errMsg = e?.toString() || 'Unknown error';
       setError(errMsg);
-      addLog({
-        sql: sqlToRun || `CREATE TABLE "${tableName.trim()}" ...`,
-        status: 'error',
-        duration,
-        message: errMsg,
-      });
     } finally {
       setSaving(false);
     }
@@ -201,7 +183,6 @@ export default function CreateTable({ tabId }: Props) {
     tableName,
     columns,
     ifNotExists,
-    addLog,
     setTables,
     activeConnection,
     updateTab,

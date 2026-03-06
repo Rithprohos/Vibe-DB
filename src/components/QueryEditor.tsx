@@ -1,24 +1,30 @@
-import { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, memo, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import { useAppStore, MAX_RESULT_ROWS } from '../store/useAppStore';
 import { executeQuery, listTables } from '../lib/db';
 import { formatCellValue } from '../lib/formatters';
 import { Button } from '@/components/ui/button';
-import { Play, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Play, Loader2, AlertCircle, CheckCircle2, ChevronsLeftRightEllipsis, Rows3, WrapText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { keymap } from '@codemirror/view';
 import { Prec } from '@codemirror/state';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDevRenderCounter } from '@/lib/dev-performance';
 
 interface Props {
   tabId: string;
 }
 
+interface SelectedCell {
+  rowIndex: number;
+  columnIndex: number;
+}
+
 const EMPTY_ARRAY: any[] = [];
+const MIN_EDITOR_HEIGHT = 120;
+const MIN_RESULTS_HEIGHT = 180;
 
 const BASIC_SETUP = {
   lineNumbers: true,
@@ -57,7 +63,12 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const [duration, setDuration] = useState(0);
   const [editorHeight, setEditorHeight] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
+  const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
+  const [wrapCells, setWrapCells] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const editorPaneRef = useRef<HTMLDivElement>(null);
   const resizerRef = useRef<HTMLDivElement>(null);
+  const resultsScrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
 
   const schema = useMemo(() => {
@@ -73,55 +84,75 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   }, [tabId]);
 
   // Resizing logic - using refs to avoid effect re-runs
-  const isResizingRef = useRef(false);
+  const dragStartYRef = useRef(0);
+  const dragStartHeightRef = useRef(300);
   const currentHeightRef = useRef(300);
   const rafId = useRef<number | null>(null);
 
-  const startResizing = useCallback(() => {
-    isResizingRef.current = true;
+  const scheduleEditorHeight = useCallback((nextHeight: number) => {
+    currentHeightRef.current = nextHeight;
+
+    if (rafId.current) return;
+
+    rafId.current = requestAnimationFrame(() => {
+      if (editorPaneRef.current) {
+        editorPaneRef.current.style.height = `${currentHeightRef.current}px`;
+      }
+      rafId.current = null;
+    });
+  }, []);
+
+  const startResizing = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    dragStartYRef.current = e.clientY;
+    dragStartHeightRef.current = editorPaneRef.current?.getBoundingClientRect().height ?? currentHeightRef.current;
     setIsResizing(true);
     document.body.classList.add('select-none', 'cursor-row-resize');
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
   }, []);
 
   const stopResizing = useCallback(() => {
-    isResizingRef.current = false;
     setIsResizing(false);
     document.body.classList.remove('select-none', 'cursor-row-resize');
     setEditorHeight(currentHeightRef.current);
   }, []);
 
-  const resize = useCallback((e: MouseEvent) => {
-    if (!isResizingRef.current || !resizerRef.current?.parentElement) return;
-    
-    currentHeightRef.current = Math.max(100, Math.min(window.innerHeight - 200, e.clientY - resizerRef.current.parentElement.getBoundingClientRect().top));
-    
-    if (!rafId.current) {
-      rafId.current = requestAnimationFrame(() => {
-        if (resizerRef.current?.parentElement) {
-          const editorContainer = resizerRef.current.parentElement.querySelector('.cm-editor');
-          if (editorContainer) {
-            (editorContainer as HTMLElement).style.height = `${currentHeightRef.current}px`;
-          }
-        }
-        rafId.current = null;
-      });
-    }
-  }, []);
+  const resize = useCallback((clientY: number) => {
+    if (!rootRef.current) return;
+
+    const containerHeight = rootRef.current.getBoundingClientRect().height;
+    const maxEditorHeight = Math.max(MIN_EDITOR_HEIGHT, containerHeight - MIN_RESULTS_HEIGHT);
+    const nextHeight = Math.max(
+      MIN_EDITOR_HEIGHT,
+      Math.min(maxEditorHeight, dragStartHeightRef.current + (clientY - dragStartYRef.current))
+    );
+
+    scheduleEditorHeight(nextHeight);
+  }, [scheduleEditorHeight]);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => resize(e);
-    const handleMouseUp = () => stopResizing();
+    const handlePointerMove = (e: PointerEvent) => resize(e.clientY);
+    const handlePointerUp = () => stopResizing();
 
     if (isResizing) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
     }
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isResizing, resize, stopResizing]);
+
+  useEffect(() => {
+    currentHeightRef.current = editorHeight;
+    if (editorPaneRef.current) {
+      editorPaneRef.current.style.height = `${editorHeight}px`;
+    }
+  }, [editorHeight]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -130,6 +161,10 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       if (rafId.current) cancelAnimationFrame(rafId.current);
     };
   }, []);
+
+  useEffect(() => {
+    setSelectedCell(null);
+  }, [result, error]);
 
   const handleRun = useCallback(async (editorView?: any) => {
     // Read query from store to avoid stale closure
@@ -163,13 +198,6 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       
       store.updateTab(tabId, { result: resultToStore, error: '' });
 
-      store.addLog({
-        sql: queryToRun,
-        status: 'success',
-        duration: elapsed,
-        message: truncated ? `${res.message} (showing ${MAX_RESULT_ROWS} of ${res.rows.length})` : res.message
-      });
-
       const upper = queryToRun.toUpperCase();
       if (upper.startsWith('CREATE') || upper.startsWith('DROP') || upper.startsWith('ALTER')) {
         const tablesList = await listTables(activeConnection.connId);
@@ -181,12 +209,6 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       const errMsg = e.toString();
       store.updateTab(tabId, { error: errMsg, result: null });
 
-      store.addLog({
-        sql: queryToRun,
-        status: 'error',
-        duration: elapsed,
-        message: errMsg
-      });
     } finally {
       setRunning(false);
     }
@@ -213,12 +235,51 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
+  const selectedCellDetails = useMemo(() => {
+    if (!result || !selectedCell) return null;
+
+    const columnName = result.columns[selectedCell.columnIndex];
+    const row = result.rows[selectedCell.rowIndex];
+    if (!columnName || !row) return null;
+
+    const rawValue = row[selectedCell.columnIndex];
+    const { text, className } = formatCellValue(rawValue);
+
+    return {
+      columnName,
+      rowNumber: selectedCell.rowIndex + 1,
+      rawValue,
+      text,
+      className,
+    };
+  }, [result, selectedCell]);
+
+  const hasRows = Boolean(result && result.columns.length > 0);
+  const rowCount = result?.rows.length ?? 0;
+  const columnCount = result?.columns.length ?? 0;
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => resultsScrollRef.current,
+    estimateSize: () => (wrapCells ? 72 : 44),
+    overscan: 10,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const virtualPaddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const virtualPaddingBottom =
+    virtualRows.length > 0
+      ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
+      : 0;
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, wrapCells, result]);
 
 
   return (
-    <div className="flex flex-col h-full w-full bg-background relative z-0">
+    <div ref={rootRef} className="flex flex-col h-full w-full bg-background relative z-0">
       {/* Editor Area */}
       <div 
+        ref={editorPaneRef}
         className="flex flex-col flex-shrink-0 relative group"
         style={{ height: editorHeight, minHeight: 100 }}
       >
@@ -254,10 +315,10 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         <div 
           ref={resizerRef}
           className={cn(
-            "absolute bottom-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-primary z-20 transition-colors opacity-0 group-hover:opacity-100",
+            "absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-primary z-20 transition-colors opacity-0 group-hover:opacity-100 touch-none",
             isResizing && "bg-primary opacity-100 shadow-glow"
           )}
-          onMouseDown={startResizing}
+          onPointerDown={startResizing}
         />
       </div>
 
@@ -276,57 +337,186 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
             </div>
           </div>
         ) : result ? (
-          <div className="flex flex-col h-full w-full">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/10 flex-shrink-0">
-              <div className="flex items-center space-x-2 text-primary">
-                <CheckCircle2 size={16} />
-                <span className="font-semibold text-sm">Success</span>
-                <span className="text-muted-foreground text-[13px] ml-2 font-medium tracking-wide border-l border-border pl-4">&middot; {result.message}</span>
-              </div>
-              {duration > 0 && (
-                <span className="text-[11px] font-mono text-muted-foreground tracking-widest bg-background border border-border px-2 py-0.5 rounded-full">
-                  {duration < 1000 ? `${Math.round(duration)}ms` : `${(duration / 1000).toFixed(2)}s`}
+          <div className="flex flex-col h-full w-full min-h-0">
+            <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border bg-secondary/10 flex-shrink-0">
+              <div className="flex items-center gap-3 text-primary min-w-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <CheckCircle2 size={16} />
+                  <span className="font-semibold text-sm">Success</span>
+                </div>
+                <span className="text-muted-foreground text-[13px] font-medium tracking-wide border-l border-border pl-3 truncate">
+                  {result.message}
                 </span>
-              )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="hidden sm:flex items-center gap-2 text-[11px] font-medium text-muted-foreground tracking-[0.18em] uppercase px-2">
+                  <span>{rowCount} rows</span>
+                  <span className="text-border">/</span>
+                  <span>{columnCount} cols</span>
+                </div>
+                {duration > 0 && (
+                  <span className="text-[11px] font-mono text-muted-foreground tracking-widest bg-background border border-border px-2 py-0.5 rounded-full">
+                    {duration < 1000 ? `${Math.round(duration)}ms` : `${(duration / 1000).toFixed(2)}s`}
+                  </span>
+                )}
+              </div>
             </div>
-            
-            {result.columns.length > 0 ? (
-              <ScrollArea className="flex-1 w-full h-full bg-background">
-                <Table className="w-full text-left max-w-none whitespace-nowrap">
-                  <TableHeader className="bg-secondary/60 sticky top-0 backdrop-blur-md z-10 border-b border-border shadow-sm">
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="w-[50px] text-muted-foreground font-semibold uppercase tracking-wider text-[10px] text-center border-r border-border/50 bg-background/20 h-8">#</TableHead>
-                      {result.columns.map((col, idx) => (
-                        <TableHead key={idx} className="font-semibold uppercase tracking-wider text-[10px] text-foreground border-r border-border/50 last:border-0 px-4 h-8 bg-background/20">
-                          {col}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {result.rows.map((row, rowIdx) => (
-                      <TableRow key={rowIdx} className={cn(
-                        "border-b border-border/20 transition-colors hover:bg-secondary/40",
-                        rowIdx % 2 === 0 ? "bg-transparent" : "bg-secondary/10"
-                      )}>
-                        <TableCell className="font-mono text-muted-foreground/50 text-[10px] text-center border-r border-border/30 bg-background/10">
-                          {rowIdx + 1}
-                        </TableCell>
-                        {row.map((cell, cellIdx) => {
-                          const { text, className } = formatCellValue(cell);
+
+            {hasRows ? (
+              <div className="flex flex-1 min-h-0 min-w-0">
+                <div className="flex min-w-0 flex-1 flex-col border-r border-border/70">
+                  <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-secondary/20 px-4 py-2.5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                      <Rows3 size={13} />
+                      <span>Results Grid</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setWrapCells(current => !current)}
+                      className={cn(
+                        'h-7 gap-2 px-2 text-xs text-muted-foreground hover:text-foreground',
+                        wrapCells && 'bg-secondary text-foreground'
+                      )}
+                    >
+                      <WrapText size={13} />
+                      {wrapCells ? 'Wrapped' : 'Truncate'}
+                    </Button>
+                  </div>
+
+                  <div ref={resultsScrollRef} className="flex-1 min-h-0 min-w-0 overflow-auto bg-background">
+                    <table className="min-w-max border-separate border-spacing-0 text-left table-fixed">
+                      <thead className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border-primary)]">
+                        <tr className="border-b border-border">
+                          <th className="sticky left-0 z-20 h-10 w-[56px] min-w-[56px] border-b border-r border-border/70 bg-secondary/65 px-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                            #
+                          </th>
+                          {result.columns.map((col, idx) => (
+                            <th
+                              key={idx}
+                              className="h-11 w-[220px] min-w-[220px] max-w-[220px] overflow-hidden border-b border-r border-border bg-background px-4 text-left text-[12px] font-semibold tracking-[0.04em] text-foreground last:border-r-0"
+                            >
+                              <span className="block overflow-hidden text-ellipsis whitespace-nowrap leading-5">
+                                {col}
+                              </span>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {virtualPaddingTop > 0 && (
+                          <tr>
+                            <td colSpan={columnCount + 1} style={{ height: `${virtualPaddingTop}px`, padding: 0 }} />
+                          </tr>
+                        )}
+
+                        {virtualRows.map((virtualRow) => {
+                          const rowIdx = virtualRow.index;
+                          const row = result.rows[rowIdx];
+
                           return (
-                            <TableCell key={cellIdx} className="px-4 border-r border-border/30 last:border-0 max-w-[400px] truncate" title={text}>
-                                <span className={className}>
-                                    {text}
-                                </span>
-                            </TableCell>
+                            <tr
+                              key={rowIdx}
+                              data-index={rowIdx}
+                              ref={(node) => {
+                                if (node) {
+                                  rowVirtualizer.measureElement(node);
+                                }
+                              }}
+                              className={cn(
+                                'transition-colors',
+                                rowIdx % 2 === 0 ? 'bg-background' : 'bg-secondary/12',
+                                'hover:bg-secondary/30'
+                              )}
+                            >
+                              <td className="sticky left-0 z-[1] border-b border-r border-border/60 bg-inherit px-3 text-center font-mono text-[11px] text-muted-foreground">
+                                {rowIdx + 1}
+                              </td>
+                              {row.map((cell, cellIdx) => {
+                                const { text, className } = formatCellValue(cell);
+                                const isActive = selectedCell?.rowIndex === rowIdx && selectedCell?.columnIndex === cellIdx;
+                                const isNumeric = typeof cell === 'number';
+
+                                return (
+                                  <td
+                                    key={cellIdx}
+                                    className={cn(
+                                      'w-[220px] min-w-[220px] max-w-[220px] overflow-hidden border-b border-r border-border/50 px-4 py-2.5 align-top last:border-r-0',
+                                      isActive && 'bg-primary/10 outline outline-1 outline-primary/40 -outline-offset-1'
+                                    )}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedCell({ rowIndex: rowIdx, columnIndex: cellIdx })}
+                                      className={cn(
+                                        'block w-full overflow-hidden rounded-sm py-0.5 outline-none transition-opacity hover:opacity-100 focus-visible:ring-1 focus-visible:ring-primary/40',
+                                        isNumeric ? 'text-right' : 'text-left'
+                                      )}
+                                      title={text}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'block w-full overflow-hidden',
+                                          wrapCells
+                                            ? 'whitespace-pre-wrap break-words leading-5'
+                                            : 'text-ellipsis whitespace-nowrap',
+                                          className
+                                        )}
+                                      >
+                                        {text}
+                                      </span>
+                                    </button>
+                                  </td>
+                                );
+                              })}
+                            </tr>
                           );
                         })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+
+                        {virtualPaddingBottom > 0 && (
+                          <tr>
+                            <td colSpan={columnCount + 1} style={{ height: `${virtualPaddingBottom}px`, padding: 0 }} />
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <aside className="hidden w-[320px] shrink-0 flex-col bg-secondary/10 xl:flex">
+                  <div className="flex items-center gap-2 border-b border-border/70 px-4 py-3 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                    <ChevronsLeftRightEllipsis size={13} />
+                    <span>Cell Inspector</span>
+                  </div>
+                  {selectedCellDetails ? (
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <div className="border-b border-border/70 px-4 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Row {selectedCellDetails.rowNumber}</div>
+                        <div className="mt-1 truncate font-semibold text-foreground">{selectedCellDetails.columnName}</div>
+                      </div>
+                      <div className="flex-1 overflow-auto p-4">
+                        <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Value</div>
+                        <pre className={cn('whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-background/80 p-4 text-[12px] leading-6 shadow-inner', selectedCellDetails.className)}>
+                          {selectedCellDetails.text}
+                        </pre>
+                        <div className="mt-4 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Type</div>
+                        <div className="mt-2 text-sm text-foreground">
+                          {selectedCellDetails.rawValue === null || selectedCellDetails.rawValue === undefined
+                            ? 'NULL'
+                            : Array.isArray(selectedCellDetails.rawValue)
+                              ? 'Array'
+                              : typeof selectedCellDetails.rawValue}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                      Select a cell to inspect long values without expanding the grid width.
+                    </div>
+                  )}
+                </aside>
+              </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
                 <span className="text-sm font-medium opacity-70 border border-border/50 p-4 rounded-xl bg-secondary/20 shadow-inner max-w-sm text-center">

@@ -3,8 +3,9 @@ pub mod engines;
 use engines::{
     ColumnInfo, ConnectionConfig, DatabaseEngine, EngineRegistry, QueryResult, TableInfo,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Instant;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
@@ -55,6 +56,27 @@ struct FilterConditionInput {
     value: String,
     #[serde(default)]
     value_to: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SqlLogEvent {
+    sql: String,
+    status: &'static str,
+    duration: f64,
+    message: String,
+}
+
+fn emit_sql_log(app: &AppHandle, sql: String, status: &'static str, duration: f64, message: String) {
+    let _ = app.emit(
+        "vibedb:sql-log",
+        SqlLogEvent {
+            sql,
+            status,
+            duration,
+            message,
+        },
+    );
 }
 
 fn quote_identifier(identifier: &str) -> String {
@@ -338,68 +360,138 @@ async fn get_table_structure(
 /// Executes a SQL query.
 #[tauri::command]
 async fn execute_query(
+    app: AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     query: String,
 ) -> Result<QueryResult, String> {
+    let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
         .registry
         .get_engine(&id)
         .await
         .map_err(|e| e.to_string())?;
-    engine
-        .execute_query(&query)
-        .await
-        .map_err(|e| e.to_string())
+    match engine.execute_query(&query).await {
+        Ok(result) => {
+            emit_sql_log(
+                &app,
+                query,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                result.message.clone(),
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                query,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
 }
 
 /// Executes multiple SQL queries in a single transaction.
 #[tauri::command]
 async fn execute_transaction(
+    app: AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     queries: Vec<String>,
 ) -> Result<QueryResult, String> {
+    let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
         .registry
         .get_engine(&id)
         .await
         .map_err(|e| e.to_string())?;
-    engine
-        .execute_transaction(&queries)
-        .await
-        .map_err(|e| e.to_string())
+    let sql = queries.join("\n");
+    match engine.execute_transaction(&queries).await {
+        Ok(result) => {
+            emit_sql_log(
+                &app,
+                sql,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                result.message.clone(),
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                sql,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
 }
 
 /// Gets the row count of a table.
 #[tauri::command]
 async fn get_table_row_count(
+    app: AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     table_name: String,
 ) -> Result<i64, String> {
+    let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
         .registry
         .get_engine(&id)
         .await
         .map_err(|e| e.to_string())?;
-    engine
-        .get_table_row_count(&table_name)
-        .await
-        .map_err(|e| e.to_string())
+    let sql = format!(
+        "SELECT COUNT(*) as count FROM {}",
+        quote_identifier(table_name.trim())
+    );
+    match engine.get_table_row_count(&table_name).await {
+        Ok(count) => {
+            emit_sql_log(
+                &app,
+                sql,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                format!("Counted {count} row(s)"),
+            );
+            Ok(count)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                sql,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
 }
 
 /// Gets the row count of a table with optional structured filters.
 #[tauri::command]
 async fn get_filtered_row_count(
+    app: AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     table_name: String,
     filters: Option<Vec<FilterConditionInput>>,
 ) -> Result<i64, String> {
+    let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
         .registry
@@ -411,7 +503,8 @@ async fn get_filtered_row_count(
         .get_table_structure(&table_name)
         .await
         .map_err(|e| e.to_string())?;
-    let where_clause = build_where_clause(&filters.unwrap_or_default(), &structure)?;
+    let filter_items = filters.unwrap_or_default();
+    let where_clause = build_where_clause(&filter_items, &structure)?;
 
     let mut query = format!(
         "SELECT COUNT(*) as count FROM {}",
@@ -422,16 +515,36 @@ async fn get_filtered_row_count(
         query.push_str(&where_sql);
     }
 
-    let result = engine
-        .execute_query(&query)
-        .await
-        .map_err(|e| e.to_string())?;
-    extract_count(&result)
+    match engine.execute_query(&query).await {
+        Ok(result) => {
+            let count = extract_count(&result)?;
+            emit_sql_log(
+                &app,
+                query,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                format!("Counted {count} filtered row(s)"),
+            );
+            Ok(count)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                query,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
 }
 
 /// Fetches table data using structured query options built in Rust.
 #[tauri::command]
 async fn get_table_data(
+    app: AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     table_name: String,
@@ -441,6 +554,7 @@ async fn get_table_data(
     order_dir: Option<String>,
     filters: Option<Vec<FilterConditionInput>>,
 ) -> Result<QueryResult, String> {
+    let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
         .registry
@@ -452,7 +566,9 @@ async fn get_table_data(
         .get_table_structure(&table_name)
         .await
         .map_err(|e| e.to_string())?;
-    let where_clause = build_where_clause(&filters.unwrap_or_default(), &structure)?;
+    let filter_items = filters.unwrap_or_default();
+    let has_filters = !filter_items.is_empty();
+    let where_clause = build_where_clause(&filter_items, &structure)?;
 
     let mut query = format!("SELECT * FROM {}", quote_identifier(table_name.trim()));
     if let Some(where_sql) = where_clause {
@@ -471,10 +587,38 @@ async fn get_table_data(
         offset.unwrap_or(0)
     ));
 
-    engine
-        .execute_query(&query)
-        .await
-        .map_err(|e| e.to_string())
+    match engine.execute_query(&query).await {
+        Ok(result) => {
+            let message = format!(
+                "{} row(s) fetched{}",
+                result.rows.len(),
+                if has_filters {
+                    " with filters"
+                } else {
+                    ""
+                }
+            );
+            emit_sql_log(
+                &app,
+                query,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message,
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                query,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
 }
 
 /// Creates a new SQLite database file.

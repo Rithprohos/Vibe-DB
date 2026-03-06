@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronDown, Trash2, Copy, AlertCircle, CheckCircle2, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useMemo, memo, useRef, useCallback, useEffect } from 'react';
+import { useState, memo, useRef, useCallback, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDevRenderCounter } from '@/lib/dev-performance';
+import { copyToClipboard } from '@/lib/copy';
 
 const selectors = {
   logs: (s: ReturnType<typeof useAppStore.getState>) => s.logs,
@@ -80,12 +81,8 @@ export default function LogDrawer() {
   const heightRef = useRef(200);
   const isDraggingRef = useRef(false);
 
-  const reversedLogs = useMemo(() => {
-    return [...logs].reverse();
-  }, [logs]);
-
   const handleCopy = useCallback((sql: string) => {
-    navigator.clipboard.writeText(sql);
+    void copyToClipboard(sql, { successMessage: 'Copied SQL' });
   }, []);
 
   const toggleDrawer = useCallback(() => {
@@ -93,7 +90,7 @@ export default function LogDrawer() {
   }, [setShowLogDrawer, showLogDrawer]);
 
   const logVirtualizer = useVirtualizer({
-    count: reversedLogs.length,
+    count: logs.length,
     getScrollElement: () => viewportRef.current,
     estimateSize: () => 64,
     overscan: 8,
@@ -177,7 +174,7 @@ export default function LogDrawer() {
         ) : (
           <div className="p-2" style={{ height: `${logVirtualizer.getTotalSize()}px`, position: 'relative' }}>
             {logVirtualizer.getVirtualItems().map((virtualItem) => {
-              const log = reversedLogs[virtualItem.index];
+              const log = logs[virtualItem.index];
               return (
                 <div
                   key={log.id}
