@@ -1,167 +1,81 @@
-# AGENTS.md — VibeDB Development Guide
+# AGENTS.md — VibeDB
 
-> This file provides essential context for AI agents working on VibeDB. Read before making changes.
+Read this before editing the repo.
 
-## Project Overview
+## Project
 
-- **Name**: VibeDB — cross-platform SQLite database manager
-- **Stack**: Tauri v2 (Rust) + React 19 + TypeScript + Vite
-- **Package Manager**: bun
-- **Identifier**: `com.vibedb.app`
-
----
+- App: VibeDB, cross-platform SQLite database manager
+- Stack: Tauri v2 + Rust + React 19 + TypeScript + Vite
+- Package manager: `bun`
+- Tauri identifier: `kh.com.vibedb`
+- Dev frontend URL: `http://localhost:1420`
 
 ## Commands
 
-### Development
-
 ```bash
-bun install          # Install dependencies (first time)
-bun run dev          # Frontend dev server only (port 1420)
-bun run tauri dev    # Full app (Rust + Vite HMR) — first compile ~2-3min
-bun run tdev         # Alias for tauri dev
+bun install
+bun run dev
+bun run tdev
+bun run build
+bun run preview
+bun run cargo:test
 ```
 
-### Build & Typecheck
+## Source Of Truth
 
-```bash
-bun run build        # TypeScript check + Vite production build
-bun run preview      # Preview production build locally
-bun run tauri build  # Build Tauri app for distribution
-```
-
-### Testing
-
-> **Note**: This project currently has no test suite. Tests are encouraged.
-
-To add tests, use Vitest:
-
-```bash
-bun add -D vitest @testing-library/react @testing-library/jest-dom jsdom
-bun vitest run src/store/useAppStore.test.ts
-bun vitest run --testNamePattern "addConnection"
-```
-
----
-
-## Code Style
-
-### General Principles
-
-- **Dark-first UI** — Use CSS variables from `src/index.css`. Never hardcode hex colors.
-- **Information density** — DB tools need compact data display.
-- **Neon accent** — Use `#00e599` sparingly.
-
-### TypeScript
-
-- **Strict mode**: `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
-- Use explicit types for parameters/returns, `type` for imports: `import { type Connection }`
-- Prefer interfaces over types for object shapes
-
-### React
-
-- Functional components with hooks, `useCallback` for handlers, `useMemo` for expensive ops
-
-### Shared Logic Rules
-
-- **No duplicated domain logic in components** — if logic/constants are used in 2+ places (for example data-type colors, identifier validation, SQL helper transforms), move them to `src/lib/*` and import from there.
-- **Prefer extending existing shared modules first** — check `src/lib/createTableConstants.ts`, `src/lib/*` helpers, and store utilities before adding new local helpers.
-- **Single source of truth for visual tokens** — reusable mappings (like type → color class) must live in shared constants, not per-component switch statements.
-- **Backend + frontend parity for validation** — user-input rules (table/column naming, safety constraints) must be enforced in frontend UX and backend command paths.
-- **When touching duplicate logic, refactor in the same PR** — do not leave a new duplicate behind even if behavior is correct.
-
-### Performance Rules
-
-- **Fetch metadata separately from row data** — avoid re-fetching table structure and total row count on every page/sort update.
-- **Memoize lookup maps** — for repeated cell rendering, build maps once (for example column-name → column-info) instead of repeated `Array.find` calls.
-- **Avoid duplicated per-cell work** — compute formatted cell values once per render path and reuse.
-- **Keep memo dependencies minimal** — only include values actually used by the memoized computation.
-- **Use stable callbacks for list items** — pass `useCallback` handlers to memoized children to prevent avoidable rerenders.
-- **Prefer single-pass filtering/partitioning** — when deriving multiple filtered lists from the same source, compute them together in one memoized pass.
-- **Virtualize long lists/tables** — use row virtualization when rendering large result sets (tables, logs, sidebar objects).
-
-### Refactor Safety Rules
-
-- **Preserve interaction semantics during refactors** — performance/memoization changes must not alter click/double-click/keyboard behavior.
-- **Do not simplify input handlers without parity checks** — avoid changing `onMouseDown`/`onClick`/`onDoubleClick` logic unless behavior is explicitly approved.
-- **Run behavior parity checklist after table-editing changes** — verify: double-click enters edit, single click only behaves as designed, `Escape` cancels, `Cmd/Ctrl+Enter` commits.
-- **Add or update regression tests for critical interactions** — when touching editable grid logic, include tests for edit entry and commit/cancel flow.
-- **Only mark perf tasks done after behavior validation** — roadmap/readme status updates require passing interaction smoke checks first.
-
-### Naming & Imports
-
-| Element | Convention | Example |
-|---------|------------|---------|
-| Components | PascalCase | `TableView.tsx` |
-| Files | kebab-case | `query-editor.tsx` |
-| Functions/vars | camelCase | `addConnection` |
-| Types | PascalCase | `Connection`, `TabType` |
-
-```typescript
-// External first, then relative
-import { useState, useEffect } from 'react';
-import { useAppStore, type Connection } from './store/useAppStore';
-import { listTables } from './lib/db';
-import './index.css';
-```
-
-### CSS & Error Handling
-
-- CSS variables for colors (`var(--bg-primary)`), Tailwind for layout, `cva` for variants
-- Try/catch for Tauri commands, log errors: `console.error('Failed to connect:', e)`
-
----
+- [`package.json`](/Users/a1234/Documents/Project/vibe-db/package.json): scripts, deps, versions
+- [`src/store/useAppStore.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/useAppStore.ts): app state, limits, persisted settings
+- [`src/lib/db.ts`](/Users/a1234/Documents/Project/vibe-db/src/lib/db.ts): frontend wrappers around Tauri commands
+- [`src-tauri/src/commands.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/commands.rs): backend command implementations
+- [`src-tauri/src/lib.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/lib.rs): Tauri setup, plugins, command registration
+- [`src/index.css`](/Users/a1234/Documents/Project/vibe-db/src/index.css): theme variables and shared styling tokens
+- [`STYLE_GUIDE.md`](/Users/a1234/Documents/Project/vibe-db/STYLE_GUIDE.md): UI rules
+- [`.agents/workflows/performance-rules.md`](/Users/a1234/Documents/Project/vibe-db/.agents/workflows/performance-rules.md): required performance and state-management rules
 
 ## Architecture
 
-### State (Zustand)
+- Frontend state lives in Zustand in `src/store/useAppStore.ts`.
+- Persisted state uses Tauri Store via `app_settings.json`, not browser localStorage.
+- Backend DB operations are implemented in `src-tauri/src/commands.rs`.
+- `src-tauri/src/lib.rs` wires plugins and exposes commands.
+- Current custom event: `vibedb:connect`.
 
-All app state in `src/store/useAppStore.ts`:
+## Current Backend Commands
 
-```typescript
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      connections: [],
-      tables: [],
-      tabs: [],
-      addConnection: (conn) => set(...),
-    }),
-    { name: 'vibedb-storage' }
-  )
-);
-```
+- Connection: `connect_database`, `disconnect_database`, `set_active_connection`
+- Schema/data: `list_tables`, `get_table_structure`, `get_table_data`
+- Querying: `execute_query`, `execute_transaction`
+- Counts/meta: `get_table_row_count`, `get_filtered_row_count`, `get_database_version`
+- Creation/helpers: `create_database`, `build_create_table_sql`
+- AI config: `get_default_ai_provider_config`
 
-### Tauri Commands
+## Working Rules
 
-Located in `src-tauri/src/lib.rs`:
+- Keep UI dark-first, compact, and use CSS variables from `src/index.css`.
+- Do not hardcode colors. Existing neon accent `#00e599` is allowed sparingly.
+- Follow [`STYLE_GUIDE.md`](/Users/a1234/Documents/Project/vibe-db/STYLE_GUIDE.md) for visual direction.
+- VibeDB should look like a devtool: sharp corners, dense layouts, restrained glow, no soft SaaS cards.
+- Avoid `rounded-full` and large radii on primary UI surfaces. Reserve fully round shapes for tiny indicators only.
+- Preserve existing visual patterns in the area you touch.
+- Do not duplicate domain logic across components. Move shared logic/constants to `src/lib/*`.
+- Keep frontend and backend validation in sync for user input.
+- When touching tables/logs/sidebar lists, preserve virtualization.
+- Keep metadata fetches separate from paginated row fetches.
+- Avoid repeated per-cell work in table rendering; memoize lookup maps when reused.
+- Preserve editable-grid behavior: double-click enters edit, `Escape` cancels, `Cmd/Ctrl+Enter` commits.
+- Follow [`.agents/workflows/performance-rules.md`](/Users/a1234/Documents/Project/vibe-db/.agents/workflows/performance-rules.md) when changing React, Zustand, async effects, or performance-sensitive code.
 
-| Command | Purpose |
-|---------|---------|
-| `list_tables` | Get all tables/views |
-| `get_table_structure` | Column definitions |
-| `execute_query` | Run SQL, return results |
-| `get_table_row_count` | Pagination support |
-| `create_database` | Create new SQLite file |
+## TypeScript / React
 
-### Custom Events
+- TS is strict: `strict`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`.
+- Prefer explicit parameter/return types for exported functions.
+- Use `import type` where appropriate.
+- Prefer interfaces for object shapes unless a union/type alias is clearer.
+- Follow the local style of the file you are editing. This repo mixes `PascalCase` component files with nested feature folders.
 
-- `vibedb:connect` — Dispatched from ConnectionDialog with connection details
+## Testing
 
----
-
-## Design System
-
-See [STYLE_GUIDE.md](./STYLE_GUIDE.md) for colors, typography, and component rules.
-
----
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `src/index.css` | CSS variables (~1100 lines) |
-| `src/store/useAppStore.ts` | Global state |
-| `src/lib/db.ts` | Tauri invoke wrappers |
-| `src-tauri/src/lib.rs` | Rust commands |
-| `tailwind.config.js` | Tailwind → CSS var mapping |
+- There is no frontend test suite yet.
+- Rust tests exist under `src-tauri/tests`.
+- Preferred existing test command: `bun run cargo:test`
+- If you change critical editing or data behavior, add tests when practical.

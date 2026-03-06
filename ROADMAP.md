@@ -201,6 +201,9 @@ Essential SQLite management features before multi-engine support.
 - [x] Inline identifier validation added for table/column names in Create Table and Edit Table with backend parity
 - [x] SQLite schema-change reliability improved by using a single SQLite pool connection (`max_connections = 1`)
 - [x] Engine-scoped data type catalog introduced so type dropdowns are explicit about current engine (SQLite today, extensible for Postgres later)
+- [x] AI settings now persist custom API keys through the Tauri Stronghold plugin snapshot flow (`ai-config.hold`)
+- [x] Stronghold dev-save reliability improved by applying the documented `scrypt` dev-profile optimization
+- [x] `src-tauri/src/lib.rs` split into focused modules (`app_state`, `ai`, `commands`, `sql_helpers`, `sql_logging`, `menu`) for maintainability
 
 ### Upcoming Tasks
 
@@ -366,6 +369,7 @@ Security improvements for production readiness.
 | Unsafe query execution             | Medium   | ✅ Fixed    |
 | Connection paths in localStorage   | Low      | ✅ Fixed    |
 | Broad Tauri capability permissions | Low      | 🟡 Review   |
+| Stronghold unlock secret is app-known | Medium | 🟡 Review   |
 | No AI data guardrails              | Low      | 🟢 Deferred |
 
 ### Completed (v0.2.3)
@@ -387,11 +391,15 @@ Security improvements for production readiness.
 | Storage                   | File                | Purpose                                    |
 | ------------------------- | ------------------- | ------------------------------------------ |
 | `tauri-plugin-store`      | `app_settings.json` | Connection metadata, tags, preferences     |
-| `tauri-plugin-stronghold` | `credentials.hold`  | Encrypted passwords, auth tokens, API keys |
+| `tauri-plugin-stronghold` | `ai-config.hold`    | Encrypted AI API keys snapshot             |
+
+### Security Caveat (Current v0.2.7)
+
+The Stronghold integration now persists and reloads API keys correctly, but it does not yet provide strong machine-bound secret protection. The current unlock string is app-known, so the snapshot is encrypted at rest but not protected by an OS keychain secret or user-supplied master password. Treat this as a reliability milestone, not a final security posture.
 
 ### Secure Credential Storage (Ready for v0.3+)
 
-Stronghold vault is installed and configured. When remote engines land, credentials will be stored securely:
+Stronghold vault plumbing is installed and working for AI keys. Before using it for remote-engine passwords/tokens, the unlock model should be upgraded to an OS-backed secret or user-provided passphrase:
 
 | Engine     | Sensitive Data                |
 | ---------- | ----------------------------- |
@@ -442,7 +450,7 @@ Stronghold vault is installed and configured. When remote engines land, credenti
 | v0.2.4  | Q1 2026 | Bug fixes + Alerts     | ✅ Complete |
 | v0.2.5  | Q1 2026 | Query UX + Performance | ✅ Complete |
 | v0.2.6  | Q1 2026 | Query UX + Performance | ✅ Complete |
-| v0.2.7  | Q1 2026 | Query Editor Interaction Fixes | ✅ Complete |
+| v0.2.7  | Q1 2026 | Query polish, AI key persistence, backend modularization | ✅ Complete |
 | v0.3    | Q2 2026 | Turso support          | 📋 Planned  |
 | v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
 | v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |

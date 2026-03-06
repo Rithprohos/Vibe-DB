@@ -26,3 +26,4 @@ dist-ssr
 opencode.json
 .config
 .tauri-keys*
+.env
