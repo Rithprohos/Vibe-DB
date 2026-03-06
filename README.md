@@ -15,7 +15,7 @@
 
 A modern, high-performance SQLite database manager built with Tauri v2 and React. Engineered for speed, security, and a premium developer experience.
 
-![VibeDB](https://img.shields.io/badge/version-0.2.5-blue)
+![VibeDB](https://img.shields.io/badge/version-0.2.6-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 [![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet)](./ROADMAP.md)
@@ -30,7 +30,7 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
 
 ## 🛠️ Core Features
 
-- **🚀 High Performance** — Full virtualization (TanStack) and code-splitting across the entire app; browse 10,000+ rows with zero lag.
+- **🚀 High Performance** — TanStack virtualization across table browsing, query results, logs, and sidebar lists, plus aggressive code-splitting for heavy UI paths.
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction.
 - **🌍 Multi-Engine Ready** — Trait-based abstraction (SQLite active; Turso, Postgres, MySQL coming soon).
 - **🏗️ Visual Table Builder** — Create tables with a polished GUI including real-time, syntax-highlighted SQL preview.
