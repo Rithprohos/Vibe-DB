@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
+import { homeDir, documentDir } from '@tauri-apps/api/path';
 import { useAppStore, type Connection, MAX_ACTIVE_CONNECTIONS } from '../store/useAppStore';
 import { createDatabase } from '../lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -9,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil } from 'lucide-react';
 import EditConnectionDialog from './EditConnectionDialog';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function ConnectionDialog() {
   const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
@@ -32,8 +34,21 @@ export default function ConnectionDialog() {
 
   const handleBrowse = async () => {
     try {
+      // Use document or home directory as a warm start for Finder
+      let defaultPath: string | undefined;
+      try {
+        defaultPath = await documentDir();
+      } catch {
+        try {
+          defaultPath = await homeDir();
+        } catch {
+          // Fallback to default behavior
+        }
+      }
+
       const selected = await open({
         multiple: false,
+        defaultPath,
         filters: [
           {
             name: 'SQLite Database',
@@ -45,6 +60,7 @@ export default function ConnectionDialog() {
           },
         ],
       });
+
       if (selected) {
         setPath(selected as string);
         if (!name) {
@@ -131,21 +147,24 @@ export default function ConnectionDialog() {
   return (
     <>
       <Dialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1200px] bg-card border-border/80 shadow-2xl shadow-black/20 p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1000px] max-h-[85vh] bg-card border-border/80 shadow-2xl shadow-black/20 p-0 overflow-hidden flex flex-col">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent-secondary to-primary" />
         
-        <div className="p-6 pb-4">
-          <DialogHeader className="mb-6">
+        <div className="p-6 pb-2 flex-shrink-0">
+          <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center space-x-2 text-xl font-bold tracking-tight">
               <Database className="text-primary" />
               <span>SQLite Connection</span>
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground mt-1">
+            <DialogDescription className="text-muted-foreground mt-1 text-xs">
               Open an existing database or create a new one to connect.
             </DialogDescription>
           </DialogHeader>
+        </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="p-6 pt-0">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
             <section className="rounded-md border border-border/70 bg-background/50 p-4">
               <div className="flex items-center gap-1.5 mb-3">
                 <Clock size={12} className="text-muted-foreground" />
@@ -312,10 +331,11 @@ export default function ConnectionDialog() {
                 </div>
               </div>
             </section>
+            </div>
           </div>
-        </div>
+        </ScrollArea>
 
-        <DialogFooter className="bg-secondary/50 p-4 border-t border-border flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:items-center">
+        <DialogFooter className="bg-secondary/50 p-4 border-t border-border flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:items-center flex-shrink-0">
           <Button
             variant="ghost"
             onClick={() => setShowConnectionDialog(false)}

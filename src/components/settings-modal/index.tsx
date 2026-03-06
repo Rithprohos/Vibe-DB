@@ -53,7 +53,7 @@ export default function SettingsModal() {
 
   return (
     <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
-      <DialogContent className="flex h-[650px] overflow-hidden border-border bg-card p-0 shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 sm:max-w-[1000px] rounded-sm">
+      <DialogContent className="flex h-[85vh] max-h-[700px] overflow-hidden border-border bg-card p-0 shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 sm:max-w-[1000px] w-[95vw] rounded-sm">
         <DialogTitle className="sr-only">Settings</DialogTitle>
         <DialogDescription className="sr-only">
           Configure VibeDB preferences, appearance, keyboard shortcuts, and application
