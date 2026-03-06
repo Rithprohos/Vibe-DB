@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -46,12 +48,28 @@ jobs:
           delimiter="$(openssl rand -hex 8)"
           echo "body<<$delimiter" >> $GITHUB_OUTPUT
 
+          # 1. Main Release Notes from File
           if [ -f ".github/release-notes/${{ github.ref_name }}.md" ]; then
             cat ".github/release-notes/${{ github.ref_name }}.md" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
           else
+            echo "## Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
             echo "See the assets to download and install this version." >> $GITHUB_OUTPUT
           fi
 
+          # 2. Automatically Generate Changelog
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "---" >> $GITHUB_OUTPUT
+            echo "## Changelog" >> $GITHUB_OUTPUT
+            echo "**Full Changelog**: [${PREVIOUS_TAG}...${{ github.ref_name }}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ github.ref_name }})" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            git log ${PREVIOUS_TAG}..${{ github.ref_name }} --pretty=format:"- \`%h\` %s @%an" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+          fi
+
+          # 3. macOS Fix Instruction
           cat << 'EOF' >> $GITHUB_OUTPUT
 
           ---
