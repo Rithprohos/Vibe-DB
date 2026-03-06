@@ -2,12 +2,25 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef } from "./createTableConstants";
 import type { TableInfo, ColumnInfo, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
+import {
+  clearStoredAiApiKey,
+  getStoredAiApiKey,
+  hasStoredAiApiKey,
+  saveStoredAiApiKey,
+} from "./aiKeyStore";
 
 export interface QueryFilter {
   field: string;
   operator: string;
   value: string;
   valueTo: string;
+}
+
+export interface DefaultAiProviderConfig {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  hasEmbeddedApiKey: boolean;
 }
 
 export async function connectDatabase(
@@ -120,6 +133,50 @@ export async function buildCreateTableSQL(
   ifNotExists: boolean,
 ): Promise<string> {
   return measureDevFetch("build_create_table_sql", () =>
-    invoke<string>("build_create_table_sql", { tableName, columns, ifNotExists }),
+    invoke<string>("build_create_table_sql", {
+      tableName,
+      columns,
+      ifNotExists,
+    }),
+  );
+}
+
+export async function getDefaultAiProviderConfig(): Promise<DefaultAiProviderConfig> {
+  return measureDevFetch("get_default_ai_provider_config", () =>
+    invoke<DefaultAiProviderConfig>("get_default_ai_provider_config"),
+  );
+}
+
+export async function hasCustomAiApiKey(profileId?: string): Promise<boolean> {
+  return measureDevFetch("has_custom_ai_api_key", () =>
+    hasStoredAiApiKey(profileId),
+  );
+}
+
+export async function getCustomAiApiKey(
+  profileId?: string,
+): Promise<string | null> {
+  return measureDevFetch("get_custom_ai_api_key", () =>
+    getStoredAiApiKey(profileId),
+  );
+}
+
+export async function saveCustomAiApiKey(
+  apiKey: string,
+  profileId?: string,
+): Promise<void> {
+  return measureDevFetch("save_custom_ai_api_key", () => {
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      throw new Error("API key cannot be empty");
+    }
+
+    return saveStoredAiApiKey(trimmed, profileId);
+  });
+}
+
+export async function clearCustomAiApiKey(profileId?: string): Promise<void> {
+  return measureDevFetch("clear_custom_ai_api_key", () =>
+    clearStoredAiApiKey(profileId),
   );
 }

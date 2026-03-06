@@ -6086,6 +6086,7 @@ name = "vibe-db"
 version = "0.2.4"
 dependencies = [
  "async-trait",
+ "dotenvy",
  "rust-argon2 1.0.0",
  "serde",
  "serde_json",

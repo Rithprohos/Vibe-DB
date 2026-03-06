@@ -69,6 +69,18 @@ export type TabType =
   | "edit-table";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
+export type AiProviderMode = "default" | "custom";
+export type AiCustomProviderKind = "polli" | "openai";
+
+export interface AiCustomProfile {
+  id: string;
+  name: string;
+  providerKind: AiCustomProviderKind;
+  baseUrl: string;
+  model: string;
+  hasApiKey: boolean;
+  updatedAt: number;
+}
 
 export type AlertType = "info" | "success" | "warning" | "error";
 
@@ -128,6 +140,21 @@ interface AppState {
   // AI Panel
   isAiPanelOpen: boolean;
   setIsAiPanelOpen: (val: boolean) => void;
+  aiProviderMode: AiProviderMode;
+  aiCustomProfiles: AiCustomProfile[];
+  aiActiveCustomProfileId: string | null;
+  aiCustomProviderKind: AiCustomProviderKind;
+  aiCustomName: string;
+  aiCustomBaseUrl: string;
+  aiCustomModel: string;
+  setAiProviderMode: (mode: AiProviderMode) => void;
+  setAiActiveCustomProfileId: (id: string | null) => void;
+  setAiCustomProviderKind: (providerKind: AiCustomProviderKind) => void;
+  setAiCustomName: (name: string) => void;
+  setAiCustomBaseUrl: (baseUrl: string) => void;
+  setAiCustomModel: (model: string) => void;
+  upsertAiCustomProfile: (profile: Omit<AiCustomProfile, "updatedAt">) => void;
+  removeAiCustomProfile: (id: string) => void;
 
   // Metadata
   databaseVersion: string | null;
@@ -214,9 +241,48 @@ export const useAppStore = create<AppState>()(
       theme: "dark",
       developerToolsEnabled: false,
       isAiPanelOpen: false,
+      aiProviderMode: "default",
+      aiCustomProfiles: [],
+      aiActiveCustomProfileId: null,
+      aiCustomProviderKind: "openai",
+      aiCustomName: "",
+      aiCustomBaseUrl: "https://api.openai.com/v1",
+      aiCustomModel: "gpt-4o-mini",
       databaseVersion: null,
 
       setIsAiPanelOpen: (val) => set({ isAiPanelOpen: val }),
+      setAiProviderMode: (mode) => set({ aiProviderMode: mode }),
+      setAiActiveCustomProfileId: (id) => set({ aiActiveCustomProfileId: id }),
+      setAiCustomProviderKind: (providerKind) => set({ aiCustomProviderKind: providerKind }),
+      setAiCustomName: (name) => set({ aiCustomName: name }),
+      setAiCustomBaseUrl: (baseUrl) => set({ aiCustomBaseUrl: baseUrl }),
+      setAiCustomModel: (model) => set({ aiCustomModel: model }),
+      upsertAiCustomProfile: (profile) =>
+        set((state) => {
+          const updatedProfile: AiCustomProfile = {
+            ...profile,
+            updatedAt: Date.now(),
+          };
+          const nextProfiles = state.aiCustomProfiles.some((p) => p.id === profile.id)
+            ? state.aiCustomProfiles.map((p) => (p.id === profile.id ? updatedProfile : p))
+            : [updatedProfile, ...state.aiCustomProfiles];
+          return {
+            aiCustomProfiles: nextProfiles.sort((a, b) => b.updatedAt - a.updatedAt),
+            aiActiveCustomProfileId: profile.id,
+          };
+        }),
+      removeAiCustomProfile: (id) =>
+        set((state) => {
+          const nextProfiles = state.aiCustomProfiles.filter((p) => p.id !== id);
+          const activeId =
+            state.aiActiveCustomProfileId === id
+              ? (nextProfiles[0]?.id ?? null)
+              : state.aiActiveCustomProfileId;
+          return {
+            aiCustomProfiles: nextProfiles,
+            aiActiveCustomProfileId: activeId,
+          };
+        }),
       setTheme: (theme) => set({ theme }),
       setDeveloperToolsEnabled: (enabled) => set({ developerToolsEnabled: enabled }),
       setDatabaseVersion: (version) => set({ databaseVersion: version }),
@@ -457,6 +523,13 @@ export const useAppStore = create<AppState>()(
         activeTabId: state.activeTabId,
         theme: state.theme,
         developerToolsEnabled: state.developerToolsEnabled,
+        aiProviderMode: state.aiProviderMode,
+        aiCustomProfiles: state.aiCustomProfiles,
+        aiActiveCustomProfileId: state.aiActiveCustomProfileId,
+        aiCustomProviderKind: state.aiCustomProviderKind,
+        aiCustomName: state.aiCustomName,
+        aiCustomBaseUrl: state.aiCustomBaseUrl,
+        aiCustomModel: state.aiCustomModel,
       }),
       storage: createJSONStorage(() => storage),
     },
