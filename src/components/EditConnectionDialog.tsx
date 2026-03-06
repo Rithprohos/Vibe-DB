@@ -17,17 +17,23 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
 
   const [name, setName] = useState('');
   const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (connection && open) {
       setName(connection.name);
       setTag(connection.tag);
+      setError('');
     }
   }, [connection, open]);
 
   const handleSave = () => {
     if (!connection) return;
     if (!name.trim()) return;
+    if (!tag) {
+      setError('Please select an environment label');
+      return;
+    }
 
     updateConnection(connection.id, {
       name: name.trim(),
@@ -81,7 +87,10 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                 {(['local', 'testing', 'development', 'production'] as const).map((t) => (
                   <button
                     key={t}
-                    onClick={() => setTag(tag === t ? undefined : t)}
+                    onClick={() => {
+                      setTag(t);
+                      setError('');
+                    }}
                     className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all border ${
                       tag === t
                         ? t === 'production'
@@ -94,6 +103,9 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                   </button>
                 ))}
               </div>
+              {error && (
+                <p className="text-[11px] text-destructive">{error}</p>
+              )}
             </div>
 
             <div className="space-y-1.5 pt-1">
@@ -117,7 +129,7 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
           </Button>
           <Button
             onClick={handleSave}
-            disabled={!name.trim()}
+            disabled={!name.trim() || !tag}
             className="shadow-glow px-8 rounded-full font-semibold tracking-wide"
           >
             Save

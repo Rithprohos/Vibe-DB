@@ -45,6 +45,26 @@ export default function StatusBar() {
   const checkForUpdatesRef = useRef(checkForUpdates);
   checkForUpdatesRef.current = checkForUpdates;
 
+  const updateButtonLabel = useMemo(() => {
+    if (checking) {
+      return 'Checking...';
+    }
+
+    if (downloading) {
+      return `Downloading ${progress}%`;
+    }
+
+    if (updateInfo?.available) {
+      return `Update v${updateInfo.version}`;
+    }
+
+    if (downloaded) {
+      return 'Ready to relaunch';
+    }
+
+    return 'Check updates';
+  }, [checking, downloading, progress, updateInfo, downloaded]);
+
   useEffect(() => {
     let mounted = true;
     let unsub: (() => void) | null = null;
@@ -131,10 +151,13 @@ export default function StatusBar() {
 
       <div className="flex-1" />
       
-      <button 
-        className="flex items-center gap-1.5 px-2 h-full hover:bg-accent hover:text-foreground transition-all cursor-pointer outline-none"
+      <button
+        className={cn(
+          'h-6 px-2.5 rounded-sm border border-border/70 bg-background/80 flex items-center gap-1.5 hover:bg-accent hover:text-foreground transition-colors cursor-pointer outline-none disabled:opacity-70',
+          updateInfo?.available && 'border-primary/50 text-primary hover:bg-primary/10'
+        )}
         onClick={checkForUpdates}
-        disabled={checking}
+        disabled={checking || downloading}
       >
         {updateInfo?.available ? (
           <Download size={12} className="text-primary" />
@@ -143,6 +166,10 @@ export default function StatusBar() {
         ) : (
           <RefreshCw size={12} className={cn(checking && "animate-spin")} />
         )}
+
+        <span className="text-[10px] font-medium tracking-wide uppercase">
+          {updateButtonLabel}
+        </span>
       </button>
       
       <button 
