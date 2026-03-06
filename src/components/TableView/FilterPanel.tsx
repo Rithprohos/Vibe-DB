@@ -77,7 +77,7 @@ export function FilterPanel({
           </div>
 
           {filters.length === 0 ? (
-            <div className="text-center py-8 bg-background/50 rounded-xl border border-dashed border-border flex flex-col items-center justify-center min-h-[132px]">
+            <div className="text-center py-8 bg-background/50 rounded-md border border-dashed border-border flex flex-col items-center justify-center min-h-[132px]">
               <Filter size={24} className="mb-2 text-muted-foreground/30" />
               <p className="text-xs text-muted-foreground/60 italic">
                 No active filters. Add a rule to query your data.
@@ -91,7 +91,7 @@ export function FilterPanel({
                   className="flex items-center space-x-2 animate-in fade-in slide-in-from-left-2 duration-200"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className="flex-1 grid grid-cols-1 gap-2 items-center bg-background p-1 pr-2 rounded-lg border border-border/50 shadow-sm xl:grid-cols-12">
+                  <div className="flex-1 grid grid-cols-1 gap-2 items-center bg-background p-1 pr-2 rounded-sm border border-border/60 shadow-sm xl:grid-cols-12">
                     <Select
                       value={filter.field}
                       onValueChange={(value) =>
@@ -166,7 +166,7 @@ export function FilterPanel({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full flex-shrink-0"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-sm flex-shrink-0"
                     onClick={() => handleRemoveFilter(filter.id)}
                   >
                     <Trash2 size={14} />

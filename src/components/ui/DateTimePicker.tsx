@@ -111,7 +111,7 @@ export function DateTimePicker({ value, onChange, onSave, onCancel, hideFooter =
           onCancel?.();
         }
       }}
-      className={cn("flex flex-col bg-popover border border-border rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200", className)}
+      className={cn("flex flex-col bg-popover border border-border rounded-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200", className)}
     >
       <div className="flex h-[360px]">
         {/* Sidebar - Presets */}
@@ -139,7 +139,7 @@ export function DateTimePicker({ value, onChange, onSave, onCancel, hideFooter =
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 bg-secondary/50 hover:bg-secondary border border-border rounded-md" 
+              className="h-8 w-8 bg-secondary/50 hover:bg-secondary border border-border rounded-sm" 
               onClick={() => setViewDate(subMonths(viewDate, 1))}
             >
               <ChevronLeft className="h-4 w-4 text-muted-foreground" />
@@ -151,7 +151,7 @@ export function DateTimePicker({ value, onChange, onSave, onCancel, hideFooter =
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 bg-secondary/50 hover:bg-secondary border border-border rounded-md" 
+              className="h-8 w-8 bg-secondary/50 hover:bg-secondary border border-border rounded-sm" 
               onClick={() => setViewDate(addMonths(viewDate, 1))}
             >
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -175,10 +175,10 @@ export function DateTimePicker({ value, onChange, onSave, onCancel, hideFooter =
                   key={i}
                   onClick={() => handleDateSelect(d)}
                   className={cn(
-                    "h-10 w-full rounded-md text-sm transition-all flex items-center justify-center relative",
+                    "h-10 w-full rounded-sm text-sm transition-all flex items-center justify-center relative",
                     !isCurrentMonth && "text-muted-foreground/30",
                     isCurrentMonth && "text-foreground hover:bg-accent",
-                    isSelected && "bg-accent text-accent-foreground font-bold rounded-lg border border-primary/30",
+                    isSelected && "bg-accent text-accent-foreground font-bold rounded-sm border border-primary/30",
                     !isSelected && isToday(d) && "after:content-[''] after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1 after:h-1 after:bg-primary after:rounded-full"
                   )}
                 >

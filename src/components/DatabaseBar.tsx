@@ -55,7 +55,7 @@ export default function DatabaseBar() {
   return (
     <div className="w-[72px] bg-background border-r border-border/50 flex flex-col items-center py-2 px-1.5 gap-1.5 shrink-0 select-none overflow-y-auto hidden-scrollbar z-10">
       <div className="w-full px-1 pb-0.5">
-        <div className="rounded-lg border border-border/50 bg-secondary/20 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80 text-center">
+        <div className="rounded-sm border border-border/60 bg-secondary/20 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80 text-center">
           DBs
         </div>
       </div>
@@ -68,20 +68,20 @@ export default function DatabaseBar() {
                   <button
                     onClick={() => handleConnectionClick(conn)}
                     className={cn(
-                      "relative w-full rounded-xl border px-1.5 py-1.5 text-left transition-all group overflow-hidden",
+                      "relative w-full rounded-md border px-1.5 py-1.5 text-left transition-all group overflow-hidden",
                       activeSidebarConnectionId === conn.id 
                         ? "border-primary/35 bg-primary/10 text-foreground shadow-[0_0_20px_hsl(var(--primary)/0.10)]"
                         : "border-border/50 bg-secondary/10 text-muted-foreground hover:border-primary/20 hover:bg-secondary/50 hover:text-foreground"
                     )}
                   >
                     {activeSidebarConnectionId === conn.id && (
-                      <div className="absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-primary" />
+                      <div className="absolute inset-y-2 left-0 w-0.5 bg-primary" />
                     )}
 
                     <div className="flex flex-col items-center gap-1">
                       <div
                         className={cn(
-                          "flex h-9 w-9 items-center justify-center rounded-xl border transition-all",
+                          "flex h-9 w-9 items-center justify-center rounded-md border transition-all",
                           activeSidebarConnectionId === conn.id
                             ? "border-primary/30 bg-primary/15 text-primary"
                             : "border-border/60 bg-background/80 text-muted-foreground group-hover:border-primary/25 group-hover:text-primary"
@@ -105,7 +105,7 @@ export default function DatabaseBar() {
                         {conn.tag && (
                           <span
                             className={cn(
-                              'inline-flex max-w-full items-center rounded-full border px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.12em]',
+                              'inline-flex max-w-full items-center rounded-sm border px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.12em]',
                               TAG_STYLES[conn.tag]
                             )}
                           >
@@ -146,10 +146,10 @@ export default function DatabaseBar() {
           <TooltipTrigger asChild>
             <button
               onClick={handleShowConnectionDialog}
-              className="w-full rounded-xl border border-dashed border-border/60 bg-secondary/10 px-1.5 py-2 text-muted-foreground hover:border-primary/30 hover:bg-secondary/40 hover:text-foreground transition-all group mt-0.5"
+              className="w-full rounded-md border border-dashed border-border/60 bg-secondary/10 px-1.5 py-2 text-muted-foreground hover:border-primary/30 hover:bg-secondary/40 hover:text-foreground transition-all group mt-0.5"
             >
               <div className="flex flex-col items-center gap-1">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-border/60 bg-background/80 group-hover:border-primary/25 group-hover:text-primary">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 bg-background/80 group-hover:border-primary/25 group-hover:text-primary">
                   <Plus size={18} className="group-hover:scale-110 transition-transform" />
                 </div>
                 <span className="text-[9px] font-medium uppercase tracking-[0.12em]">New</span>

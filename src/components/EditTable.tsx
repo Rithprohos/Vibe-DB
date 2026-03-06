@@ -445,13 +445,13 @@ export default function EditTable({ tableName, tabId }: Props) {
   return (
     <div className="h-full overflow-auto bg-background custom-scrollbar-hide">
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-4">
-        <header className="rounded-xl border border-border bg-surface/30 backdrop-blur-sm">
+        <header className="rounded-md border border-border bg-surface/30 backdrop-blur-sm">
           <div className="border-b border-border/60 px-4 py-3 md:px-5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <div
                   className={
-                    "flex h-8 w-8 items-center justify-center rounded-lg " +
+                    "flex h-8 w-8 items-center justify-center rounded-sm " +
                     "border border-primary/30 bg-primary/10"
                   }
                 >
@@ -513,7 +513,7 @@ export default function EditTable({ tableName, tabId }: Props) {
         {error && (
           <div
             className={
-              "flex items-start gap-2 rounded-lg border " +
+              "flex items-start gap-2 rounded-sm border " +
               "border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
             }
           >
@@ -524,7 +524,7 @@ export default function EditTable({ tableName, tabId }: Props) {
 
         <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
           <div className="space-y-4">
-            <section className="rounded-xl border border-border bg-surface/20 p-4">
+            <section className="rounded-md border border-border bg-surface/20 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Table2 size={14} className="text-primary" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -560,7 +560,7 @@ export default function EditTable({ tableName, tabId }: Props) {
               )}
             </section>
 
-            <section className="rounded-xl border border-border bg-surface/20 p-4">
+            <section className="rounded-md border border-border bg-surface/20 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Type size={14} className="text-primary" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -638,7 +638,7 @@ export default function EditTable({ tableName, tabId }: Props) {
               )}
             </section>
 
-            <section className="rounded-xl border border-border bg-surface/20 p-4">
+            <section className="rounded-md border border-border bg-surface/20 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <PencilRuler size={14} className="text-primary" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -689,7 +689,7 @@ export default function EditTable({ tableName, tabId }: Props) {
               )}
             </section>
 
-            <section className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+            <section className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Trash2 size={14} className="text-destructive" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-destructive/90">
@@ -744,7 +744,7 @@ export default function EditTable({ tableName, tabId }: Props) {
             </section>
           </div>
 
-          <aside className="rounded-xl border border-border bg-surface/30 overflow-hidden">
+          <aside className="rounded-md border border-border bg-surface/30 overflow-hidden">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

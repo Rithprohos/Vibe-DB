@@ -264,7 +264,7 @@ export default function CreateTable({ tabId }: Props) {
       <div className="border-b border-border bg-background/80 backdrop-blur-sm px-6 py-4 flex-shrink-0">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-md bg-primary/10 border border-primary/30 flex items-center justify-center">
               <TableIcon size={20} className="text-primary" />
             </div>
             <div>
@@ -319,7 +319,7 @@ export default function CreateTable({ tabId }: Props) {
 
       {/* ── Error Banner ── */}
       {error && (
-        <div className="mx-6 mt-3 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-mono max-w-6xl">
+        <div className="mx-6 mt-3 flex items-center gap-2 px-4 py-2.5 rounded-sm bg-destructive/10 border border-destructive/20 text-destructive text-sm font-mono max-w-6xl">
           <AlertCircle size={16} className="flex-shrink-0" />
           <span className="truncate">{error}</span>
         </div>
@@ -362,7 +362,7 @@ export default function CreateTable({ tabId }: Props) {
 
           {/* SQL Preview */}
           {showPreview && (
-            <div className="mb-4 rounded-xl border border-border bg-surface/[0.3] overflow-hidden glass-panel animate-in fade-in-0 duration-200">
+            <div className="mb-4 rounded-md border border-border bg-surface/[0.3] overflow-hidden glass-panel animate-in fade-in-0 duration-200">
               <div className="px-4 py-2 bg-secondary/40 border-b border-border/50">
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   Generated SQL
@@ -381,7 +381,7 @@ export default function CreateTable({ tabId }: Props) {
           )}
 
           {/* Columns Grid */}
-          <div className="rounded-xl border border-border bg-surface/[0.3] overflow-hidden shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 glass-panel">
+          <div className="rounded-md border border-border bg-surface/[0.3] overflow-hidden shadow-xl shadow-black/15 glass-panel">
             <Table className="w-full text-left">
               <TableHeader className="bg-secondary/40 sticky top-0 backdrop-blur-md border-b border-border/50">
                 <TableRow className="border-border/50 hover:bg-transparent">

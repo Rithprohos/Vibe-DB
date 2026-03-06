@@ -74,7 +74,7 @@ export default function TabBar() {
               
               <div
                 className={cn(
-                  "flex items-center justify-center w-5 h-5 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100",
+                  "flex items-center justify-center w-5 h-5 rounded-sm hover:bg-muted transition-colors opacity-0 group-hover:opacity-100",
                   activeTabId === tab.id && "opacity-100"
                 )}
                 onClick={(e) => {

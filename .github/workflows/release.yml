@@ -89,6 +89,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VIBEDB_DEFAULT_AI_URL: ${{ vars.VIBEDB_DEFAULT_AI_URL != '' && vars.VIBEDB_DEFAULT_AI_URL || 'https://gen.pollinations.ai' }}
+          VIBEDB_DEFAULT_AI_MODEL: ${{ vars.VIBEDB_DEFAULT_AI_MODEL != '' && vars.VIBEDB_DEFAULT_AI_MODEL || 'qwen-coder' }}
+          VIBEDB_DEFAULT_AI_API_KEY: ${{ secrets.VIBEDB_DEFAULT_AI_API_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "VibeDB ${{ github.ref_name }}"

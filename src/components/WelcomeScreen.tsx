@@ -23,7 +23,7 @@ const WelcomeScreen = memo(function WelcomeScreen() {
       <div className="flex-1 flex items-center justify-center p-8 bg-background relative overflow-hidden">
       
       <div className="max-w-md w-full z-10 animate-fade-in">
-        <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 text-primary mb-8 mx-auto shadow-glow border border-primary/20">
+        <div className="flex items-center justify-center w-20 h-20 rounded-md bg-primary/10 text-primary mb-8 mx-auto border border-primary/30">
           <Zap size={40} />
         </div>
         
@@ -39,7 +39,7 @@ const WelcomeScreen = memo(function WelcomeScreen() {
         <div className="flex justify-center mb-16">
           <Button
             size="lg"
-            className="rounded-full shadow-glow px-8 h-14 text-base font-semibold transition-transform hover:scale-105"
+            className="px-8 h-12 text-sm font-semibold tracking-wide transition-transform hover:scale-[1.02]"
             onClick={() => setShowConnectionDialog(true)}
           >
             <Zap size={20} className="mr-2" />
@@ -56,10 +56,10 @@ const WelcomeScreen = memo(function WelcomeScreen() {
               {recentConnections.map((conn) => (
                 <div
                   key={conn.id}
-                  className="flex items-center p-4 rounded-xl bg-secondary/30 border border-border/50 cursor-pointer hover:bg-secondary hover:border-primary/50 hover:glow-shadow transition-all group"
+                  className="flex items-center p-4 rounded-md bg-secondary/30 border border-border/60 cursor-pointer hover:bg-secondary hover:border-primary/50 transition-all group"
                   onClick={() => handleConnect(conn)}
                 >
-                  <div className="w-12 h-12 rounded-lg bg-background flex items-center justify-center mr-4 group-hover:text-primary transition-colors border border-border shadow-sm">
+                  <div className="w-12 h-12 rounded-sm bg-background flex items-center justify-center mr-4 group-hover:text-primary transition-colors border border-border shadow-sm">
                     <Database size={20} />
                   </div>
                   <div className="flex-1 overflow-hidden">

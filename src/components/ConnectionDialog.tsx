@@ -131,7 +131,7 @@ export default function ConnectionDialog() {
   return (
     <>
       <Dialog open={showConnectionDialog} onOpenChange={setShowConnectionDialog}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1200px] bg-card border-border shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[1200px] bg-card border-border/80 shadow-2xl shadow-black/20 p-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent-secondary to-primary" />
         
         <div className="p-6 pb-4">
@@ -146,7 +146,7 @@ export default function ConnectionDialog() {
           </DialogHeader>
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-            <section className="rounded-xl border border-border/60 bg-background/50 p-4">
+            <section className="rounded-md border border-border/70 bg-background/50 p-4">
               <div className="flex items-center gap-1.5 mb-3">
                 <Clock size={12} className="text-muted-foreground" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -161,10 +161,10 @@ export default function ConnectionDialog() {
                   {recentConnections.map((conn) => (
                     <div
                       key={conn.id}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-background border border-border/50 cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-all group"
+                      className="flex items-center gap-3 p-2.5 rounded-sm bg-background border border-border/60 cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-all group"
                       onClick={() => handleSwitchTo(conn)}
                     >
-                      <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+                      <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
                         <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -208,7 +208,7 @@ export default function ConnectionDialog() {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-border/70 bg-background/60 p-6 text-center">
+                <div className="rounded-sm border border-dashed border-border/70 bg-background/60 p-6 text-center">
                   <Database size={22} className="mx-auto mb-2 text-muted-foreground/80" />
                   <p className="text-sm text-foreground">No saved connections yet</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -218,7 +218,7 @@ export default function ConnectionDialog() {
               )}
             </section>
 
-            <section className="rounded-xl border border-border/60 bg-background/50 p-4">
+            <section className="rounded-md border border-border/70 bg-background/50 p-4">
               <div className="mb-4">
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   New Connection
@@ -274,7 +274,7 @@ export default function ConnectionDialog() {
                     </Button>
                   </div>
                   {error && (
-                    <p className="text-xs text-destructive font-medium mt-2 p-2 bg-destructive/10 rounded border border-destructive/20 animate-fade-in">
+                    <p className="text-xs text-destructive font-medium mt-2 p-2 bg-destructive/10 rounded-sm border border-destructive/20 animate-fade-in">
                       {error}
                     </p>
                   )}
@@ -292,7 +292,7 @@ export default function ConnectionDialog() {
                           setTag(t);
                           setError('');
                         }}
-                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                        className={`px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all border ${
                           tag === t
                             ? t === 'production'
                               ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(248,113,113,0.15)]'
@@ -326,7 +326,7 @@ export default function ConnectionDialog() {
           <Button
             onClick={handleConnect}
             disabled={!path.trim() || !tag}
-            className="shadow-glow px-8 rounded-full font-semibold tracking-wide w-full sm:w-auto"
+            className="px-8 font-semibold tracking-wide w-full sm:w-auto"
           >
             Connect
           </Button>

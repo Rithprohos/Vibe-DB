@@ -41,7 +41,7 @@ export function RowInspector({
 
           {selectedRowData ? (
             <div className="flex-1 overflow-auto px-3 py-3">
-              <div className="mb-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground">
+              <div className="mb-3 rounded-sm border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground">
                 Click another row in the grid to inspect it without leaving the table.
               </div>
               <div className="space-y-3">
@@ -52,7 +52,7 @@ export function RowInspector({
                   return (
                     <div
                       key={colName}
-                      className="rounded-xl border border-border/60 bg-background/80 shadow-sm"
+                      className="rounded-md border border-border/60 bg-background/80 shadow-sm"
                     >
                       <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
                         <div className="min-w-0">
@@ -90,7 +90,7 @@ export function RowInspector({
             </div>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-              <div className="mb-3 rounded-full border border-border/60 bg-secondary/30 p-3">
+              <div className="mb-3 rounded-sm border border-border/60 bg-secondary/30 p-3">
                 <Eye size={20} className="text-muted-foreground" />
               </div>
               <div className="text-sm font-medium text-foreground">No row selected</div>

@@ -53,7 +53,7 @@ export default function ToastViewport() {
           <div
             key={toast.id}
             className={cn(
-              'pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 animate-in slide-in-from-top-2 fade-in duration-150',
+              'pointer-events-auto flex items-center gap-3 rounded-md border px-4 py-3 animate-in slide-in-from-top-2 fade-in duration-150',
               style.className
             )}
           >

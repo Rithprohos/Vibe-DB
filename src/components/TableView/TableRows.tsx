@@ -1,4 +1,5 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type MouseEvent as ReactMouseEvent } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { formatCellValue } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import type { ColumnInfo } from '@/store/useAppStore';
@@ -61,22 +62,29 @@ const VirtualCell = memo(function VirtualCell({
     return formatCellValue(displayValue);
   }, [displayValue, isScrolling]);
 
+  const preventGridSelection = (event: ReactMouseEvent<HTMLTableCellElement>) => {
+    if (isEditing) return;
+    event.preventDefault();
+  };
+
   return (
     <td
       key={cellId}
       className={cn(
-        'border-r border-border/60 p-0 text-xs relative overflow-hidden',
+        'border-r border-border/60 p-0 text-xs relative overflow-hidden select-none',
         isRowNum && 'bg-muted/10 font-mono text-muted-foreground/50',
         isEditing && 'ring-1 ring-inset ring-primary bg-primary/5 z-10',
         hasPendingEdit && !isEditing && 'bg-amber-500/10'
       )}
       style={{ borderBottom: '1px solid var(--border)' }}
-      onMouseDown={() => {
+      onMouseDown={(event) => {
+        preventGridSelection(event);
         if (!isScrolling && hasActiveEditingCell && !isRowNum && !isEditing) {
           onBeginEdit(rowIndex, colName, displayValue);
         }
       }}
-      onDoubleClick={() => {
+      onDoubleClick={(event) => {
+        preventGridSelection(event);
         if (!isScrolling) {
           onBeginEdit(rowIndex, colName, displayValue);
         }
@@ -95,7 +103,7 @@ const VirtualCell = memo(function VirtualCell({
       ) : (
         <div
           className={cn(
-            'px-2 py-1.5 h-full w-full min-h-[32px] font-mono overflow-hidden text-ellipsis whitespace-nowrap',
+            'px-2 py-1.5 h-full w-full min-h-[32px] font-mono overflow-hidden text-ellipsis whitespace-nowrap select-none',
             formattedCell.className
           )}
         >
@@ -188,5 +196,99 @@ export const VirtualRow = memo(function VirtualRow({
         );
       })}
     </tr>
+  );
+});
+
+interface VirtualizedTableBodyProps {
+  tableData: Record<string, unknown>[];
+  gridCols: string[];
+  columnCount: number;
+  columnInfoByName: Record<string, ColumnInfo>;
+  scrollElement: HTMLDivElement | null;
+  selectedRowIndex: number | null;
+  editingCell: EditingCellState | null;
+  editValue: string;
+  saving: boolean;
+  getPendingCellValue: (rowIndex: number, colName: string) => unknown;
+  isCellPending: (rowIndex: number, colName: string) => boolean;
+  onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
+  onSaveCell: (rowIndex: number, colName: string, value: string) => void;
+  onCancelEdit: () => void;
+  onEditValueChange: (value: string) => void;
+  onInspectRow: (rowIndex: number) => void;
+}
+
+export const VirtualizedTableBody = memo(function VirtualizedTableBody({
+  tableData,
+  gridCols,
+  columnCount,
+  columnInfoByName,
+  scrollElement,
+  selectedRowIndex,
+  editingCell,
+  editValue,
+  saving,
+  getPendingCellValue,
+  isCellPending,
+  onBeginEdit,
+  onSaveCell,
+  onCancelEdit,
+  onEditValueChange,
+  onInspectRow,
+}: VirtualizedTableBodyProps) {
+  const rowVirtualizer = useVirtualizer({
+    count: tableData.length,
+    getScrollElement: () => scrollElement,
+    estimateSize: () => 34,
+    overscan: 6,
+    isScrollingResetDelay: 120,
+  });
+
+  const isScrolling = rowVirtualizer.isScrolling;
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom =
+    virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
+
+  return (
+    <>
+      {paddingTop > 0 && (
+        <tr>
+          <td colSpan={columnCount} style={{ height: `${paddingTop}px`, padding: 0 }} />
+        </tr>
+      )}
+
+      {virtualRows.map((virtualRow) => {
+        const rowData = tableData[virtualRow.index];
+        return (
+          <VirtualRow
+            key={`row-${virtualRow.index}`}
+            rowIndex={virtualRow.index}
+            rowData={rowData}
+            gridCols={gridCols}
+            isSelected={selectedRowIndex === virtualRow.index}
+            editingCell={editingCell}
+            editValue={editValue}
+            saving={saving}
+            columnInfoByName={columnInfoByName}
+            isScrolling={isScrolling}
+            getPendingCellValue={getPendingCellValue}
+            isCellPending={isCellPending}
+            onBeginEdit={onBeginEdit}
+            onSaveCell={onSaveCell}
+            onCancelEdit={onCancelEdit}
+            onEditValueChange={onEditValueChange}
+            onInspectRow={onInspectRow}
+          />
+        );
+      })}
+
+      {paddingBottom > 0 && (
+        <tr>
+          <td colSpan={columnCount} style={{ height: `${paddingBottom}px`, padding: 0 }} />
+        </tr>
+      )}
+    </>
   );
 });

@@ -1,7 +1,6 @@
 import { useMemo, useEffect, useCallback, useRef, useState, startTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Key, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -18,7 +17,7 @@ import { useNewRow } from './hooks/useNewRow';
 import { useCellEditing } from './hooks/useCellEditing';
 import type { TableViewProps } from './types';
 import { useDevRenderCounter } from '@/lib/dev-performance';
-import { VirtualRow } from './TableRows';
+import { VirtualizedTableBody } from './TableRows';
 import { FilterPanel } from './FilterPanel';
 import { RowInspector } from './RowInspector';
 import { copyToClipboard } from '@/lib/copy';
@@ -241,8 +240,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   // Build columns for TanStack Table
   const columns = useMemo<ColumnDef<any>[]>(() => {
-    if (!data) return [];
-    
     const cols: ColumnDef<any>[] = [];
 
     gridCols.forEach((colName) => {
@@ -281,7 +278,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     });
 
     return cols;
-  }, [data, columnInfoByName, gridCols, sortCol, sortDir, handleSort]);
+  }, [columnInfoByName, gridCols, sortCol, sortDir, handleSort]);
 
   const table = useReactTable({
     data: [],
@@ -292,14 +289,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   });
 
   const isResizingTable = table.getState().columnSizingInfo.isResizingColumn;
-  const rowVirtualizer = useVirtualizer({
-    count: tableData.length,
-    getScrollElement: () => tableScrollRef.current,
-    estimateSize: () => 34,
-    overscan: 6,
-    isScrollingResetDelay: 120,
-  });
-  const isScrolling = rowVirtualizer.isScrolling;
 
   useEffect(() => {
     if (isResizingTable) {
@@ -538,7 +527,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
         <div
           ref={tableScrollRef}
           className="flex-1 relative overflow-auto custom-scrollbar bg-grid-white/[0.02]"
-          style={{ contain: 'strict', willChange: 'scroll-position' }}
+          style={{ contain: 'strict' }}
         >
           <div className="min-w-full inline-block align-middle">
             <table className="w-full border-separate border-spacing-0 table-fixed">
@@ -640,56 +629,24 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                   </td>
                 </tr>
               ) : (
-                (() => {
-                  const virtualRows = rowVirtualizer.getVirtualItems();
-                  const totalSize = rowVirtualizer.getTotalSize();
-                  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
-                  const paddingBottom =
-                    virtualRows.length > 0
-                      ? totalSize - virtualRows[virtualRows.length - 1].end
-                      : 0;
-
-                  return (
-                    <>
-                      {paddingTop > 0 && (
-                        <tr>
-                          <td colSpan={columns.length} style={{ height: `${paddingTop}px`, padding: 0 }} />
-                        </tr>
-                      )}
-
-                      {virtualRows.map((virtualRow) => {
-                        const rowData = tableData[virtualRow.index];
-                        return (
-                          <VirtualRow
-                            key={`row-${virtualRow.index}`}
-                            rowIndex={virtualRow.index}
-                            rowData={rowData}
-                            gridCols={gridCols}
-                            isSelected={selectedRowIndex === virtualRow.index}
-                            editingCell={editingCell}
-                            editValue={editValue}
-                            saving={saving}
-                            columnInfoByName={columnInfoByName}
-                            isScrolling={isScrolling}
-                            getPendingCellValue={getPendingCellValue}
-                            isCellPending={isCellPending}
-                            onBeginEdit={handleBeginCellEdit}
-                            onSaveCell={handleSaveCellForRow}
-                            onCancelEdit={handleCancelCellEdit}
-                            onEditValueChange={setEditValue}
-                            onInspectRow={handleInspectRow}
-                          />
-                        );
-                      })}
-
-                      {paddingBottom > 0 && (
-                        <tr>
-                          <td colSpan={columns.length} style={{ height: `${paddingBottom}px`, padding: 0 }} />
-                        </tr>
-                      )}
-                    </>
-                  );
-                })()
+                <VirtualizedTableBody
+                  tableData={tableData}
+                  gridCols={gridCols}
+                  columnCount={columns.length}
+                  columnInfoByName={columnInfoByName}
+                  scrollElement={tableScrollRef.current}
+                  selectedRowIndex={selectedRowIndex}
+                  editingCell={editingCell}
+                  editValue={editValue}
+                  saving={saving}
+                  getPendingCellValue={getPendingCellValue}
+                  isCellPending={isCellPending}
+                  onBeginEdit={handleBeginCellEdit}
+                  onSaveCell={handleSaveCellForRow}
+                  onCancelEdit={handleCancelCellEdit}
+                  onEditValueChange={setEditValue}
+                  onInspectRow={handleInspectRow}
+                />
               )}
               </tbody>
             </table>
