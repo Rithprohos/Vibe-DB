@@ -728,16 +728,28 @@ fn setup_menu(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         None::<&str>,
     )?;
     let separator = PredefinedMenuItem::separator(app)?;
+    let undo = PredefinedMenuItem::undo(app, None)?;
+    let redo = PredefinedMenuItem::redo(app, None)?;
+    let cut = PredefinedMenuItem::cut(app, None)?;
+    let copy = PredefinedMenuItem::copy(app, None)?;
+    let paste = PredefinedMenuItem::paste(app, None)?;
+    let select_all = PredefinedMenuItem::select_all(app, None)?;
 
     let app_submenu =
         Submenu::with_items(app, "VibeDB", true, &[&about, &separator, &check_updates])?;
+    let edit_submenu = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[&undo, &redo, &separator, &cut, &copy, &paste, &separator, &select_all],
+    )?;
 
     let menu = Menu::with_items(
         app,
         &[
             &app_submenu,
             &Submenu::new(app, "File", true)?,
-            &Submenu::new(app, "Edit", true)?,
+            &edit_submenu,
             &Submenu::new(app, "View", true)?,
         ],
     )?;

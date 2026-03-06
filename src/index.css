@@ -226,13 +226,14 @@
     @apply bg-background text-foreground;
     font-family: "Inter", sans-serif;
     overflow: hidden;
-    -webkit-user-select: none;
-    user-select: none;
   }
 
   /* Re-enable selection where it matters */
   input, textarea,
   .cm-editor,
+  .cm-scroller,
+  .cm-content,
+  .cm-line,
   .cell-content,
   pre, code,
   [data-selectable],

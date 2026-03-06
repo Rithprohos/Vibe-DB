@@ -187,9 +187,19 @@ export default function App() {
   // Global Keybindings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if user is in an input/textarea to avoid triggering shortcuts unexpectedly
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
-        if (e.key !== ',' && e.key !== 'l' && e.key !== 'Enter') return;
+      const target = e.target as HTMLElement | null;
+      const isEditableTarget = Boolean(
+        target &&
+        (
+          ['INPUT', 'TEXTAREA'].includes(target.tagName) ||
+          target.isContentEditable ||
+          target.closest('.cm-editor')
+        )
+      );
+
+      // Keep native editor shortcuts intact inside form fields and CodeMirror.
+      if (isEditableTarget && e.key !== ',' && e.key !== 'l') {
+        return;
       }
 
       const isMod = e.metaKey || e.ctrlKey;

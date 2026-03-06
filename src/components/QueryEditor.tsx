@@ -22,9 +22,39 @@ interface SelectedCell {
   columnIndex: number;
 }
 
+interface EditorViewLike {
+  state: {
+    selection: {
+      main: {
+        empty: boolean;
+        from: number;
+        to: number;
+      };
+    };
+    sliceDoc: (from: number, to: number) => string;
+  };
+}
+
 const EMPTY_ARRAY: any[] = [];
 const MIN_EDITOR_HEIGHT = 120;
 const MIN_RESULTS_HEIGHT = 180;
+
+function isEditorViewLike(value: unknown): value is EditorViewLike {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Partial<EditorViewLike>;
+  const state = candidate.state;
+  const main = state?.selection?.main;
+
+  return Boolean(
+    state &&
+    typeof state.sliceDoc === 'function' &&
+    main &&
+    typeof main.empty === 'boolean' &&
+    typeof main.from === 'number' &&
+    typeof main.to === 'number'
+  );
+}
 
 const BASIC_SETUP = {
   lineNumbers: true,
@@ -173,7 +203,13 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     let queryToRun = (currentTab?.query || '').trim();
 
     // Use the passed EditorView (from keymap) or fallback to ref
-    const view = editorView || editorRef.current?.view;
+    const refView = editorRef.current?.view;
+    const view = isEditorViewLike(editorView)
+      ? editorView
+      : isEditorViewLike(refView)
+        ? refView
+        : null;
+
     if (view) {
       const selection = view.state.selection.main;
       if (!selection.empty) {
@@ -257,6 +293,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const hasRows = Boolean(result && result.columns.length > 0);
   const rowCount = result?.rows.length ?? 0;
   const columnCount = result?.columns.length ?? 0;
+  const canRun = Boolean(activeConnection?.connId) && !running;
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => resultsScrollRef.current,
@@ -280,14 +317,14 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       {/* Editor Area */}
       <div 
         ref={editorPaneRef}
-        className="flex flex-col flex-shrink-0 relative group"
+        className="flex flex-col flex-shrink-0 relative group min-h-0 overflow-hidden"
         style={{ height: editorHeight, minHeight: 100 }}
       >
-        <div className="flex items-center justify-between px-4 h-12 border-b border-border bg-secondary/30 backdrop-blur-sm">
+        <div className="relative z-10 flex items-center justify-between px-4 h-12 border-b border-border bg-secondary/30 backdrop-blur-sm">
           <Button 
             size="sm" 
-            onClick={handleRun}
-            disabled={running || !query.trim()}
+            onClick={() => void handleRun()}
+            disabled={!canRun}
             className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
           >
             {running ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Play size={14} className="mr-2" />}
@@ -300,16 +337,18 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
           </div>
         </div>
         
-        <CodeMirror
-          ref={editorRef}
-          value={query}
-          height="100%"
-          extensions={[sql({ schema }), runKeymap]}
-          theme={vscodeDark}
-          onChange={setQuery}
-          className="flex-1 w-full bg-background text-[14px] custom-scrollbar-hide focus-within:ring-inset focus-within:ring-1 focus-within:ring-primary/20 cm-editor-wrapper"
-          basicSetup={BASIC_SETUP}
-        />
+        <div className="relative z-0 min-h-0 flex-1 overflow-hidden">
+          <CodeMirror
+            ref={editorRef}
+            value={query}
+            height="100%"
+            extensions={[sql({ schema }), runKeymap]}
+            theme={vscodeDark}
+            onChange={setQuery}
+            className="h-full w-full overflow-hidden bg-background text-[14px] custom-scrollbar-hide focus-within:ring-inset focus-within:ring-1 focus-within:ring-primary/20 cm-editor-wrapper"
+            basicSetup={BASIC_SETUP}
+          />
+        </div>
         
         {/* Resizer */}
         <div 
