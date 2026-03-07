@@ -194,6 +194,12 @@ Essential SQLite management features before multi-engine support.
 ### Completed in v0.2.7
 
 - [x] CreateTable column row rendering optimized with React.memo — typing in column name fields no longer causes lag
+- [x] LogDrawer virtualization performance: stabilized virtualizer callbacks, removed ScrollArea overhead, memoized expensive formatting
+- [x] TableView virtualization performance: stabilized getScrollElement/estimateSize callbacks, reduced overscan, memoized padding styles
+- [x] RowInspector: switched to transform-based GPU-accelerated animation, fixed overlay positioning
+- [x] TableRows: removed isScrolling optimization causing text size jumps, simplified VirtualCell props
+- [x] Number formatting: removed blue color for consistent foreground text styling
+- [x] Row selection behavior: click selects row without auto-opening inspector (toggle button only)
 - [x] QueryEditor Run action hardened so toolbar clicks and keyboard-triggered execution share the same safe path
 - [x] QueryEditor clipboard/select behavior restored by preserving native editor shortcuts and text selection semantics
 - [x] macOS/Tauri Edit menu now includes standard undo/redo/cut/copy/paste/select-all actions for webview text inputs
