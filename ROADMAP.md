@@ -193,6 +193,7 @@ Essential SQLite management features before multi-engine support.
 
 ### Completed in v0.2.7
 
+- [x] CreateTable column row rendering optimized with React.memo — typing in column name fields no longer causes lag
 - [x] QueryEditor Run action hardened so toolbar clicks and keyboard-triggered execution share the same safe path
 - [x] QueryEditor clipboard/select behavior restored by preserving native editor shortcuts and text selection semantics
 - [x] macOS/Tauri Edit menu now includes standard undo/redo/cut/copy/paste/select-all actions for webview text inputs
