@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { buildCreateTableSQL, executeQuery, listTables } from '../lib/db';
 import { validateColumnName, validateTableName } from '../lib/tableName';
@@ -49,8 +49,258 @@ interface Props {
   tabId: string;
 }
 
+// ── Memoized Column Row Component ──
+// Isolates re-renders so typing in one column doesn't re-render all others
+
+interface ColumnRowProps {
+  col: ColumnDef;
+  index: number;
+  engineDataTypes: ReturnType<typeof getDataTypesForEngine>;
+  engineTypeLabel: string;
+  hasError: string | undefined;
+  canRemove: boolean;
+  onUpdate: (id: string, updates: Partial<ColumnDef>) => void;
+  onRemove: (id: string) => void;
+  onMovePk: (targetId: string) => void;
+}
+
+const ColumnRow = memo(function ColumnRow({
+  col,
+  index,
+  engineDataTypes,
+  engineTypeLabel,
+  hasError,
+  canRemove,
+  onUpdate,
+  onRemove,
+  onMovePk,
+}: ColumnRowProps) {
+  // Stable callbacks - only recreate if col.id changes
+  const handleNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onUpdate(col.id, { name: e.target.value });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handleTypeChange = useCallback(
+    (val: string) => {
+      onUpdate(col.id, { type: val });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handlePkChange = useCallback(
+    (v: boolean | 'indeterminate') => {
+      if (v && !col.primaryKey) {
+        onMovePk(col.id);
+      } else {
+        onUpdate(col.id, { primaryKey: !!v });
+      }
+    },
+    [col.id, col.primaryKey, onUpdate, onMovePk],
+  );
+
+  const handleAutoIncrementChange = useCallback(
+    (v: boolean | 'indeterminate') => {
+      onUpdate(col.id, { autoIncrement: !!v });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handleNotNullChange = useCallback(
+    (v: boolean | 'indeterminate') => {
+      onUpdate(col.id, { notNull: !!v });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handleUniqueChange = useCallback(
+    (v: boolean | 'indeterminate') => {
+      onUpdate(col.id, { unique: !!v });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handleDefaultOptionChange = useCallback(
+    (val: string) => {
+      onUpdate(col.id, {
+        defaultOption: val || 'none',
+        defaultValue: '',
+      });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handleDefaultValueChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onUpdate(col.id, { defaultValue: e.target.value });
+    },
+    [col.id, onUpdate],
+  );
+
+  const handleRemove = useCallback(() => {
+    onRemove(col.id);
+  }, [col.id, onRemove]);
+
+  return (
+    <TableRow
+      className={cn(
+        'border-border/20 transition-colors group',
+        index % 2 === 0 ? 'bg-transparent' : 'bg-secondary/10',
+      )}
+    >
+      {/* Drag handle */}
+      <TableCell className="pl-3 py-2">
+        <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
+          <GripVertical size={14} />
+        </div>
+      </TableCell>
+
+      {/* Column Name */}
+      <TableCell className="py-2">
+        <Input
+          type="text"
+          value={col.name}
+          onChange={handleNameChange}
+          placeholder="column_name"
+          className={cn(
+            'bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-sm font-medium h-8 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary',
+            hasError &&
+              'border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive',
+          )}
+        />
+        {hasError && (
+          <div className="mt-1 text-[10px] text-destructive leading-tight">
+            {hasError}
+          </div>
+        )}
+      </TableCell>
+
+      {/* Data Type */}
+      <TableCell className="py-2">
+        <Select value={col.type} onValueChange={handleTypeChange}>
+          <SelectTrigger className="h-8 bg-transparent border-border/50 text-sm focus:ring-1 focus:ring-primary">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {engineTypeLabel}
+              </SelectLabel>
+              {engineDataTypes.map(t => (
+                <SelectItem key={t.value} value={t.value}>
+                  <span
+                    className={cn('font-mono text-xs font-bold', t.color)}
+                  >
+                    {t.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </TableCell>
+
+      {/* Primary Key */}
+      <TableCell className="text-center py-2">
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={col.primaryKey}
+            onCheckedChange={handlePkChange}
+            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+          />
+        </div>
+      </TableCell>
+
+      {/* Auto Increment */}
+      <TableCell className="text-center py-2">
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={col.autoIncrement}
+            onCheckedChange={handleAutoIncrementChange}
+            disabled={!col.primaryKey || col.type !== 'INTEGER'}
+            className={cn(
+              'data-[state=checked]:bg-warning data-[state=checked]:border-warning',
+              (!col.primaryKey || col.type !== 'INTEGER') && 'opacity-30',
+            )}
+          />
+        </div>
+      </TableCell>
+
+      {/* Not Null */}
+      <TableCell className="text-center py-2">
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={col.notNull}
+            onCheckedChange={handleNotNullChange}
+            className="data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
+          />
+        </div>
+      </TableCell>
+
+      {/* Unique */}
+      <TableCell className="text-center py-2">
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={col.unique}
+            onCheckedChange={handleUniqueChange}
+            className="data-[state=checked]:bg-info data-[state=checked]:border-info"
+          />
+        </div>
+      </TableCell>
+
+      {/* Default Value */}
+      <TableCell className="py-2">
+        <div className="flex gap-1.5">
+          <Select
+            value={col.defaultOption}
+            onValueChange={handleDefaultOptionChange}
+          >
+            <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs focus:ring-1 focus:ring-primary flex-1">
+              <SelectValue placeholder="None" />
+            </SelectTrigger>
+            <SelectContent>
+              {DEFAULT_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <span className="text-xs">{opt.label}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {col.defaultOption === 'custom' && (
+            <Input
+              type="text"
+              value={col.defaultValue}
+              onChange={handleDefaultValueChange}
+              placeholder="value"
+              className="bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-xs h-8 w-24 focus-visible:ring-1 focus-visible:ring-primary"
+            />
+          )}
+        </div>
+      </TableCell>
+
+      {/* Remove */}
+      <TableCell className="py-2 pr-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleRemove}
+          disabled={!canRemove}
+          className={cn(
+            'w-7 h-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity',
+            'hover:bg-destructive/10 hover:text-destructive',
+            !canRemove && '!opacity-0',
+          )}
+        >
+          <Trash2 size={13} />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+});
+
 export default function CreateTable({ tabId }: Props) {
-  const fieldErrorClass = 'border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive';
   // ── Store selectors (granular per Rule #1) ──
   const tabs = useAppStore(s => s.tabs);
   const connections = useAppStore(s => s.connections);
@@ -88,10 +338,6 @@ export default function CreateTable({ tabId }: Props) {
   const sqlPreviewRequestIdRef = useRef(0);
 
   // ── Derived values ──
-  const pkCount = useMemo(
-    () => columns.filter(c => c.primaryKey).length,
-    [columns],
-  );
   const validColumnCount = useMemo(
     () => columns.filter(c => c.name.trim()).length,
     [columns],
@@ -154,6 +400,20 @@ export default function CreateTable({ tabId }: Props) {
   const handleCancel = useCallback(() => {
     closeTab(tabId);
   }, [closeTab, tabId]);
+
+  // Move PK to a specific column (when clicking PK on a different column)
+  const movePk = useCallback(
+    (targetId: string) => {
+      setColumns(prev =>
+        prev.map(c => ({
+          ...c,
+          primaryKey: c.id === targetId,
+          autoIncrement: c.id === targetId ? c.autoIncrement : false,
+        })),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     const hasTableName = tableName.trim().length > 0;
@@ -292,7 +552,7 @@ export default function CreateTable({ tabId }: Props) {
                 }}
                 className={cn(
                   "bg-background border-border placeholder:text-muted-foreground/40 text-sm font-medium focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary h-9",
-                  liveTableNameError && fieldErrorClass,
+                  liveTableNameError && "border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive",
                 )}
                 autoFocus
               />
@@ -412,201 +672,18 @@ export default function CreateTable({ tabId }: Props) {
               </TableHeader>
               <TableBody>
                 {columns.map((col, idx) => (
-                  <TableRow
+                  <ColumnRow
                     key={col.id}
-                    className={cn(
-                      'border-border/20 transition-colors group',
-                      idx % 2 === 0 ? 'bg-transparent' : 'bg-secondary/10',
-                    )}
-                  >
-                    {/* Drag handle */}
-                    <TableCell className="pl-3 py-2">
-                      <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
-                        <GripVertical size={14} />
-                      </div>
-                    </TableCell>
-
-                    {/* Column Name */}
-                    <TableCell className="py-2">
-                      <Input
-                        type="text"
-                        value={col.name}
-                        onChange={e =>
-                          updateColumn(col.id, { name: e.target.value })
-                        }
-                        placeholder="column_name"
-                        className={cn(
-                          "bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-sm font-medium h-8 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary",
-                          liveColumnNameErrors[col.id] && fieldErrorClass,
-                        )}
-                      />
-                      {liveColumnNameErrors[col.id] && (
-                        <div className="mt-1 text-[10px] text-destructive leading-tight">
-                          {liveColumnNameErrors[col.id]}
-                        </div>
-                      )}
-                    </TableCell>
-
-                    {/* Data Type */}
-                    <TableCell className="py-2">
-                      <Select
-                        value={col.type}
-                        onValueChange={val =>
-                          updateColumn(col.id, { type: val })
-                        }
-                      >
-                        <SelectTrigger className="h-8 bg-transparent border-border/50 text-sm focus:ring-1 focus:ring-primary">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                              {engineTypeLabel}
-                            </SelectLabel>
-                            {engineDataTypes.map(t => (
-                              <SelectItem key={t.value} value={t.value}>
-                                <span
-                                  className={cn(
-                                    'font-mono text-xs font-bold',
-                                    t.color,
-                                  )}
-                                >
-                                  {t.label}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-
-                    {/* Primary Key */}
-                    <TableCell className="text-center py-2">
-                      <div className="flex items-center justify-center">
-                        <Checkbox
-                          checked={col.primaryKey}
-                          onCheckedChange={v => {
-                            if (v && pkCount >= 1 && !col.primaryKey) {
-                              // Move PK to this column
-                              setColumns(prev =>
-                                prev.map(c => ({
-                                  ...c,
-                                  primaryKey: c.id === col.id,
-                                  autoIncrement:
-                                    c.id === col.id
-                                      ? c.autoIncrement
-                                      : false,
-                                })),
-                              );
-                            } else {
-                              updateColumn(col.id, { primaryKey: !!v });
-                            }
-                          }}
-                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                      </div>
-                    </TableCell>
-
-                    {/* Auto Increment */}
-                    <TableCell className="text-center py-2">
-                      <div className="flex items-center justify-center">
-                        <Checkbox
-                          checked={col.autoIncrement}
-                          onCheckedChange={v =>
-                            updateColumn(col.id, { autoIncrement: !!v })
-                          }
-                          disabled={!col.primaryKey || col.type !== 'INTEGER'}
-                          className={cn(
-                            'data-[state=checked]:bg-warning data-[state=checked]:border-warning',
-                            (!col.primaryKey || col.type !== 'INTEGER') &&
-                              'opacity-30',
-                          )}
-                        />
-                      </div>
-                    </TableCell>
-
-                    {/* Not Null */}
-                    <TableCell className="text-center py-2">
-                      <div className="flex items-center justify-center">
-                        <Checkbox
-                          checked={col.notNull}
-                          onCheckedChange={v =>
-                            updateColumn(col.id, { notNull: !!v })
-                          }
-                          className="data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
-                        />
-                      </div>
-                    </TableCell>
-
-                    {/* Unique */}
-                    <TableCell className="text-center py-2">
-                      <div className="flex items-center justify-center">
-                        <Checkbox
-                          checked={col.unique}
-                          onCheckedChange={v =>
-                            updateColumn(col.id, { unique: !!v })
-                          }
-                          className="data-[state=checked]:bg-info data-[state=checked]:border-info"
-                        />
-                      </div>
-                    </TableCell>
-
-                    {/* Default Value */}
-                    <TableCell className="py-2">
-                      <div className="flex gap-1.5">
-                        <Select
-                          value={col.defaultOption}
-                          onValueChange={val =>
-                            updateColumn(col.id, {
-                              defaultOption: val || 'none',
-                              defaultValue: '',
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs focus:ring-1 focus:ring-primary flex-1">
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DEFAULT_OPTIONS.map(opt => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                <span className="text-xs">{opt.label}</span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {col.defaultOption === 'custom' && (
-                          <Input
-                            type="text"
-                            value={col.defaultValue}
-                            onChange={e =>
-                              updateColumn(col.id, {
-                                defaultValue: e.target.value,
-                              })
-                            }
-                            placeholder="value"
-                            className="bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-xs h-8 w-24 focus-visible:ring-1 focus-visible:ring-primary"
-                          />
-                        )}
-                      </div>
-                    </TableCell>
-
-                    {/* Remove */}
-                    <TableCell className="py-2 pr-3">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeColumn(col.id)}
-                        disabled={columns.length <= 1}
-                        className={cn(
-                          'w-7 h-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity',
-                          'hover:bg-destructive/10 hover:text-destructive',
-                          columns.length <= 1 && '!opacity-0',
-                        )}
-                      >
-                        <Trash2 size={13} />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                    col={col}
+                    index={idx}
+                    engineDataTypes={engineDataTypes}
+                    engineTypeLabel={engineTypeLabel}
+                    hasError={liveColumnNameErrors[col.id]}
+                    canRemove={columns.length > 1}
+                    onUpdate={updateColumn}
+                    onRemove={removeColumn}
+                    onMovePk={movePk}
+                  />
                 ))}
               </TableBody>
             </Table>
