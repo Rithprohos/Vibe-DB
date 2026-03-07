@@ -206,6 +206,7 @@ Essential SQLite management features before multi-engine support.
 - [x] Table sidebar context menu now includes **Edit Table**, opening a dedicated schema-edit tab
 - [x] ALTER TABLE workflow shipped for SQLite: rename table, add column, rename column, and drop column
 - [x] Inline identifier validation added for table/column names in Create Table and Edit Table with backend parity
+- [x] TableRows refactor: removed redundant `cellId` and stabilized row/cell props for cleaner virtualization path
 - [x] SQLite schema-change reliability improved by using a single SQLite pool connection (`max_connections = 1`)
 - [x] Engine-scoped data type catalog introduced so type dropdowns are explicit about current engine (SQLite today, extensible for Postgres later)
 - [x] AI settings now persist custom API keys through the Tauri Stronghold plugin snapshot flow (`ai-config.hold`)
