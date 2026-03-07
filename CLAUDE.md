@@ -32,14 +32,14 @@ bun run cargo:test   # Run Rust backend tests
 
 Tauri commands are defined in `src-tauri/src/lib.rs` and wrapped in `src/lib/db.ts`:
 
-| Command | Purpose |
-|---------|---------|
-| `connect_database` | Connect to SQLite file |
-| `disconnect_database` | Close connection |
-| `list_tables` | Get tables/views |
-| `get_table_structure` | Column definitions |
-| `execute_query` | Run SQL, return results |
-| `create_database` | Create new SQLite file |
+| Category | Commands |
+|----------|----------|
+| Connection | `connect_database`, `disconnect_database`, `set_active_connection` |
+| Schema/data | `list_tables`, `get_table_structure`, `get_table_data` |
+| Querying | `execute_query`, `execute_transaction` |
+| Counts/meta | `get_table_row_count`, `get_filtered_row_count`, `get_database_version` |
+| Creation/helpers | `create_database`, `build_create_table_sql` |
+| AI config | `get_default_ai_provider_config` |
 
 ### Database Engine System (Rust)
 
@@ -88,6 +88,9 @@ interface AppState {
 
 ### Performance Rules
 
+See [`.agents/workflows/performance-rules.md`](.agents/workflows/performance-rules.md) for complete rules. Key points:
+
+- **Granular selectors:** `useAppStore(s => s.connections)` not `useAppStore(state => ({...}))`
 - Fetch table structure and row counts separately from paged data fetches.
 - Build lookup maps once (`useMemo`) for hot render paths instead of repeated linear scans.
 - Avoid repeated formatter calls in cell renders; compute once and reuse.
@@ -126,7 +129,8 @@ Key variables: `--bg-primary`, `--bg-secondary`, `--accent-primary` (#00e599 neo
 |------|---------|
 | `src/store/useAppStore.ts` | Global state, persistence logic |
 | `src/lib/db.ts` | Tauri invoke wrappers |
-| `src-tauri/src/lib.rs` | Tauri command handlers |
+| `src-tauri/src/commands.rs` | Tauri command implementations |
+| `src-tauri/src/lib.rs` | Tauri setup, plugins, command registration |
 | `src-tauri/src/engines/` | Database engine implementations |
 | `src/index.css` | CSS variables, themes (~1100 lines) |
 | `tailwind.config.js` | Tailwind → CSS variable mapping |
@@ -141,6 +145,29 @@ See `STYLE_GUIDE.md` for complete rules. Key points:
 - **Typography:** Inter for UI, JetBrains Mono for data/SQL
 - **Neon accent:** `#00e599` sparingly for interactive elements
 - **Naming:** `PascalCase` components, `kebab-case` files, `camelCase` functions
+
+## Working Rules
+
+- Keep UI dark-first, compact, and use CSS variables from `src/index.css`.
+- Do not hardcode colors. Existing neon accent `#00e599` is allowed sparingly.
+- VibeDB should look like a devtool: sharp corners, dense layouts, restrained glow, no soft SaaS cards.
+- Avoid `rounded-full` and large radii on primary UI surfaces. Reserve fully round shapes for tiny indicators only.
+- Preserve existing visual patterns in the area you touch.
+- Do not duplicate domain logic across components. Move shared logic/constants to `src/lib/*`.
+- Keep frontend and backend validation in sync for user input.
+- When touching tables/logs/sidebar lists, preserve virtualization.
+- Keep metadata fetches separate from paginated row fetches.
+- Avoid repeated per-cell work in table rendering; memoize lookup maps when reused.
+- Preserve editable-grid behavior: double-click enters edit, `Escape` cancels, `Cmd/Ctrl+Enter` commits.
+- Follow [`.agents/workflows/performance-rules.md`](.agents/workflows/performance-rules.md) when changing React, Zustand, async effects, or performance-sensitive code.
+
+## TypeScript / React
+
+- TS is strict: `strict`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`.
+- Prefer explicit parameter/return types for exported functions.
+- Use `import type` where appropriate.
+- Prefer interfaces for object shapes unless a union/type alias is clearer.
+- Follow the local style of the file you are editing. This repo mixes `PascalCase` component files with nested feature folders.
 
 ## Keyboard Shortcuts (Global)
 

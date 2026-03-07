@@ -28,16 +28,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
   getDefaultAiProviderConfig,
+  getCustomAiApiKey,
   hasCustomAiApiKey,
   saveCustomAiApiKey,
   clearCustomAiApiKey,
+  pingAiProvider,
   type DefaultAiProviderConfig,
 } from '@/lib/db';
 import { type AiCustomProviderKind, useAppStore } from '@/store/useAppStore';
 
 const DEFAULT_ENV_VALUE = '__default_env__';
-const DEFAULT_POLLI_BASE_URL = 'https://gen.pollinations.ai';
-const DEFAULT_POLLI_MODEL = 'openai';
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
@@ -61,6 +61,7 @@ export function AiSettings() {
   const [savingKey, setSavingKey] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [isCreatingEnvironment, setIsCreatingEnvironment] = useState(false);
+  const [pingingProvider, setPingingProvider] = useState(false);
 
   const selectedEnvValue = useMemo(
     () =>
@@ -70,8 +71,8 @@ export function AiSettings() {
     [aiProviderMode, aiActiveCustomProfileId],
   );
 
-  const defaultPolliBaseUrl = defaultConfig?.baseUrl ?? DEFAULT_POLLI_BASE_URL;
-  const defaultPolliModel = defaultConfig?.model ?? DEFAULT_POLLI_MODEL;
+  const defaultPolliBaseUrl = defaultConfig?.baseUrl ?? '';
+  const defaultPolliModel = defaultConfig?.model ?? '';
 
   const resetToDefaultEnvironment = useCallback(() => {
     setAiProviderMode('default');
@@ -249,11 +250,16 @@ export function AiSettings() {
     setIsCreatingEnvironment(true);
     setFormName('');
     setFormProviderKind('polli');
-    setFormBaseUrl(DEFAULT_POLLI_BASE_URL);
-    setFormModel(DEFAULT_POLLI_MODEL);
+    setFormBaseUrl(defaultPolliBaseUrl);
+    setFormModel(defaultPolliModel);
     setHasSavedApiKey(false);
     setApiKeyInput('');
-  }, [setAiActiveCustomProfileId, setAiProviderMode]);
+  }, [
+    defaultPolliBaseUrl,
+    defaultPolliModel,
+    setAiActiveCustomProfileId,
+    setAiProviderMode,
+  ]);
 
   const handleCancelCreateEnvironment = useCallback(() => {
     setIsCreatingEnvironment(false);
@@ -417,8 +423,8 @@ export function AiSettings() {
       setIsCreatingEnvironment(false);
       setFormName('');
       setFormProviderKind('polli');
-      setFormBaseUrl(DEFAULT_POLLI_BASE_URL);
-      setFormModel(DEFAULT_POLLI_MODEL);
+      setFormBaseUrl(defaultPolliBaseUrl);
+      setFormModel(defaultPolliModel);
       setApiKeyInput('');
       setHasSavedApiKey(false);
       showAlert({
@@ -440,8 +446,68 @@ export function AiSettings() {
     aiActiveCustomProfileId,
     aiCustomProfiles,
     hasSavedApiKey,
+    defaultPolliBaseUrl,
+    defaultPolliModel,
     removeAiCustomProfile,
     setAiActiveCustomProfileId,
+    showAlert,
+    withTimeout,
+  ]);
+
+  const handlePingProvider = useCallback(async () => {
+    const resolvedBaseUrl = formBaseUrl.trim();
+    const resolvedModel = formModel.trim();
+
+    if (!resolvedBaseUrl || !resolvedModel) {
+      showAlert({
+        title: 'Missing provider configuration',
+        message: 'Base URL and model are required before testing the provider.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setPingingProvider(true);
+    try {
+      const resolvedApiKey =
+        apiKeyInput.trim() ||
+        (aiProviderMode === 'custom' && aiActiveCustomProfileId
+          ? await getCustomAiApiKey(aiActiveCustomProfileId)
+          : null);
+
+      await withTimeout(
+        pingAiProvider({
+          providerKind: formProviderKind,
+          baseUrl: resolvedBaseUrl,
+          model: resolvedModel,
+          apiKey: resolvedApiKey,
+          useDefaultConfig: aiProviderMode === 'default',
+        }),
+        15000,
+      );
+
+      showAlert({
+        title: 'Provider reachable',
+        message: 'The API responded to a chat completions ping.',
+        type: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to ping AI provider:', error);
+      showAlert({
+        title: 'Provider ping failed',
+        message: error instanceof Error ? error.message : 'Could not reach the AI provider.',
+        type: 'error',
+      });
+    } finally {
+      setPingingProvider(false);
+    }
+  }, [
+    aiActiveCustomProfileId,
+    aiProviderMode,
+    apiKeyInput,
+    formBaseUrl,
+    formModel,
+    formProviderKind,
     showAlert,
     withTimeout,
   ]);
@@ -688,6 +754,20 @@ export function AiSettings() {
         {/* Action Footer - Fixed at bottom without absolute hacks */}
         <div className="border-t border-border bg-background p-5 pb-8 flex items-center justify-between gap-3 flex-shrink-0 z-20">
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void handlePingProvider()}
+              disabled={pingingProvider || savingProfile || savingKey}
+              className="border-border/60 bg-background/60 px-4 h-10 rounded-sm font-medium"
+            >
+              {pingingProvider ? (
+                <Loader2 size={16} className="mr-2 animate-spin" />
+              ) : (
+                <Cpu size={16} className="mr-2" />
+              )}
+              Ping API
+            </Button>
+
             {aiActiveCustomProfileId || isCreatingEnvironment ? (
               <>
                 <Button 

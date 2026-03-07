@@ -326,7 +326,7 @@ export default function Sidebar() {
               placeholder="Search tables..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-background/50 border-border placeholder:text-muted-foreground/50 text-sm focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary h-8"
+              className="bg-transparent border-border/30 placeholder:text-muted-foreground/20 text-sm focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:border-primary/30 h-8"
             />
           </div>
 

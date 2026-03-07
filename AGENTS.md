@@ -42,12 +42,23 @@ bun run cargo:test
 
 ## Current Backend Commands
 
-- Connection: `connect_database`, `disconnect_database`, `set_active_connection`
-- Schema/data: `list_tables`, `get_table_structure`, `get_table_data`
-- Querying: `execute_query`, `execute_transaction`
-- Counts/meta: `get_table_row_count`, `get_filtered_row_count`, `get_database_version`
-- Creation/helpers: `create_database`, `build_create_table_sql`
-- AI config: `get_default_ai_provider_config`
+Defined in `src-tauri/src/commands.rs`:
+
+| Category | Commands |
+|----------|----------|
+| Connection | `connect_database`, `disconnect_database`, `set_active_connection` |
+| Schema/data | `list_tables`, `get_table_structure`, `get_table_data` |
+| Querying | `execute_query`, `execute_transaction` |
+| Counts/meta | `get_table_row_count`, `get_filtered_row_count`, `get_database_version` |
+| Creation/helpers | `create_database`, `build_create_table_sql` |
+| AI config | `get_default_ai_provider_config` |
+
+## Storage Architecture
+
+| Storage | File | Purpose |
+|---------|------|---------|
+| `tauri-plugin-store` | `app_settings.json` | Connection metadata, tags, preferences, tabs |
+| `tauri-plugin-stronghold` | `credentials.hold` | Encrypted passwords/auth tokens |
 
 ## Working Rules
 
@@ -72,6 +83,21 @@ bun run cargo:test
 - Use `import type` where appropriate.
 - Prefer interfaces for object shapes unless a union/type alias is clearer.
 - Follow the local style of the file you are editing. This repo mixes `PascalCase` component files with nested feature folders.
+
+## Event System
+
+Custom DOM events for decoupled communication:
+- `vibedb:connect` — Dispatched from `ConnectionDialog` with connection details, handled in `App.tsx`
+
+## Adding New Database Engines
+
+Implementation checklist:
+1. Create `src-tauri/src/engines/<engine>.rs` implementing `DatabaseEngine` trait
+2. Add variant to `EngineType` in `types.rs`
+3. Register in `EngineRegistry::connect()` in `mod.rs`
+4. Add connection config UI in frontend
+5. Handle engine-specific types in query results
+6. Write integration tests
 
 ## Testing
 

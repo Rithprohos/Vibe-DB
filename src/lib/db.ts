@@ -23,6 +23,40 @@ export interface DefaultAiProviderConfig {
   hasEmbeddedApiKey: boolean;
 }
 
+export interface AiProviderPingRequest {
+  providerKind: "polli" | "openai";
+  baseUrl: string;
+  model: string;
+  apiKey?: string | null;
+  useDefaultConfig: boolean;
+}
+
+export interface SchemaColumn {
+  name: string;
+  colType: string;
+  isPk: boolean;
+  isNullable: boolean;
+}
+
+export interface SchemaTable {
+  name: string;
+  columns: SchemaColumn[];
+}
+
+export interface GenerateSqlRequest {
+  prompt: string;
+  schema: SchemaTable[];
+  providerKind: "polli" | "openai";
+  baseUrl: string;
+  model: string;
+  apiKey?: string | null;
+}
+
+export interface GenerateSqlResponse {
+  sql: string;
+  explanation?: string;
+}
+
 export async function connectDatabase(
   path: string,
   name: string,
@@ -144,6 +178,20 @@ export async function buildCreateTableSQL(
 export async function getDefaultAiProviderConfig(): Promise<DefaultAiProviderConfig> {
   return measureDevFetch("get_default_ai_provider_config", () =>
     invoke<DefaultAiProviderConfig>("get_default_ai_provider_config"),
+  );
+}
+
+export async function pingAiProvider(request: AiProviderPingRequest): Promise<void> {
+  return measureDevFetch("ping_ai_provider", () =>
+    invoke<void>("ping_ai_provider", { request }),
+  );
+}
+
+export async function generateSql(
+  request: GenerateSqlRequest,
+): Promise<GenerateSqlResponse> {
+  return measureDevFetch("generate_sql", () =>
+    invoke<GenerateSqlResponse>("generate_sql", { request }),
   );
 }
 

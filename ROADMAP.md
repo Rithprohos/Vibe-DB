@@ -205,8 +205,28 @@ Essential SQLite management features before multi-engine support.
 - [x] AI settings now persist custom API keys through the Tauri Stronghold plugin snapshot flow (`ai-config.hold`)
 - [x] Stronghold dev-save reliability improved by applying the documented `scrypt` dev-profile optimization
 - [x] `src-tauri/src/lib.rs` split into focused modules (`app_state`, `ai`, `commands`, `sql_helpers`, `sql_logging`, `menu`) for maintainability
+- [x] AI SQL generation panel — natural language to SQL with schema-aware context
+- [x] AI panel generates actual SQL via Pollinations/OpenAI API (was mock before)
+- [x] AI context scoped to current table only — fetches real column info (PK, type, nullable)
+- [x] AI system prompt optimized for SQLite with clear rules and examples
+- [x] AI restricted to SELECT queries only (read-only, no data modification)
+- [x] AI error handling with retry button and proper loading states
+- [x] `src/components/AiPanel.tsx` shipped as an inline table-aware AI assistant with suggestions, current-table schema context, retry flow, and insert-into-editor handoff
+- [x] AI module refactored into `src/ai/` subdirectory with clean separation:
+  - `mod.rs` — Types and Tauri command handlers
+  - `client.rs` — HTTP client and API communication
+  - `config.rs` — Configuration and environment
+  - `prompts.rs` — System prompts for different AI assistants
 
 ### Upcoming Tasks
+
+**AI Panel Improvements**
+- [ ] Add related tables support for JOIN queries (detect FK relationships)
+- [ ] Show generated SQL explanation/comments alongside the query
+- [ ] Add "Copy SQL" button in addition to "Insert into Editor"
+- [ ] Allow custom temperature/max_tokens in AI settings
+- [ ] Cache generated SQL suggestions per table for quick reuse
+- [ ] Add SQL validation before inserting (check if query is valid for current schema)
 
 - [ ] Schema viewer with relationship lines
 - [ ] Import dialog (CSV/JSON/SQL)
@@ -451,7 +471,7 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 | v0.2.4  | Q1 2026 | Bug fixes + Alerts     | ✅ Complete |
 | v0.2.5  | Q1 2026 | Query UX + Performance | ✅ Complete |
 | v0.2.6  | Q1 2026 | Query UX + Performance | ✅ Complete |
-| v0.2.7  | Q1 2026 | Query polish, AI key persistence, backend modularization | ✅ Complete |
+| v0.2.7  | Q1 2026 | Query polish, AI SQL generation, key persistence, modularization | ✅ Complete |
 | v0.3    | Q2 2026 | Turso support          | 📋 Planned  |
 | v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
 | v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |
