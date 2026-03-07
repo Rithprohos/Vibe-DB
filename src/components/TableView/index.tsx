@@ -523,11 +523,11 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       )}
 
       {/* Main Table Content */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <div
           ref={tableScrollRef}
           className="flex-1 relative overflow-auto custom-scrollbar bg-grid-white/[0.02]"
-          style={{ contain: 'strict' }}
+          style={{ contain: 'strict', transform: 'translateZ(0)' }}
         >
           <div className="min-w-full inline-block align-middle">
             <table className="w-full border-separate border-spacing-0 table-fixed">
@@ -645,7 +645,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                   onSaveCell={handleSaveCellForRow}
                   onCancelEdit={handleCancelCellEdit}
                   onEditValueChange={setEditValue}
-                  onInspectRow={handleInspectRow}
+                  onSelectRow={setSelectedRowIndex}
                 />
               )}
               </tbody>

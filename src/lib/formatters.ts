@@ -15,7 +15,7 @@ export function formatCellValue(value: any): {
   if (typeof value === "number") {
     return {
       text: value.toString(),
-      className: "text-blue-400 font-mono text-xs",
+      className: "text-foreground font-mono text-xs",
     };
   }
   if (typeof value === "boolean") {

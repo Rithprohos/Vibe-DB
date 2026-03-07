@@ -1,9 +1,8 @@
 import { useAppStore } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronDown, Trash2, Copy, AlertCircle, CheckCircle2, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, memo, useRef, useCallback, useEffect } from 'react';
+import { useState, memo, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDevRenderCounter } from '@/lib/dev-performance';
 import { copyToClipboard } from '@/lib/copy';
@@ -21,30 +20,30 @@ interface LogItemProps {
 }
 
 const LogItem = memo(function LogItem({ log, onCopy }: LogItemProps) {
+  const timeString = useMemo(() => new Date(log.timestamp).toLocaleTimeString(), [log.timestamp]);
+  const durationString = useMemo(() => `${log.duration.toFixed(1)}ms`, [log.duration]);
+  const isError = log.status === 'error';
+  const containerClass = useMemo(() => cn(
+    "flex items-start gap-2 rounded-md border bg-secondary/50 text-xs overflow-hidden group transition-colors hover:bg-secondary/80",
+    isError ? "border-destructive/30" : "border-border/50"
+  ), [isError]);
+  const iconClass = useMemo(() => cn(
+    "flex items-center justify-center w-6 h-6 flex-shrink-0",
+    isError ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+  ), [isError]);
+
   return (
-    <div
-      className={cn(
-        "flex items-start gap-2 rounded-md border bg-secondary/50 text-xs overflow-hidden group transition-colors hover:bg-secondary/80",
-        log.status === 'error' ? "border-destructive/30" : "border-border/50"
-      )}
-    >
-      <div className={cn(
-        "flex items-center justify-center w-6 h-6 flex-shrink-0",
-        log.status === 'error' ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-      )}>
-        {log.status === 'error' ? (
-          <AlertCircle size={12} />
-        ) : (
-          <CheckCircle2 size={12} />
-        )}
+    <div className={containerClass}>
+      <div className={iconClass}>
+        {isError ? <AlertCircle size={12} /> : <CheckCircle2 size={12} />}
       </div>
       <div className="flex-1 min-w-0 py-1.5 pr-2">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="font-mono text-[10px] text-muted-foreground">
-            {new Date(log.timestamp).toLocaleTimeString()}
+            {timeString}
           </span>
           <span className="text-[10px] font-mono text-muted-foreground/70">
-            {log.duration.toFixed(1)}ms
+            {durationString}
           </span>
         </div>
         <pre className="font-mono text-foreground/90 whitespace-pre-wrap break-all leading-relaxed">
@@ -69,6 +68,29 @@ const LogItem = memo(function LogItem({ log, onCopy }: LogItemProps) {
   );
 });
 
+interface VirtualRowProps {
+  index: number;
+  start: number;
+  log: ReturnType<typeof useAppStore.getState>['logs'][0];
+  onCopy: (sql: string) => void;
+  measureRef: (el: HTMLElement | null) => void;
+}
+
+const VirtualRow = memo(function VirtualRow({ index, start, log, onCopy, measureRef }: VirtualRowProps) {
+  const style = useMemo(() => ({ top: start, paddingBottom: '6px' }), [start]);
+
+  return (
+    <div
+      data-index={index}
+      ref={measureRef}
+      className="absolute left-0 w-full"
+      style={style}
+    >
+      <LogItem log={log} onCopy={onCopy} />
+    </div>
+  );
+});
+
 export default function LogDrawer() {
   useDevRenderCounter('LogDrawer');
   const logs = useAppStore(selectors.logs);
@@ -89,12 +111,26 @@ export default function LogDrawer() {
     setShowLogDrawer(!showLogDrawer);
   }, [setShowLogDrawer, showLogDrawer]);
 
+  const getScrollElement = useCallback(() => viewportRef.current, []);
+  const estimateSize = useCallback(() => 80, []);
+  const getItemKey = useCallback((index: number) => logs[index]?.id ?? index, [logs]);
+
   const logVirtualizer = useVirtualizer({
     count: logs.length,
-    getScrollElement: () => viewportRef.current,
-    estimateSize: () => 64,
-    overscan: 8,
+    getScrollElement,
+    estimateSize,
+    overscan: 3,
+    getItemKey,
   });
+
+  const measureElementRef = useRef(logVirtualizer.measureElement);
+  useEffect(() => {
+    measureElementRef.current = logVirtualizer.measureElement;
+  }, [logVirtualizer.measureElement]);
+
+  const measureElement = useCallback((el: HTMLElement | null) => {
+    if (el) measureElementRef.current(el);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -164,7 +200,7 @@ export default function LogDrawer() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 bg-background" viewportRef={viewportRef}>
+      <div ref={viewportRef} className="flex-1 bg-background overflow-auto">
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
             <Database size={24} className="opacity-40 mb-2" />
@@ -173,29 +209,19 @@ export default function LogDrawer() {
           </div>
         ) : (
           <div className="p-2" style={{ height: `${logVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-            {logVirtualizer.getVirtualItems().map((virtualItem) => {
-              const log = logs[virtualItem.index];
-              return (
-                <div
-                  key={log.id}
-                  data-index={virtualItem.index}
-                  ref={logVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualItem.start}px)`,
-                    paddingBottom: '6px',
-                  }}
-                >
-                  <LogItem log={log} onCopy={handleCopy} />
-                </div>
-              );
-            })}
+            {logVirtualizer.getVirtualItems().map((vi) => (
+              <VirtualRow
+                key={vi.key}
+                index={vi.index}
+                start={vi.start}
+                log={logs[vi.index]}
+                onCopy={handleCopy}
+                measureRef={measureElement}
+              />
+            ))}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 }
