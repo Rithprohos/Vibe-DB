@@ -140,13 +140,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     });
   }, [tableData]);
 
-  const handleInspectRow = useCallback((rowIndex: number) => {
-    startTransition(() => {
-      setSelectedRowIndex(rowIndex);
-      setIsInspectorOpen(true);
-    });
-  }, []);
-
   const toggleInspector = useCallback(() => {
     startTransition(() => {
       setIsInspectorOpen((current) => {

@@ -7,7 +7,6 @@ import { CellInput } from './CellInput';
 import type { EditingCellState } from './types';
 
 interface VirtualCellProps {
-  cellId: string;
   colName: string;
   rowIndex: number;
   cellValue: unknown;
@@ -26,7 +25,6 @@ interface VirtualCellProps {
 }
 
 const VirtualCell = memo(function VirtualCell({
-  cellId,
   colName,
   rowIndex,
   cellValue,
@@ -150,7 +148,6 @@ export const VirtualRow = memo(function VirtualRow({
         return (
           <VirtualCell
             key={`${rowIndex}:${colName}`}
-            cellId={`${rowIndex}:${colName}`}
             colName={colName}
             rowIndex={rowIndex}
             cellValue={rowData[colName]}
