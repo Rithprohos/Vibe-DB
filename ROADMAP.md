@@ -227,6 +227,7 @@ Essential SQLite management features before multi-engine support.
 ### Upcoming Tasks
 
 **AI Panel Improvements**
+
 - [ ] Add related tables support for JOIN queries (detect FK relationships)
 - [ ] Show generated SQL explanation/comments alongside the query
 - [ ] Add "Copy SQL" button in addition to "Insert into Editor"
@@ -241,6 +242,12 @@ Essential SQLite management features before multi-engine support.
 - [ ] Saved queries panel in sidebar
 - [ ] Save query dialog with name/description
 - [ ] Query library with search/filter
+
+**Security & Infrastructure**
+
+- [ ] Implement strict CSP in `tauri.conf.json`
+- [ ] Audit Tauri capabilities (remove unused permissions)
+- [ ] Document security posture in README
 
 ### Testing
 
@@ -390,14 +397,14 @@ sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-native-tls"] }
 
 Security improvements for production readiness.
 
-| Issue                              | Severity | Status      |
-| ---------------------------------- | -------- | ----------- |
-| No Content Security Policy (CSP)   | High     | 🔴 Critical |
-| Unsafe query execution             | Medium   | ✅ Fixed    |
-| Connection paths in localStorage   | Low      | ✅ Fixed    |
-| Broad Tauri capability permissions | Low      | 🟡 Review   |
-| Stronghold unlock secret is app-known | Medium | 🟡 Review   |
-| No AI data guardrails              | Low      | 🟢 Deferred |
+| Issue                                 | Severity | Status      |
+| ------------------------------------- | -------- | ----------- |
+| No Content Security Policy (CSP)      | High     | 🔴 Critical |
+| Unsafe query execution                | Medium   | ✅ Fixed    |
+| Connection paths in localStorage      | Low      | ✅ Fixed    |
+| Broad Tauri capability permissions    | Low      | 🟡 Review   |
+| Stronghold unlock secret is app-known | Medium   | 🟡 Review   |
+| No AI data guardrails                 | Low      | 🟢 Deferred |
 
 ### Completed (v0.2.3)
 
@@ -407,18 +414,12 @@ Security improvements for production readiness.
 - [x] Register store and stronghold permissions in Tauri capabilities
 - [x] Query safety validation — block DELETE/UPDATE without WHERE, tautological WHERE clauses (e.g., `WHERE 1=1`, `OR 1=1`)
 
-### Upcoming Tasks (v0.2.4 & Beyond)
-
-- [ ] Implement strict CSP in `tauri.conf.json`
-- [ ] Audit Tauri capabilities (remove unused permissions)
-- [ ] Document security posture in README
-
 ### Storage Architecture (Implemented)
 
-| Storage                   | File                | Purpose                                    |
-| ------------------------- | ------------------- | ------------------------------------------ |
-| `tauri-plugin-store`      | `app_settings.json` | Connection metadata, tags, preferences     |
-| `tauri-plugin-stronghold` | `ai-config.hold`    | Encrypted AI API keys snapshot             |
+| Storage                   | File                | Purpose                                |
+| ------------------------- | ------------------- | -------------------------------------- |
+| `tauri-plugin-store`      | `app_settings.json` | Connection metadata, tags, preferences |
+| `tauri-plugin-stronghold` | `ai-config.hold`    | Encrypted AI API keys snapshot         |
 
 ### Security Caveat (Current v0.2.7)
 
@@ -470,17 +471,17 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 
 ## Timeline (Estimated)
 
-| Version | Target  | Focus                  | Status      |
-| ------- | ------- | ---------------------- | ----------- |
-| v0.2    | Q1 2026 | Engine abstraction     | ✅ Complete |
-| v0.2.3  | Q1 2026 | Security + UX polish   | ✅ Complete |
-| v0.2.4  | Q1 2026 | Bug fixes + Alerts     | ✅ Complete |
-| v0.2.5  | Q1 2026 | Query UX + Performance | ✅ Complete |
-| v0.2.6  | Q1 2026 | Query UX + Performance | ✅ Complete |
+| Version | Target  | Focus                                                            | Status      |
+| ------- | ------- | ---------------------------------------------------------------- | ----------- |
+| v0.2    | Q1 2026 | Engine abstraction                                               | ✅ Complete |
+| v0.2.3  | Q1 2026 | Security + UX polish                                             | ✅ Complete |
+| v0.2.4  | Q1 2026 | Bug fixes + Alerts                                               | ✅ Complete |
+| v0.2.5  | Q1 2026 | Query UX + Performance                                           | ✅ Complete |
+| v0.2.6  | Q1 2026 | Query UX + Performance                                           | ✅ Complete |
 | v0.2.7  | Q1 2026 | Query polish, AI SQL generation, key persistence, modularization | ✅ Complete |
-| v0.3    | Q2 2026 | Turso support          | 📋 Planned  |
-| v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
-| v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |
+| v0.3    | Q2 2026 | Turso support                                                    | 📋 Planned  |
+| v0.4    | Q3 2026 | PostgreSQL                                                       | 📋 Planned  |
+| v0.5    | Q4 2026 | MySQL                                                            | 📋 Planned  |
 
 ---
 
