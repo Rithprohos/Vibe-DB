@@ -243,6 +243,23 @@ Essential SQLite management features before multi-engine support.
 - [ ] Save query dialog with name/description
 - [ ] Query library with search/filter
 
+**Performance & UI Polish**
+
+- [ ] Tune virtualization overscan and estimated row heights per view
+- [ ] Replace TableView spacer-row virtualization with absolutely positioned rows
+- [ ] Add QueryEditor performance pass (syntax highlight + memoized parse path)
+- [ ] Add QueryEditor result column resizing and responsive inspector behavior
+- [ ] Extend Rust-emitted SQL logging to schema introspection paths (`list_tables`, etc.)
+- [ ] Add frontend performance tests (Vitest + RTL) for large datasets
+- [ ] Cache table schema in Rust by `conn_id + table_name`
+- [ ] Keep pagination/filter/sort execution fully in Rust commands
+- [ ] Add prepared statements for repeated table patterns
+- [ ] Return typed rows with reusable column metadata maps
+- [ ] Debounce UI-triggered query refreshes
+- [ ] Keep metadata fetches separate from row fetches
+- [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
+- [ ] Expand Rust-side command timing instrumentation
+
 **Security & Infrastructure**
 
 - [ ] Implement strict CSP in `tauri.conf.json`
@@ -277,39 +294,6 @@ Essential SQLite management features before multi-engine support.
 | Stale fetch guard    | ✅ Done (v0.2.4) | Ignore out-of-order async responses for structure/count/data fetches                           |
 | Split fetch strategy | ✅ Done (v0.2.4) | Separate schema/count fetch from paginated row data fetches                                    |
 | Lazy tab loading     | ✅ Done (v0.2.6) | Heavy tab views are code-split and only the active tab view is mounted                         |
-
-### Next Actions (post-v0.2.7)
-
-- [ ] Tune virtualization for UX quality (overscan and estimated row heights per view)
-- [ ] Replace TableView spacer-row virtualization with absolutely positioned rows for smoother scrolling
-- [ ] Add QueryEditor performance pass (debounced syntax highlight + memoized parse path)
-- [ ] Add QueryEditor result column resizing and responsive inspector behavior
-- [ ] Extend Rust-emitted SQL logging to schema introspection paths (`list_tables`, `get_table_structure`) for complete drawer coverage
-- [x] Add render/fetch instrumentation in dev mode (measure rerender counts and fetch latency)
-- [x] Apply code-splitting for heavy UI chunks to reduce initial bundle size
-- [ ] Add frontend performance tests (Vitest + RTL) for large table/log datasets
-
-### Backend-First Performance Plan (Added)
-
-- [ ] Cache table schema in Rust by `conn_id + table_name` to avoid repeated `get_table_structure` calls on every filtered fetch/count.
-- [ ] Keep pagination/filter/sort execution fully in Rust commands, with frontend passing only structured params.
-- [ ] Add prepared statements for repeated table browse/query patterns to reduce parse/plan overhead.
-- [ ] Return typed rows with reusable column metadata maps so frontend avoids repeated per-cell lookup/type work.
-- [x] (0.2.6) Ensure virtualization covers all large lists/tables/logs consistently (TableView, QueryEditor results, Sidebar objects, LogDrawer, and future heavy panels where needed).
-- [ ] Debounce UI-triggered query refreshes (filter/search input paths) to reduce query burst load.
-- [ ] Keep metadata fetches separate from row fetches; refresh schema/count only on context changes (connection/table/filter apply), not page/sort.
-- [ ] Add index recommendation flow (based on common filter/sort columns) with one-click `CREATE INDEX` assistance.
-- [ ] Expand Rust-side performance instrumentation (command timing breakdowns) and track before/after benchmarks for each optimization.
-
-### App Performance Status (UI-Focused)
-
-| Item                                                               | Status           | Notes                                                                                    |
-| ------------------------------------------------------------------ | ---------------- | ---------------------------------------------------------------------------------------- |
-| More code-splitting/lazy loading for heavy UI panels               | ✅ Done (v0.2.6) | Main views, dialogs, drawers, AI panel, and alert modal are lazy-loaded                  |
-| Debounce filter/search state updates                               | 📋 Planned       | Apply debounce to filter/search-driven refresh paths                                     |
-| Reduce rerenders in large views (memoized row/cell + stable props) | ✅ Done (v0.2.6) | TableView virtual row/cell path extracted into memoized components with stable callbacks |
-| Move expensive formatting/highlighting off hot render paths        | 📋 Planned       | Shift repeated per-cell formatting/highlight work out of render loops                    |
-| Centralized copy feedback via global toast + helper                | ✅ Done (v0.2.6) | Copy actions now share one frontend clipboard helper and non-blocking toast feedback     |
 
 ---
 
