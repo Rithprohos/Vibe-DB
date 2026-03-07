@@ -39,6 +39,105 @@ const EMPTY_ARRAY: any[] = [];
 const MIN_EDITOR_HEIGHT = 120;
 const MIN_RESULTS_HEIGHT = 180;
 
+// Memoized cell component to prevent re-render during scroll
+interface TableCellProps {
+  cell: unknown;
+  rowIdx: number;
+  cellIdx: number;
+  isActive: boolean;
+  wrapCells: boolean;
+  onSelect: (rowIdx: number, cellIdx: number) => void;
+}
+
+const TableCell = memo(function TableCell({
+  cell,
+  rowIdx,
+  cellIdx,
+  isActive,
+  wrapCells,
+  onSelect,
+}: TableCellProps) {
+  const { text, className } = formatCellValue(cell);
+  const isNumeric = typeof cell === 'number';
+
+  const isFirstColumn = cellIdx === 0;
+
+  return (
+    <td
+      className={cn(
+        'overflow-hidden border-b border-r border-border/50 px-4 py-2.5 align-top last:border-r-0',
+        isFirstColumn ? 'w-[80px] min-w-[80px] max-w-[80px]' : 'w-[220px] min-w-[220px] max-w-[220px]',
+        isActive && 'bg-primary/10 outline outline-1 outline-primary/40 -outline-offset-1'
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(rowIdx, cellIdx)}
+        className={cn(
+          'block w-full overflow-hidden rounded-sm py-0.5 outline-none transition-opacity hover:opacity-100 focus-visible:ring-1 focus-visible:ring-primary/40',
+          isNumeric ? 'text-right' : 'text-left'
+        )}
+        title={text}
+      >
+        <span
+          className={cn(
+            'block w-full overflow-hidden',
+            wrapCells
+              ? 'whitespace-pre-wrap break-words leading-5'
+              : 'text-ellipsis whitespace-nowrap',
+            className
+          )}
+        >
+          {text}
+        </span>
+      </button>
+    </td>
+  );
+});
+
+// Memoized row component to prevent re-render during scroll
+// Only re-renders when: row data changes, wrapCells changes, or THIS row's selection changes
+interface TableRowProps {
+  row: unknown[];
+  rowIdx: number;
+  selectedColumnIndex: number | null;
+  wrapCells: boolean;
+  onSelectCell: (rowIdx: number, cellIdx: number) => void;
+  measureRef: (node: HTMLElement | null) => void;
+}
+
+const TableRow = memo(function TableRow({
+  row,
+  rowIdx,
+  selectedColumnIndex,
+  wrapCells,
+  onSelectCell,
+  measureRef,
+}: TableRowProps) {
+  return (
+    <tr
+      data-index={rowIdx}
+      ref={measureRef}
+      className={cn(
+        rowIdx % 2 === 0 ? 'bg-background' : 'bg-secondary/12',
+        'hover:bg-secondary/30'
+      )}
+    >
+      {row.map((cell, cellIdx) => (
+        <TableCell
+          key={cellIdx}
+          cell={cell}
+          rowIdx={rowIdx}
+          cellIdx={cellIdx}
+          isActive={selectedColumnIndex === cellIdx}
+          wrapCells={wrapCells}
+          onSelect={onSelectCell}
+        />
+      ))}
+    </tr>
+  );
+});
+
 function isEditorViewLike(value: unknown): value is EditorViewLike {
   if (!value || typeof value !== 'object') return false;
 
@@ -94,6 +193,9 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const [editorHeight, setEditorHeight] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
+  const handleSelectCell = useCallback((rowIdx: number, cellIdx: number) => {
+    setSelectedCell({ rowIndex: rowIdx, columnIndex: cellIdx });
+  }, []);
   const [wrapCells, setWrapCells] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const editorPaneRef = useRef<HTMLDivElement>(null);
@@ -294,12 +396,26 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const rowCount = result?.rows.length ?? 0;
   const columnCount = result?.columns.length ?? 0;
   const canRun = Boolean(activeConnection?.connId) && !running;
+  const estimateSize = useCallback(() => (wrapCells ? 72 : 44), [wrapCells]);
+
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => resultsScrollRef.current,
-    estimateSize: () => (wrapCells ? 72 : 44),
+    estimateSize,
     overscan: 10,
   });
+
+  // Keep virtualizer reference stable for the measureElement callback
+  const virtualizerRef = useRef(rowVirtualizer);
+  virtualizerRef.current = rowVirtualizer;
+
+  // Stable ref callback for measuring elements - critical for scroll performance
+  // Uses ref to avoid dependency on rowVirtualizer object which changes when data changes
+  const measureElement = useCallback((node: HTMLElement | null) => {
+    if (node) {
+      virtualizerRef.current.measureElement(node);
+    }
+  }, []);
   const virtualRows = rowVirtualizer.getVirtualItems();
   const virtualPaddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
   const virtualPaddingBottom =
@@ -307,9 +423,6 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       ? rowVirtualizer.getTotalSize() - virtualRows[virtualRows.length - 1].end
       : 0;
 
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [rowVirtualizer, wrapCells, result]);
 
 
   return (
@@ -425,16 +538,16 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
                   </div>
 
                   <div ref={resultsScrollRef} className="flex-1 min-h-0 min-w-0 overflow-auto bg-background">
-                    <table className="min-w-max border-separate border-spacing-0 text-left table-fixed">
+                    <table className="border-separate border-spacing-0 text-left" style={{ width: `${80 + (columnCount - 1) * 220}px` }}>
                       <thead className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border-primary)]">
                         <tr className="border-b border-border">
-                          <th className="sticky left-0 z-20 h-10 w-[56px] min-w-[56px] border-b border-r border-border/70 bg-secondary/65 px-3 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                            #
-                          </th>
                           {result.columns.map((col, idx) => (
                             <th
                               key={idx}
-                              className="h-11 w-[220px] min-w-[220px] max-w-[220px] overflow-hidden border-b border-r border-border bg-background px-4 text-left text-[12px] font-semibold tracking-[0.04em] text-foreground last:border-r-0"
+                              className={cn(
+                                "h-11 overflow-hidden border-b border-r border-border bg-background px-4 text-left text-[12px] font-semibold tracking-[0.04em] text-foreground last:border-r-0",
+                                idx === 0 ? "w-[80px] min-w-[80px] max-w-[80px]" : "w-[220px] min-w-[220px] max-w-[220px]"
+                              )}
                             >
                               <span className="block overflow-hidden text-ellipsis whitespace-nowrap leading-5">
                                 {col}
@@ -446,76 +559,29 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
                       <tbody>
                         {virtualPaddingTop > 0 && (
                           <tr>
-                            <td colSpan={columnCount + 1} style={{ height: `${virtualPaddingTop}px`, padding: 0 }} />
+                            <td colSpan={columnCount} style={{ height: `${virtualPaddingTop}px`, padding: 0 }} />
                           </tr>
                         )}
 
                         {virtualRows.map((virtualRow) => {
                           const rowIdx = virtualRow.index;
-                          const row = result.rows[rowIdx];
-
+                          const isRowSelected = selectedCell?.rowIndex === rowIdx;
                           return (
-                            <tr
+                            <TableRow
                               key={rowIdx}
-                              data-index={rowIdx}
-                              ref={(node) => {
-                                if (node) {
-                                  rowVirtualizer.measureElement(node);
-                                }
-                              }}
-                              className={cn(
-                                'transition-colors',
-                                rowIdx % 2 === 0 ? 'bg-background' : 'bg-secondary/12',
-                                'hover:bg-secondary/30'
-                              )}
-                            >
-                              <td className="sticky left-0 z-[1] border-b border-r border-border/60 bg-inherit px-3 text-center font-mono text-[11px] text-muted-foreground">
-                                {rowIdx + 1}
-                              </td>
-                              {row.map((cell, cellIdx) => {
-                                const { text, className } = formatCellValue(cell);
-                                const isActive = selectedCell?.rowIndex === rowIdx && selectedCell?.columnIndex === cellIdx;
-                                const isNumeric = typeof cell === 'number';
-
-                                return (
-                                  <td
-                                    key={cellIdx}
-                                    className={cn(
-                                      'w-[220px] min-w-[220px] max-w-[220px] overflow-hidden border-b border-r border-border/50 px-4 py-2.5 align-top last:border-r-0',
-                                      isActive && 'bg-primary/10 outline outline-1 outline-primary/40 -outline-offset-1'
-                                    )}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedCell({ rowIndex: rowIdx, columnIndex: cellIdx })}
-                                      className={cn(
-                                        'block w-full overflow-hidden rounded-sm py-0.5 outline-none transition-opacity hover:opacity-100 focus-visible:ring-1 focus-visible:ring-primary/40',
-                                        isNumeric ? 'text-right' : 'text-left'
-                                      )}
-                                      title={text}
-                                    >
-                                      <span
-                                        className={cn(
-                                          'block w-full overflow-hidden',
-                                          wrapCells
-                                            ? 'whitespace-pre-wrap break-words leading-5'
-                                            : 'text-ellipsis whitespace-nowrap',
-                                          className
-                                        )}
-                                      >
-                                        {text}
-                                      </span>
-                                    </button>
-                                  </td>
-                                );
-                              })}
-                            </tr>
+                              row={result.rows[rowIdx]}
+                              rowIdx={rowIdx}
+                              selectedColumnIndex={isRowSelected ? selectedCell!.columnIndex : null}
+                              wrapCells={wrapCells}
+                              onSelectCell={handleSelectCell}
+                              measureRef={measureElement}
+                            />
                           );
                         })}
 
                         {virtualPaddingBottom > 0 && (
                           <tr>
-                            <td colSpan={columnCount + 1} style={{ height: `${virtualPaddingBottom}px`, padding: 0 }} />
+                            <td colSpan={columnCount} style={{ height: `${virtualPaddingBottom}px`, padding: 0 }} />
                           </tr>
                         )}
                       </tbody>
