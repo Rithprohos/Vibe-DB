@@ -1,10 +1,12 @@
 import { memo, useMemo, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import type { CheckedState } from '@radix-ui/react-checkbox';
 import { formatCellValue } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import type { ColumnInfo } from '@/store/useAppStore';
 import { CellInput } from './CellInput';
 import type { EditingCellState } from './types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface VirtualCellProps {
   colName: string;
@@ -15,6 +17,7 @@ interface VirtualCellProps {
   isEditing: boolean;
   isRowNum: boolean;
   isDateCol: boolean;
+  isRowChecked: boolean;
   hasActiveEditingCell: boolean;
   editValue: string;
   saving: boolean;
@@ -23,6 +26,8 @@ interface VirtualCellProps {
   onCancelEdit: () => void;
   onEditValueChange: (value: string) => void;
 }
+
+const CHECKED_CELL_BG = 'rgba(var(--glow-color), 0.14)';
 
 const VirtualCell = memo(function VirtualCell({
   colName,
@@ -33,6 +38,7 @@ const VirtualCell = memo(function VirtualCell({
   isEditing,
   isRowNum,
   isDateCol,
+  isRowChecked,
   hasActiveEditingCell,
   editValue,
   saving,
@@ -43,6 +49,7 @@ const VirtualCell = memo(function VirtualCell({
 }: VirtualCellProps) {
   const displayValue = pendingValue ?? cellValue;
   const formattedCell = useMemo(() => formatCellValue(displayValue), [displayValue]);
+  const cellBgColor = isRowChecked ? CHECKED_CELL_BG : undefined;
 
   const preventGridSelection = (event: ReactMouseEvent<HTMLTableCellElement>) => {
     if (isEditing) return;
@@ -54,10 +61,14 @@ const VirtualCell = memo(function VirtualCell({
       className={cn(
         'border-r border-border/60 p-0 text-xs relative overflow-hidden select-none',
         isRowNum && 'bg-muted/10 font-mono text-muted-foreground/50',
+        isRowNum && isRowChecked && 'text-foreground/90',
         isEditing && 'ring-1 ring-inset ring-primary bg-primary/5 z-10',
         hasPendingEdit && !isEditing && 'bg-amber-500/10'
       )}
-      style={{ borderBottom: '1px solid var(--border)' }}
+      style={{
+        borderBottom: '1px solid var(--border)',
+        backgroundColor: cellBgColor,
+      }}
       onMouseDown={(event) => {
         preventGridSelection(event);
         if (hasActiveEditingCell && !isRowNum && !isEditing) {
@@ -98,6 +109,7 @@ interface VirtualRowProps {
   rowData: Record<string, unknown>;
   gridCols: string[];
   isSelected: boolean;
+  isChecked: boolean;
   editingCell: EditingCellState | null;
   editValue: string;
   saving: boolean;
@@ -109,6 +121,7 @@ interface VirtualRowProps {
   onCancelEdit: () => void;
   onEditValueChange: (value: string) => void;
   onSelectRow: (rowIndex: number) => void;
+  onToggleRowChecked: (rowIndex: number, nextChecked: boolean) => void;
 }
 
 export const VirtualRow = memo(function VirtualRow({
@@ -116,6 +129,7 @@ export const VirtualRow = memo(function VirtualRow({
   rowData,
   gridCols,
   isSelected,
+  isChecked,
   editingCell,
   editValue,
   saving,
@@ -127,17 +141,41 @@ export const VirtualRow = memo(function VirtualRow({
   onCancelEdit,
   onEditValueChange,
   onSelectRow,
+  onToggleRowChecked,
 }: VirtualRowProps) {
+  const handleCheckboxChange = useCallback((nextState: CheckedState) => {
+    onToggleRowChecked(rowIndex, nextState === true);
+  }, [onToggleRowChecked, rowIndex]);
+  const rowOutline = isChecked ? 'inset 0 0 0 1px rgba(var(--glow-color), 0.45)' : undefined;
+
   return (
     <tr
       className={cn(
         'group',
         rowIndex % 2 === 0 ? 'bg-background' : 'bg-muted/30',
-        isSelected && 'bg-primary/8 ring-1 ring-inset ring-primary/25',
-        !isSelected && 'hover:bg-accent/70'
+        isSelected && !isChecked && 'ring-1 ring-inset ring-primary/45',
+        !isSelected && !isChecked && 'hover:bg-accent/70',
+        isChecked && !isSelected && 'hover:bg-transparent'
       )}
+      style={{ boxShadow: rowOutline }}
       onClick={() => onSelectRow(rowIndex)}
     >
+      <td
+        className="border-r border-border/60 p-0 text-xs overflow-hidden select-none bg-muted/10"
+        style={{
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: isChecked ? CHECKED_CELL_BG : undefined,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="h-full min-h-[32px] px-2 py-1.5 flex items-center justify-center">
+          <Checkbox
+            checked={isChecked}
+            onCheckedChange={handleCheckboxChange}
+            aria-label={`Select row ${rowIndex + 1}`}
+          />
+        </div>
+      </td>
       {gridCols.map((colName) => {
         const isEditing =
           editingCell?.rowIndex === rowIndex && editingCell?.colName === colName;
@@ -156,6 +194,7 @@ export const VirtualRow = memo(function VirtualRow({
             isEditing={isEditing}
             isRowNum={colName === 'rowNum'}
             isDateCol={isDateCol}
+            isRowChecked={isChecked}
             hasActiveEditingCell={Boolean(editingCell)}
             editValue={editValue}
             saving={saving}
@@ -177,6 +216,7 @@ interface VirtualizedTableBodyProps {
   columnInfoByName: Record<string, ColumnInfo>;
   scrollElement: HTMLDivElement | null;
   selectedRowIndex: number | null;
+  checkedRowIndices: Set<number>;
   editingCell: EditingCellState | null;
   editValue: string;
   saving: boolean;
@@ -187,6 +227,7 @@ interface VirtualizedTableBodyProps {
   onCancelEdit: () => void;
   onEditValueChange: (value: string) => void;
   onSelectRow: (rowIndex: number) => void;
+  onToggleRowChecked: (rowIndex: number, nextChecked: boolean) => void;
 }
 
 const paddingStyle = { height: 0, padding: 0 };
@@ -198,6 +239,7 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
   columnInfoByName,
   scrollElement,
   selectedRowIndex,
+  checkedRowIndices,
   editingCell,
   editValue,
   saving,
@@ -208,13 +250,34 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
   onCancelEdit,
   onEditValueChange,
   onSelectRow,
+  onToggleRowChecked,
 }: VirtualizedTableBodyProps) {
+  const keyColumns = useMemo(() => {
+    const pkColumns = gridCols.filter((colName) => columnInfoByName[colName]?.pk);
+    if (pkColumns.length > 0) return pkColumns;
+    if (gridCols.includes('rowNum')) return ['rowNum'];
+    return [];
+  }, [columnInfoByName, gridCols]);
+
   const getScrollElement = useCallback(() => scrollElement, [scrollElement]);
   const estimateSize = useCallback(() => 34, []);
   const getItemKey = useCallback((index: number) => {
     const row = tableData[index];
-    return row && typeof row === 'object' ? JSON.stringify(row) : index;
-  }, [tableData]);
+    if (!row || typeof row !== 'object') return index;
+
+    if (keyColumns.length > 0) {
+      let key = '';
+      for (const colName of keyColumns) {
+        const val = row[colName];
+        key += `${colName}:${val == null ? 'null' : String(val)}|`;
+      }
+      if (key) return key;
+    }
+
+    const rowNum = row.rowNum;
+    if (rowNum != null) return `rowNum:${String(rowNum)}`;
+    return index;
+  }, [keyColumns, tableData]);
 
   const rowVirtualizer = useVirtualizer({
     count: tableData.length,
@@ -254,6 +317,7 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
           rowData={tableData[virtualRow.index]}
           gridCols={gridCols}
           isSelected={selectedRowIndex === virtualRow.index}
+          isChecked={checkedRowIndices.has(virtualRow.index)}
           editingCell={editingCell}
           editValue={editValue}
           saving={saving}
@@ -265,6 +329,7 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
           onCancelEdit={onCancelEdit}
           onEditValueChange={onEditValueChange}
           onSelectRow={onSelectRow}
+          onToggleRowChecked={onToggleRowChecked}
         />
       ))}
 

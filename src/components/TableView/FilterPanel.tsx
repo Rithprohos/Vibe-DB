@@ -91,14 +91,14 @@ export function FilterPanel({
                   className="flex items-center space-x-2 animate-in fade-in slide-in-from-left-2 duration-200"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className="flex-1 grid grid-cols-1 gap-2 items-center bg-background p-1 pr-2 rounded-sm border border-border/60 shadow-sm xl:grid-cols-12">
+                  <div className="flex-1 grid grid-cols-1 gap-2 items-center bg-background p-1 pr-2 rounded-sm border border-border/60 shadow-sm md:grid-cols-12">
                     <Select
                       value={filter.field}
                       onValueChange={(value) =>
                         handleUpdateFilter(filter.id, { field: value })
                       }
                     >
-                      <SelectTrigger className="h-8 bg-transparent border-0 text-xs font-medium text-foreground focus:ring-0 xl:col-span-4">
+                      <SelectTrigger className="h-8 bg-transparent border-0 text-xs font-medium text-foreground focus:ring-0 md:col-span-4">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -110,7 +110,7 @@ export function FilterPanel({
                       </SelectContent>
                     </Select>
 
-                    <div className="relative h-full flex items-center border-border/50 xl:col-span-3 xl:border-l">
+                    <div className="relative flex items-center border-border/50 md:col-span-3 md:border-l">
                       <Select
                         value={filter.operator}
                         onValueChange={(value) =>
@@ -130,7 +130,7 @@ export function FilterPanel({
                       </Select>
                     </div>
 
-                    <div className="h-8 flex items-center border-border/50 bg-secondary/5 xl:col-span-5 xl:border-l">
+                    <div className="h-8 flex items-center border-border/50 bg-secondary/5 md:col-span-5 md:border-l">
                       {!UNARY_OPERATORS.includes(filter.operator) && (
                         <div className="flex-1 flex items-center px-2 space-x-2">
                           <input

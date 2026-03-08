@@ -9,6 +9,7 @@ import {
   flexRender,
   type ColumnDef,
 } from '@tanstack/react-table';
+import type { CheckedState } from '@radix-ui/react-checkbox';
 
 import { NewRowTextInput, NewRowDateInput } from './NewRowInputs';
 import { useTableData } from './hooks/useTableData';
@@ -21,6 +22,7 @@ import { VirtualizedTableBody } from './TableRows';
 import { FilterPanel } from './FilterPanel';
 import { RowInspector } from './RowInspector';
 import { copyToClipboard } from '@/lib/copy';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const PAGE_SIZE_OPTIONS = ['50', '100', '200', '500'] as const;
 
@@ -30,6 +32,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   const [commitFlash, setCommitFlash] = useState(false);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [checkedRowIndices, setCheckedRowIndices] = useState<Set<number>>(() => new Set());
   const commitFlashTimerRef = useRef<number | null>(null);
 
   const {
@@ -152,6 +155,48 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     });
   }, [selectedRowIndex, tableData.length]);
 
+  const checkedRowCount = checkedRowIndices.size;
+  const allRowsChecked = tableData.length > 0 && checkedRowCount === tableData.length;
+  const someRowsChecked = checkedRowCount > 0 && !allRowsChecked;
+
+  useEffect(() => {
+    setCheckedRowIndices((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<number>();
+      prev.forEach((rowIndex) => {
+        if (rowIndex >= 0 && rowIndex < tableData.length) {
+          next.add(rowIndex);
+        }
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tableData]);
+
+  const handleToggleRowChecked = useCallback((rowIndex: number, nextChecked: boolean) => {
+    setCheckedRowIndices((prev) => {
+      const alreadyChecked = prev.has(rowIndex);
+      if (alreadyChecked === nextChecked) return prev;
+      const next = new Set(prev);
+      if (nextChecked) {
+        next.add(rowIndex);
+      } else {
+        next.delete(rowIndex);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleAllRowsChecked = useCallback((nextState: CheckedState) => {
+    const shouldCheckAll = nextState === true;
+    setCheckedRowIndices((prev) => {
+      if (!shouldCheckAll) {
+        return prev.size === 0 ? prev : new Set();
+      }
+      if (tableData.length === 0 || prev.size === tableData.length) return prev;
+      return new Set(Array.from({ length: tableData.length }, (_, index) => index));
+    });
+  }, [tableData.length]);
+
   const handleCopyField = useCallback(async (columnName: string, value: unknown) => {
     await copyToClipboard(value == null ? '' : String(value), {
       successMessage: `Copied ${columnName}`,
@@ -235,6 +280,25 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   const columns = useMemo<ColumnDef<any>[]>(() => {
     const cols: ColumnDef<any>[] = [];
 
+    cols.push({
+      id: '__select__',
+      header: () => (
+        <div className="h-full min-h-[32px] px-2 py-1.5 flex items-center justify-center">
+          <Checkbox
+            checked={allRowsChecked ? true : someRowsChecked ? 'indeterminate' : false}
+            onCheckedChange={handleToggleAllRowsChecked}
+            disabled={tableData.length === 0}
+            aria-label={allRowsChecked ? 'Deselect all rows' : 'Select all rows'}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      ),
+      size: 38,
+      minSize: 38,
+      maxSize: 38,
+      enableResizing: false,
+    });
+
     gridCols.forEach((colName) => {
       const columnInfo = columnInfoByName[colName];
       let type = columnInfo?.col_type.toLowerCase() || 'text';
@@ -271,7 +335,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     });
 
     return cols;
-  }, [columnInfoByName, gridCols, sortCol, sortDir, handleSort]);
+  }, [allRowsChecked, columnInfoByName, gridCols, handleSort, handleToggleAllRowsChecked, someRowsChecked, sortCol, sortDir, tableData.length]);
 
   const table = useReactTable({
     data: [],
@@ -456,6 +520,9 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
               <span className="text-primary font-bold">Filtered: </span>
             ) : null}
             {totalRows.toLocaleString()} rows total
+            {checkedRowCount > 0 ? (
+              <span className="ml-3 text-primary font-bold">{checkedRowCount.toLocaleString()} selected</span>
+            ) : null}
           </div>
 
           <div className="flex items-center space-x-1.5 pr-2">
@@ -562,6 +629,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
               {/* Virtual New Row */}
               {newRowData && (
                 <tr className="bg-amber-500/10 hover:bg-amber-500/15 transition-colors border-b border-amber-500/30">
+                  <td className="border-r border-border/50 p-0 bg-muted/15" />
                   {gridCols.map((colName) => {
                     const columnInfo = columnInfoByName[colName];
                     const col = table.getColumn(colName);
@@ -629,6 +697,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                   columnInfoByName={columnInfoByName}
                   scrollElement={tableScrollRef.current}
                   selectedRowIndex={selectedRowIndex}
+                  checkedRowIndices={checkedRowIndices}
                   editingCell={editingCell}
                   editValue={editValue}
                   saving={saving}
@@ -639,6 +708,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                   onCancelEdit={handleCancelCellEdit}
                   onEditValueChange={setEditValue}
                   onSelectRow={setSelectedRowIndex}
+                  onToggleRowChecked={handleToggleRowChecked}
                 />
               )}
               </tbody>

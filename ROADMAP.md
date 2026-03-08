@@ -11,7 +11,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.7)
+## Current State (v0.2.8)
 
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
@@ -224,6 +224,15 @@ Essential SQLite management features before multi-engine support.
   - `client.rs` — HTTP client and API communication
   - `config.rs` — Configuration and environment
   - `prompts.rs` — System prompts for different AI assistants
+
+### Completed in v0.2.8
+
+- [x] TableView multi-row checkbox selection added with per-row checkboxes and header select-all for visible page rows
+- [x] TableView checked-row styling updated to explicit green accent highlighting with stable intensity while scrolling
+- [x] TableView selection visuals normalized so checked rows remain consistent even when inspector row focus changes
+- [x] Filter panel rule layout compacted for desktop widths by moving from `xl` to `md` breakpoint for single-line rule rows
+- [x] TableView virtualization key path optimized by removing `JSON.stringify(row)` and using stable PK/`rowNum`-based keys
+- [x] LogDrawer open/toggle responsiveness improved: idle prefetch for lazy chunk, functional Zustand toggle path, hidden-state virtualizer pause, and `requestAnimationFrame`-throttled resize updates
 
 ### Upcoming Tasks
 
