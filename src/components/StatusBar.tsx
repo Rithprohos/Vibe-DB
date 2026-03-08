@@ -32,8 +32,8 @@ export default function StatusBar() {
     [activeConnection, tablesByConnection]
   );
   const toggleLogDrawer = useCallback(
-    () => setShowLogDrawer(!showLogDrawer),
-    [setShowLogDrawer, showLogDrawer]
+    () => setShowLogDrawer((prev) => !prev),
+    [setShowLogDrawer]
   );
 
   useEffect(() => {

@@ -108,15 +108,15 @@ export default function LogDrawer() {
   }, []);
 
   const toggleDrawer = useCallback(() => {
-    setShowLogDrawer(!showLogDrawer);
-  }, [setShowLogDrawer, showLogDrawer]);
+    setShowLogDrawer((prev) => !prev);
+  }, [setShowLogDrawer]);
 
   const getScrollElement = useCallback(() => viewportRef.current, []);
   const estimateSize = useCallback(() => 80, []);
   const getItemKey = useCallback((index: number) => logs[index]?.id ?? index, [logs]);
 
   const logVirtualizer = useVirtualizer({
-    count: logs.length,
+    count: showLogDrawer ? logs.length : 0,
     getScrollElement,
     estimateSize,
     overscan: 3,
@@ -142,17 +142,30 @@ export default function LogDrawer() {
     isDraggingRef.current = true;
     const startY = e.clientY;
     const startHeight = heightRef.current;
+    let rafId: number | null = null;
+    let pendingHeight = startHeight;
 
     const handleMove = (e: MouseEvent) => {
       if (!isDraggingRef.current || !drawerRef.current) return;
-      const newHeight = Math.max(100, Math.min(500, startHeight - (e.clientY - startY)));
-      heightRef.current = newHeight;
-      drawerRef.current.style.transition = 'none';
-      drawerRef.current.style.maxHeight = `${newHeight}px`;
-      drawerRef.current.style.height = `${newHeight}px`;
+      pendingHeight = Math.max(100, Math.min(500, startHeight - (e.clientY - startY)));
+      if (rafId !== null) return;
+
+      rafId = window.requestAnimationFrame(() => {
+        heightRef.current = pendingHeight;
+        if (drawerRef.current) {
+          drawerRef.current.style.transition = 'none';
+          drawerRef.current.style.maxHeight = `${pendingHeight}px`;
+          drawerRef.current.style.height = `${pendingHeight}px`;
+        }
+        rafId = null;
+      });
     };
 
     const handleUp = () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       if (isDraggingRef.current && drawerRef.current) {
         drawerRef.current.style.transition = '';
         setHeight(heightRef.current);
@@ -209,7 +222,7 @@ export default function LogDrawer() {
           </div>
         ) : (
           <div className="p-2" style={{ height: `${logVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-            {logVirtualizer.getVirtualItems().map((vi) => (
+            {showLogDrawer && logVirtualizer.getVirtualItems().map((vi) => (
               <VirtualRow
                 key={vi.key}
                 index={vi.index}

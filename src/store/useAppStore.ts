@@ -92,6 +92,8 @@ export interface AlertOptions {
   onConfirm?: () => void;
 }
 
+type BooleanSetter = boolean | ((prev: boolean) => boolean);
+
 export interface Tab {
   id: string;
   connectionId: string;
@@ -192,7 +194,7 @@ interface AppState {
   // Log actions
   addLog: (log: Omit<SqlLog, "id" | "timestamp">) => void;
   clearLogs: () => void;
-  setShowLogDrawer: (val: boolean) => void;
+  setShowLogDrawer: (val: BooleanSetter) => void;
   setShowSettingsModal: (val: boolean) => void;
   showToast: (toast: Omit<ToastItem, "id">) => void;
   dismissToast: (id: string) => void;
@@ -390,7 +392,10 @@ export const useAppStore = create<AppState>()(
         })),
 
       clearLogs: () => set({ logs: [] }),
-      setShowLogDrawer: (val) => set({ showLogDrawer: val }),
+      setShowLogDrawer: (val) =>
+        set((state) => ({
+          showLogDrawer: typeof val === 'function' ? val(state.showLogDrawer) : val,
+        })),
       setShowSettingsModal: (val) => set({ showSettingsModal: val }),
       showToast: (toast) =>
         set((state) => ({

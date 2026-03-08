@@ -181,9 +181,35 @@ export default function App() {
   const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
   const [hasLoadedLogDrawer, setHasLoadedLogDrawer] = useState(() => useAppStore.getState().showLogDrawer);
 
-  // Keep a ref for showLogDrawer so the effect doesn't re-register on every toggle
-  const showLogDrawerRef = useRef(showLogDrawer);
-  showLogDrawerRef.current = showLogDrawer;
+  // Preload the lazy chunk so first open of logs feels instant.
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let idleId: number | null = null;
+
+    const preloadLogDrawer = () => {
+      if (!cancelled) {
+        void import('./components/LogDrawer');
+      }
+    };
+
+    const hasRequestIdleCallback = typeof window.requestIdleCallback === 'function';
+    if (hasRequestIdleCallback) {
+      idleId = window.requestIdleCallback(preloadLogDrawer, { timeout: 1200 });
+    } else {
+      timeoutId = window.setTimeout(preloadLogDrawer, 600);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   // Global Keybindings
   useEffect(() => {
@@ -225,7 +251,7 @@ export default function App() {
         });
       } else if (isMod && e.key === 'l') {
         e.preventDefault();
-        setShowLogDrawer(!showLogDrawerRef.current);
+        setShowLogDrawer((prev) => !prev);
       } else if (isMod && e.key === ',') {
         e.preventDefault();
         setShowSettingsModal(true);
