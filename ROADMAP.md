@@ -4,6 +4,7 @@
   <a href="./README.md">🏠 Overview</a> &nbsp;•&nbsp;
   <a href="./ROADMAP.md"><b>🗺️ Roadmap</b></a> &nbsp;•&nbsp;
   <a href="https://github.com/Rithprohos/vibe-db/releases">🚀 Releases</a> &nbsp;•&nbsp;
+  <a href="./changelog/">📜 Changelog</a> &nbsp;•&nbsp;
   <a href="./LICENSE">⚖️ License</a>
 </p>
 
@@ -58,54 +59,25 @@ pub trait DatabaseEngine: Send + Sync {
 
 ---
 
-## ✅ Phase 1: Engine Abstraction (v0.2) — COMPLETE
-
-Refactored backend to support multiple database drivers.
-
-### Completed Tasks
-
-- [x] Create `DatabaseEngine` trait abstraction
-- [x] Implement engine registry pattern
-- [x] Abstract connection configuration
-- [x] Unify query result types across engines
-- [x] Migrate from `rusqlite` to `sqlx`
-- [x] Connection management by ID
-
-### Architecture
-
-```
-src-tauri/src/engines/
-├── mod.rs          # EngineRegistry - manages connections
-├── traits.rs       # DatabaseEngine trait
-├── types.rs        # ConnectionConfig, TableInfo, ColumnInfo, QueryResult
-└── sqlite.rs       # SQLite implementation
-```
-
----
-
 ## Phase 1.5: SQLite UX Polish (v0.2.x)
 
-Essential SQLite management features before multi-engine support.
+See [`changelog/`](./changelog/) for completed features.
 
 ### Table Management
 
-| Feature              | Priority         | Description                                                                                         |
-| -------------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
-| Create Table Wizard  | ✅ Done (v0.2.3) | Visual table builder with column types, constraints, defaults, SQL preview with syntax highlighting |
-| Inline Data Edit     | ✅ Done (v0.2.3) | Click cell → edit → save directly in table view                                                     |
-| Edit Table Structure | Medium           | Add/drop columns, modify types/constraints                                                          |
-| Schema Viewer (ERD)  | Medium           | Visual diagram of tables and relationships                                                          |
-| Index Manager        | Low              | View existing indexes, create new ones                                                              |
+| Feature              | Priority | Description                                            |
+| -------------------- | -------- | ------------------------------------------------------ |
+| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints             |
+| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships             |
+| Index Manager        | Low      | View existing indexes, create new ones                 |
 
 ### Data Operations
 
-| Feature              | Priority         | Description                                                           |
-| -------------------- | ---------------- | --------------------------------------------------------------------- |
-| Filter Query Builder | ✅ Done (v0.2.3) | Visual WHERE clause builder with multiple conditions, BETWEEN support |
-| Multi Cell/Row Edit  | ✅ Done (v0.2.4) | Stage multiple edits and commit in a single transaction               |
-| Import Data          | Medium           | CSV, JSON, SQL file import                                            |
-| Export Data          | Medium           | Export table/query results as CSV, JSON, SQL                          |
-| Backup/Restore       | Low              | One-click database backup and restore                                 |
+| Feature      | Priority | Description                                   |
+| ------------ | -------- | --------------------------------------------- |
+| Import Data  | Medium   | CSV, JSON, SQL file import                     |
+| Export Data  | Medium   | Export table/query results as CSV, JSON, SQL   |
+| Backup/Restore | Low    | One-click database backup and restore         |
 
 ### Query Management
 
@@ -114,125 +86,6 @@ Essential SQLite management features before multi-engine support.
 | Saved Queries   | High     | Save queries to library with name/description, persisted across sessions |
 | Query Folders   | Medium   | Organize saved queries into folders/categories                           |
 | Query Templates | Low      | Pre-built queries for common operations (create table, insert, etc.)     |
-
-### Workspace
-
-| Feature                | Priority         | Description                                                                                              |
-| ---------------------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
-| Tabs Context Menu      | ✅ Done (v0.2.3) | Right-click on tabs to close, close others, or close all                                                 |
-| Connection Tags        | ✅ Done (v0.2.3) | Environment labels: local, testing, development, production                                              |
-| Editable Names         | ✅ Done (v0.2.3) | Edit connection names and tags without reconnecting                                                      |
-| Database Version       | ✅ Done (v0.2.3) | Display engine version (e.g., SQLite v3.x) in TopBar                                                     |
-| Disconnect / Reconnect | ✅ Done (v0.2.3) | Close connection without losing saved data, reconnect from sidebar                                       |
-| Saved Connections List | ✅ Done (v0.2.3) | Sidebar shows all saved connections when disconnected (name, type, tag)                                  |
-| Keyboard Shortcuts     | ✅ Done (v0.2.3) | ⌘N new connection, ⌘W close tab, ⌘T new query, ⌘L toggle logs, ⌘, settings, ⌘↵ execute (selected or all) |
-| Settings Modal         | ✅ Done (v0.2.3) | Keybindings reference panel accessible via ⌘, or settings icon                                           |
-| Theme Switching        | ✅ Done (v0.2.3) | Dark, Light, Purple Solarized themes with persisted preference                                           |
-| Global Alert Modal     | ✅ Done (v0.2.4) | Theme-matched alert system for user feedback (success, error, warning, info) with store-based state      |
-
-### Completed (v0.2.3)
-
-- [x] Inline cell editing with save/cancel
-- [x] Tabs context menu (close, close other, close all)
-- [x] Editable connection names and tags
-- [x] Database versioning support in backend and UI
-- [x] Disconnect vs remove connection (preserve saved connection data)
-- [x] Sidebar saved connections list when disconnected
-- [x] Keyboard shortcuts (⌘N, ⌘W, ⌘T, ⌘L, ⌘,, ⌘↵)
-- [x] Settings modal with keybindings reference
-- [x] Theme switching (Dark, Light, Purple Solarized)
-- [x] Create Table Wizard component with SQL preview and syntax highlighting
-- [x] Filter Query builder with BETWEEN support and WHERE clause generation
-
-### Completed in v0.2.4
-
-- [x] Welcome screen shows exactly 2 recent connections (requires min 2 to display section)
-- [x] Tabs cleared when closing connections (disconnect, close all, close others)
-- [x] Invalid paths no longer auto-create databases (file existence check before connect)
-- [x] Failed connections not persisted to store (addConnection after successful connect)
-- [x] Global alert modal component with theme-matched styling (success, error, warning, info types)
-- [x] Update check shows "up to date" alert when no updates available
-- [x] Alert modal uses performance-optimized patterns (useRef for callbacks, proper cleanup)
-- [x] Virtualized row rendering in TableView via TanStack Virtual
-- [x] Virtualized list rendering in LogDrawer and Sidebar object lists
-- [x] Stale request protection for table data/count/structure fetches
-- [x] Separated metadata/count fetching from paged row-data fetch path
-- [x] Transaction command for atomic multi-statement commit (`execute_transaction`)
-- [x] Multi-cell edit staging with pending highlight and single Commit action
-- [x] One-click Commit includes active cell edit (no extra save step)
-- [x] Clicking outside edited cell auto-stages the change (immediate pending highlight)
-- [x] Unified Commit supports pending edits + new-row insert in one transaction
-- [x] New-row form auto-detects integer PK auto-increment columns and marks them as `AUTO` (no manual input)
-- [x] Transaction commit flow hardened: insert-only commits allowed without PK, PK required only for row updates
-- [x] Shared SQL helper utilities added (identifier quoting, value escaping/formatting, numeric detection, auto-PK detection)
-- [x] `execute_transaction` constrained to DML batch statements (`INSERT`/`UPDATE`/`DELETE`) for safer cross-engine behavior
-- [x] Commit success animation timer cleanup added to prevent UI timer leaks on unmount
-
-### Completed in v0.2.5
-
-- [x] Comprehensive code-splitting for heavy UI chunks (Views, Dialogs, Drawers, AI Panel, Alerts)
-- [x] TableView virtual row/cell optimization via memoized sub-components and stable callbacks
-- [x] Dev-mode instrumentation for measuring render counts and fetch latency
-- [x] Reduced initial bundle size by lazy-loading non-critical UI segments
-
-### Completed in v0.2.6
-
-- [x] QueryEditor result workspace reworked with constrained split-pane layout and internal scrolling
-- [x] QueryEditor splitter drag path rebuilt for smoother pointer-based resizing and proper tab-bar/layout clamping
-- [x] QueryEditor result grid upgraded with sticky headers, cell inspector, deterministic column widths, and row virtualization
-- [x] Lazy-loaded active tab views and major dialogs/drawers to reduce initial bundle cost
-- [x] Developer Tools toggle and sample data generator added in Settings with guarded production-safe access
-- [x] TableView footer now supports user-selectable rows per page
-- [x] TableView sticky header background corrected to remain opaque while scrolling
-- [x] TableView scroll path optimized by simplifying body rendering and reducing hot-path per-cell work
-- [x] TableView row inspector added as an internal right-side panel with row selection and full-value inspection
-- [x] TableView filter panel expanded for larger screens and split into smaller local components for maintainability
-- [x] SQL activity logging moved to Rust-emitted events so table browsing, filtering, pagination, and transactions reach the log drawer consistently
-- [x] Global frontend copy helper and toast notifications added for consistent non-blocking "Copied" feedback
-- [x] Log drawer ordering corrected so newest SQL activity appears at the top
-
-### Completed in v0.2.7
-
-- [x] CreateTable column row rendering optimized with React.memo — typing in column name fields no longer causes lag
-- [x] LogDrawer virtualization performance: stabilized virtualizer callbacks, removed ScrollArea overhead, memoized expensive formatting
-- [x] TableView virtualization performance: stabilized getScrollElement/estimateSize callbacks, reduced overscan, memoized padding styles
-- [x] RowInspector: switched to transform-based GPU-accelerated animation, fixed overlay positioning
-- [x] TableRows: removed isScrolling optimization causing text size jumps, simplified VirtualCell props
-- [x] Number formatting: removed blue color for consistent foreground text styling
-- [x] Row selection behavior: click selects row without auto-opening inspector (toggle button only)
-- [x] QueryEditor Run action hardened so toolbar clicks and keyboard-triggered execution share the same safe path
-- [x] QueryEditor clipboard/select behavior restored by preserving native editor shortcuts and text selection semantics
-- [x] macOS/Tauri Edit menu now includes standard undo/redo/cut/copy/paste/select-all actions for webview text inputs
-- [x] Table sidebar context menu now includes **Edit Table**, opening a dedicated schema-edit tab
-- [x] ALTER TABLE workflow shipped for SQLite: rename table, add column, rename column, and drop column
-- [x] Inline identifier validation added for table/column names in Create Table and Edit Table with backend parity
-- [x] TableRows refactor: removed redundant `cellId` and stabilized row/cell props for cleaner virtualization path
-- [x] SQLite schema-change reliability improved by using a single SQLite pool connection (`max_connections = 1`)
-- [x] Engine-scoped data type catalog introduced so type dropdowns are explicit about current engine (SQLite today, extensible for Postgres later)
-- [x] AI settings now persist custom API keys through the Tauri Stronghold plugin snapshot flow (`ai-config.hold`)
-- [x] Stronghold dev-save reliability improved by applying the documented `scrypt` dev-profile optimization
-- [x] `src-tauri/src/lib.rs` split into focused modules (`app_state`, `ai`, `commands`, `sql_helpers`, `sql_logging`, `menu`) for maintainability
-- [x] AI SQL generation panel — natural language to SQL with schema-aware context
-- [x] AI panel generates actual SQL via Pollinations/OpenAI API (was mock before)
-- [x] AI context scoped to current table only — fetches real column info (PK, type, nullable)
-- [x] AI system prompt optimized for SQLite with clear rules and examples
-- [x] AI restricted to SELECT queries only (read-only, no data modification)
-- [x] AI error handling with retry button and proper loading states
-- [x] `src/components/AiPanel.tsx` shipped as an inline table-aware AI assistant with suggestions, current-table schema context, retry flow, and insert-into-editor handoff
-- [x] AI module refactored into `src/ai/` subdirectory with clean separation:
-  - `mod.rs` — Types and Tauri command handlers
-  - `client.rs` — HTTP client and API communication
-  - `config.rs` — Configuration and environment
-  - `prompts.rs` — System prompts for different AI assistants
-
-### Completed in v0.2.8
-
-- [x] TableView multi-row checkbox selection added with per-row checkboxes and header select-all for visible page rows
-- [x] TableView checked-row styling updated to explicit green accent highlighting with stable intensity while scrolling
-- [x] TableView selection visuals normalized so checked rows remain consistent even when inspector row focus changes
-- [x] Filter panel rule layout compacted for desktop widths by moving from `xl` to `md` breakpoint for single-line rule rows
-- [x] TableView virtualization key path optimized by removing `JSON.stringify(row)` and using stable PK/`rowNum`-based keys
-- [x] LogDrawer open/toggle responsiveness improved: idle prefetch for lazy chunk, functional Zustand toggle path, hidden-state virtualizer pause, and `requestAnimationFrame`-throttled resize updates
 
 ### Upcoming Tasks
 
@@ -284,26 +137,6 @@ Essential SQLite management features before multi-engine support.
 | Engine registry     | ✅ Done    | Connection/disconnect tests        |
 | SQLite engine       | ✅ Done    | Full integration tests             |
 | Frontend components | 📋 Planned | Vitest + React Testing Library     |
-
-### Performance Optimizations
-
-| Optimization         | Status           | Description                                                                                    |
-| -------------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
-| Tab limit            | ✅ Done (v0.2.3) | Max 20 tabs, oldest auto-removed                                                               |
-| Result truncation    | ✅ Done (v0.2.3) | Max 1000 rows stored per result                                                                |
-| Zustand selectors    | ✅ Done (v0.2.3) | All components use granular selectors — no full-store destructuring                            |
-| Memoized components  | ✅ Done (v0.2.3) | QueryEditor, WelcomeScreen wrapped in `memo()`                                                 |
-| Memoized derivations | ✅ Done (v0.2.3) | `useMemo` for `.find()` / `.filter()` operations across all components                         |
-| Stable effect deps   | ✅ Done (v0.2.3) | Primitive values as `useEffect` deps, not object references                                    |
-| Stable callbacks     | ✅ Done (v0.2.3) | `useCallback` for handlers passed as props or used in effects                                  |
-| Stable callback refs | ✅ Done (v0.2.4) | `useRef` pattern for callbacks to avoid stale closures                                         |
-| Async cleanup        | ✅ Done (v0.2.4) | `mounted` flag pattern for async event listener cleanup                                        |
-| Tab reuse            | ✅ Done (v0.2.3) | Opening same table reuses existing tab                                                         |
-| Performance rules    | ✅ Done (v0.2.3) | `.agents/workflows/performance-rules.md` — 15 enforceable rules (3 tiers)                      |
-| Virtual scrolling    | ✅ Done (v0.2.6) | TanStack Virtual applied to TableView rows, QueryEditor results, LogDrawer logs, Sidebar lists |
-| Stale fetch guard    | ✅ Done (v0.2.4) | Ignore out-of-order async responses for structure/count/data fetches                           |
-| Split fetch strategy | ✅ Done (v0.2.4) | Separate schema/count fetch from paginated row data fetches                                    |
-| Lazy tab loading     | ✅ Done (v0.2.6) | Heavy tab views are code-split and only the active tab view is mounted                         |
 
 ---
 
@@ -387,7 +220,7 @@ sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-native-tls"] }
 
 ---
 
-## Security Hardening (v0.2.x)
+## Security Hardening
 
 Security improvements for production readiness.
 
@@ -400,14 +233,6 @@ Security improvements for production readiness.
 | Stronghold unlock secret is app-known | Medium   | 🟡 Review   |
 | No AI data guardrails                 | Low      | 🟢 Deferred |
 
-### Completed (v0.2.3)
-
-- [x] Migrate state persistence from `localStorage` to `tauri-plugin-store` (`app_settings.json`)
-- [x] Set up `tauri-plugin-stronghold` for encrypted credential vault (Argon2id + XChaCha20-Poly1305)
-- [x] Add connection environment tags (local, testing, development, production)
-- [x] Register store and stronghold permissions in Tauri capabilities
-- [x] Query safety validation — block DELETE/UPDATE without WHERE, tautological WHERE clauses (e.g., `WHERE 1=1`, `OR 1=1`)
-
 ### Storage Architecture (Implemented)
 
 | Storage                   | File                | Purpose                                |
@@ -415,7 +240,7 @@ Security improvements for production readiness.
 | `tauri-plugin-store`      | `app_settings.json` | Connection metadata, tags, preferences |
 | `tauri-plugin-stronghold` | `ai-config.hold`    | Encrypted AI API keys snapshot         |
 
-### Security Caveat (Current v0.2.7)
+### Security Caveat (Current v0.2.8)
 
 The Stronghold integration now persists and reloads API keys correctly, but it does not yet provide strong machine-bound secret protection. The current unlock string is app-known, so the snapshot is encrypted at rest but not protected by an OS keychain secret or user-supplied master password. Treat this as a reliability milestone, not a final security posture.
 
@@ -465,17 +290,12 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 
 ## Timeline (Estimated)
 
-| Version | Target  | Focus                                                            | Status      |
-| ------- | ------- | ---------------------------------------------------------------- | ----------- |
-| v0.2    | Q1 2026 | Engine abstraction                                               | ✅ Complete |
-| v0.2.3  | Q1 2026 | Security + UX polish                                             | ✅ Complete |
-| v0.2.4  | Q1 2026 | Bug fixes + Alerts                                               | ✅ Complete |
-| v0.2.5  | Q1 2026 | Query UX + Performance                                           | ✅ Complete |
-| v0.2.6  | Q1 2026 | Query UX + Performance                                           | ✅ Complete |
-| v0.2.7  | Q1 2026 | Query polish, AI SQL generation, key persistence, modularization | ✅ Complete |
-| v0.3    | Q2 2026 | Turso support                                                    | 📋 Planned  |
-| v0.4    | Q3 2026 | PostgreSQL                                                       | 📋 Planned  |
-| v0.5    | Q4 2026 | MySQL                                                            | 📋 Planned  |
+| Version | Target  | Focus           | Status      |
+| ------- | ------- | --------------- | -----------|
+| v0.2.8  | Q1 2026 | SQLite UX polish| ✅ Complete |
+| v0.3    | Q2 2026 | Turso support   | 📋 Planned |
+| v0.4    | Q3 2026 | PostgreSQL      | 📋 Planned |
+| v0.5    | Q4 2026 | MySQL           | 📋 Planned |
 
 ---
 
