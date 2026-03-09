@@ -12,11 +12,11 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.2.8)
+## Current State (v2.0.0)
 
-| Database | Status    | Notes                   |
-| -------- | --------- | ----------------------- |
-| SQLite   | ✅ Stable | Full support via `sqlx` |
+| Database | Status    | Notes                     |
+| -------- | --------- | ------------------------- |
+| SQLite   | ✅ Stable | Full support via `sqlx`   |
 | Turso    | ✅ Stable | Full support via `libsql` |
 
 ### SQLite Commands
@@ -66,19 +66,19 @@ See [`changelog/`](./changelog/) for completed features.
 
 ### Table Management
 
-| Feature              | Priority | Description                                            |
-| -------------------- | -------- | ------------------------------------------------------ |
-| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints             |
-| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships             |
-| Index Manager        | Low      | View existing indexes, create new ones                 |
+| Feature              | Priority | Description                                |
+| -------------------- | -------- | ------------------------------------------ |
+| Edit Table Structure | Medium   | Add/drop columns, modify types/constraints |
+| Schema Viewer (ERD)  | Medium   | Visual diagram of tables and relationships |
+| Index Manager        | Low      | View existing indexes, create new ones     |
 
 ### Data Operations
 
-| Feature      | Priority | Description                                   |
-| ------------ | -------- | --------------------------------------------- |
-| Import Data  | Medium   | CSV, JSON, SQL file import                     |
-| Export Data  | Medium   | Export table/query results as CSV, JSON, SQL   |
-| Backup/Restore | Low    | One-click database backup and restore         |
+| Feature        | Priority | Description                                  |
+| -------------- | -------- | -------------------------------------------- |
+| Import Data    | Medium   | CSV, JSON, SQL file import                   |
+| Export Data    | Medium   | Export table/query results as CSV, JSON, SQL |
+| Backup/Restore | Low      | One-click database backup and restore        |
 
 ### Query Management
 
@@ -137,21 +137,21 @@ See [`changelog/`](./changelog/) for completed features.
 | Engine types        | ✅ Done    | Unit tests for all data structures |
 | Engine registry     | ✅ Done    | Connection/disconnect tests        |
 | SQLite engine       | ✅ Done    | Full integration tests             |
-| Turso engine        | ✅ Done    | Implementation complete            |
+| Turso engine        | ✅ Done    | Full implementation + UI complete  |
 | Frontend components | 📋 Planned | Vitest + React Testing Library     |
 
 ---
 
-## Phase 2: Turso Support (v0.3) ✅ Complete
+## Phase 2: Turso Support (v2.0.0) ✅ Complete
 
 [Turso](https://turso.tech/) — LibSQL/SQLite-compatible edge database.
 
-| Feature                         | Priority | Status |
-| ------------------------------- | -------- | ------ |
+| Feature                         | Priority | Status         |
+| ------------------------------- | -------- | -------------- |
 | Connection via URL + Auth Token | High     | ✅ Implemented |
 | Local libSQL file support       | High     | ✅ Implemented |
-| Embedded replica support        | Medium   | 📋 Planned |
-| Sync status display             | Low      | 📋 Planned |
+| Embedded replica support        | Medium   | 📋 Planned     |
+| Sync status display             | Low      | 📋 Planned     |
 
 ### Turso Commands
 
@@ -183,8 +183,8 @@ pub struct TursoEngine {
 - [x] Support remote connections with auth token
 - [x] Support local libSQL file connections
 - [ ] Support embedded replica mode
-- [ ] Handle remote sync status
-- [ ] Update connection dialog UI
+- [x] Handle remote sync status
+- [x] Update connection dialog UI
 
 ### Dependencies
 
@@ -337,13 +337,12 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 
 ## Timeline (Estimated)
 
-| Version | Target  | Focus                  | Status      |
-| ------- | ------- | ---------------------- | ----------- |
-| v0.2.8  | Q1 2026 | SQLite UX polish       | ✅ Complete |
-| v0.3.0  | Q2 2026 | Turso support          | ✅ Complete |
-| v0.3.1  | Q2 2026 | Embedded replicas, UI  | 📋 Planned  |
-| v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
-| v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |
+| Version | Target  | Focus                     | Status      |
+| ------- | ------- | ------------------------- | ----------- |
+| v2.0.0  | Q1 2026 | Turso & UI Revitalization | ✅ Complete |
+| v0.3.1  | Q2 2026 | Embedded replicas, UI     | 📋 Planned  |
+| v0.4    | Q3 2026 | PostgreSQL                | 📋 Planned  |
+| v0.5    | Q4 2026 | MySQL                     | 📋 Planned  |
 
 ---
 

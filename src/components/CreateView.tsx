@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import CodeMirror from "@uiw/react-codemirror";
+import { sql } from "@codemirror/lang-sql";
+import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import {
   AlertCircle,
   Copy,
@@ -29,6 +32,28 @@ const DEFAULT_CREATE_VIEW_DRAFT = {
   sourceSql: "SELECT * FROM table_name",
   ifNotExists: true,
   temporary: false,
+} as const;
+const EMPTY_ARRAY: { name: string }[] = [];
+const BASIC_SETUP = {
+  lineNumbers: true,
+  foldGutter: true,
+  dropCursor: true,
+  allowMultipleSelections: true,
+  indentOnInput: true,
+  bracketMatching: true,
+  closeBrackets: true,
+  autocompletion: true,
+  rectangularSelection: true,
+  crosshairCursor: true,
+  highlightActiveLine: true,
+  highlightSelectionMatches: true,
+  closeBracketsKeymap: true,
+  defaultKeymap: true,
+  searchKeymap: true,
+  historyKeymap: true,
+  foldKeymap: true,
+  completionKeymap: true,
+  lintKeymap: true,
 } as const;
 
 function validateSelectSource(value: string): string | null {
@@ -65,6 +90,7 @@ function normalizeSelectForPreview(value: string): string {
 export default function CreateView({ tabId }: Props) {
   const tabs = useAppStore((s) => s.tabs);
   const connections = useAppStore((s) => s.connections);
+  const tablesByConnection = useAppStore((s) => s.tablesByConnection);
   const setTables = useAppStore((s) => s.setTables);
   const updateTab = useAppStore((s) => s.updateTab);
   const openTableTab = useAppStore((s) => s.openTableTab);
@@ -78,6 +104,9 @@ export default function CreateView({ tabId }: Props) {
   );
   const connId = activeConnection?.connId;
   const createViewDraft = tab?.createViewDraft ?? DEFAULT_CREATE_VIEW_DRAFT;
+  const tables = tab?.connectionId
+    ? (tablesByConnection[tab.connectionId] ?? EMPTY_ARRAY)
+    : EMPTY_ARRAY;
   const viewName = createViewDraft.viewName;
   const sourceSql = createViewDraft.sourceSql;
   const ifNotExists = createViewDraft.ifNotExists;
@@ -90,6 +119,13 @@ export default function CreateView({ tabId }: Props) {
   const [previewResult, setPreviewResult] = useState<QueryResult | null>(null);
   const [generatedSql, setGeneratedSql] = useState("");
   const sqlPreviewRequestIdRef = useRef(0);
+  const schema = useMemo(() => {
+    const nextSchema: Record<string, string[]> = {};
+    tables.forEach((table) => {
+      nextSchema[table.name] = [];
+    });
+    return nextSchema;
+  }, [tables]);
 
   const updateCreateViewDraft = useCallback(
     (
@@ -395,20 +431,26 @@ export default function CreateView({ tabId }: Props) {
               </Button>
             </div>
             <div className="p-4">
-              <textarea
-                value={sourceSql}
-                onChange={(e) => {
-                  updateCreateViewDraft({ sourceSql: e.target.value });
-                  setError("");
-                }}
+              <div
                 className={cn(
-                  "w-full min-h-[160px] resize-y border border-border bg-background px-3 py-2 text-[13px] font-mono text-foreground outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 rounded-sm",
+                  "overflow-hidden rounded-sm border border-border bg-background",
                   liveSourceError &&
-                    "border-destructive/70 focus:ring-destructive/50 focus:border-destructive/70",
+                    "border-destructive/70 focus-within:border-destructive/70",
                 )}
-                spellCheck={false}
-                placeholder={"SELECT id, name\nFROM users\nWHERE is_active = 1"}
-              />
+              >
+                <CodeMirror
+                  value={sourceSql}
+                  height="220px"
+                  extensions={[sql({ schema })]}
+                  theme={vscodeDark}
+                  onChange={(value) => {
+                    updateCreateViewDraft({ sourceSql: value });
+                    setError("");
+                  }}
+                  className="w-full overflow-hidden bg-background text-[13px] custom-scrollbar-hide focus-within:ring-inset focus-within:ring-1 focus-within:ring-primary/20"
+                  basicSetup={BASIC_SETUP}
+                />
+              </div>
               {liveSourceError && (
                 <p className="mt-2 text-[11px] text-destructive">{liveSourceError}</p>
               )}
