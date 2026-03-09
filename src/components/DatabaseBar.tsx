@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Database, Plus, X, XCircle, XCircleIcon } from 'lucide-react';
+import { Database, Plus, X, XCircle, XCircleIcon, Cloud } from 'lucide-react';
 import { useAppStore, type Connection } from '../store/useAppStore';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -88,13 +88,23 @@ export default function DatabaseBar() {
                         )}
                       >
                         <div className="flex items-center justify-center">
-                          <Database
-                            size={18}
-                            className={cn(
-                              "transition-transform",
-                              activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
-                            )}
-                          />
+                          {conn.type === 'turso' ? (
+                            <Cloud
+                              size={18}
+                              className={cn(
+                                "transition-transform",
+                                activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
+                              )}
+                            />
+                          ) : (
+                            <Database
+                              size={18}
+                              className={cn(
+                                "transition-transform",
+                                activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
+                              )}
+                            />
+                          )}
                         </div>
                       </div>
 

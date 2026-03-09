@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VibeDB is a cross-platform SQLite database manager built with Tauri v2 (Rust) and React 19. It uses an extensible database engine abstraction to support multiple database types (SQLite now, Turso/PostgreSQL/MySQL planned).
+VibeDB is a cross-platform SQLite database manager built with Tauri v2 (Rust) and React 19. It uses an extensible database engine abstraction to support multiple database types (SQLite and Turso now, PostgreSQL/MySQL planned).
 
 **Package Manager:** bun
 
@@ -197,6 +197,7 @@ cd src-tauri
 cargo test              # All tests
 cargo test engines      # Engine tests only
 cargo test sqlite       # SQLite tests only
+cargo test turso        # Turso tests only
 cargo test -- --nocapture  # Show println output
 ```
 
@@ -216,11 +217,16 @@ Custom DOM events for decoupled communication:
 
 ## Adding New Database Engines
 
-See `ROADMAP.md` for planned engines. Implementation checklist:
+See `ROADMAP.md` for planned engines. Reference implementations:
+- **SQLite**: `src-tauri/src/engines/sqlite.rs`
+- **Turso**: `src-tauri/src/engines/turso.rs`
+
+Implementation checklist:
 
 1. Create `src-tauri/src/engines/<engine>.rs` implementing `DatabaseEngine` trait
 2. Add variant to `EngineType` in `types.rs`
 3. Register in `EngineRegistry::connect()` in `mod.rs`
-4. Add connection config UI in frontend
-5. Handle engine-specific types in query results
-6. Write integration tests
+4. Add connection config helpers in `types.rs` (e.g., `ConnectionConfig::turso_remote()`)
+5. Add connection config UI in frontend
+6. Handle engine-specific types in query results
+7. Write integration tests

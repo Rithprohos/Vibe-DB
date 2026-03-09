@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error;
 
-use super::config::{resolve_default_api_key, trim_trailing_slashes, AI_GENERATION_TIMEOUT_SECS, AI_PING_TIMEOUT_SECS};
+use super::config::{
+    resolve_default_api_key, trim_trailing_slashes, AI_GENERATION_TIMEOUT_SECS,
+    AI_PING_TIMEOUT_SECS,
+};
 use super::prompts::{clean_generated_sql, SQL_QUERY_ASSISTANT};
 use super::{GenerateSqlRequest, GenerateSqlResponse};
 
@@ -116,16 +119,13 @@ async fn send_chat_request(
         builder = builder.bearer_auth(key);
     }
 
-    let response = builder
-        .send()
-        .await
-        .map_err(|e| {
-            if e.is_timeout() {
-                AiError::Timeout
-            } else {
-                AiError::Transport(e.to_string())
-            }
-        })?;
+    let response = builder.send().await.map_err(|e| {
+        if e.is_timeout() {
+            AiError::Timeout
+        } else {
+            AiError::Transport(e.to_string())
+        }
+    })?;
 
     if !response.status().is_success() {
         let status = response.status().to_string();
@@ -166,7 +166,8 @@ pub async fn generate_sql(request: GenerateSqlRequest) -> Result<GenerateSqlResp
     }
 
     let schema_context = super::prompts::build_schema_context(&request.schema);
-    let user_prompt = format!("{schema_context}\nUser Request: {prompt}\n\nGenerate the SQL query:");
+    let user_prompt =
+        format!("{schema_context}\nUser Request: {prompt}\n\nGenerate the SQL query:");
 
     // Resolve API key: use provided key, or fall back to default embedded key
     let api_key = request
@@ -232,16 +233,13 @@ pub async fn ping_provider(
         builder = builder.bearer_auth(key);
     }
 
-    let response = builder
-        .send()
-        .await
-        .map_err(|e| {
-            if e.is_timeout() {
-                AiError::Timeout
-            } else {
-                AiError::Transport(e.to_string())
-            }
-        })?;
+    let response = builder.send().await.map_err(|e| {
+        if e.is_timeout() {
+            AiError::Timeout
+        } else {
+            AiError::Transport(e.to_string())
+        }
+    })?;
 
     if response.status().is_success() {
         return Ok(());

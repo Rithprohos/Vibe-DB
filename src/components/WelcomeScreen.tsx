@@ -33,7 +33,7 @@ const WelcomeScreen = memo(function WelcomeScreen() {
         
         <p className="text-center text-muted-foreground mb-12 text-sm leading-relaxed max-w-[320px] mx-auto font-medium">
           Open source database management. Beautiful, fast, and built for
-          developers. Start by connecting to a SQLite database.
+          developers. Start by connecting to a database.
         </p>
 
         <div className="flex justify-center mb-16">

@@ -17,6 +17,7 @@ Multi-database engine support for VibeDB.
 | Database | Status    | Notes                   |
 | -------- | --------- | ----------------------- |
 | SQLite   | ✅ Stable | Full support via `sqlx` |
+| Turso    | ✅ Stable | Full support via `libsql` |
 
 ### SQLite Commands
 
@@ -136,24 +137,51 @@ See [`changelog/`](./changelog/) for completed features.
 | Engine types        | ✅ Done    | Unit tests for all data structures |
 | Engine registry     | ✅ Done    | Connection/disconnect tests        |
 | SQLite engine       | ✅ Done    | Full integration tests             |
+| Turso engine        | ✅ Done    | Implementation complete            |
 | Frontend components | 📋 Planned | Vitest + React Testing Library     |
 
 ---
 
-## Phase 2: Turso Support (v0.3)
+## Phase 2: Turso Support (v0.3) ✅ Complete
 
 [Turso](https://turso.tech/) — LibSQL/SQLite-compatible edge database.
 
-| Feature                         | Priority |
-| ------------------------------- | -------- |
-| Connection via URL + Auth Token | High     |
-| Embedded replica support        | Medium   |
-| Sync status display             | Low      |
+| Feature                         | Priority | Status |
+| ------------------------------- | -------- | ------ |
+| Connection via URL + Auth Token | High     | ✅ Implemented |
+| Local libSQL file support       | High     | ✅ Implemented |
+| Embedded replica support        | Medium   | 📋 Planned |
+| Sync status display             | Low      | 📋 Planned |
+
+### Turso Commands
+
+- `connect_database` — Connect to remote Turso or local libSQL file
+- `disconnect_database` — Disconnect from database
+- `execute_query` — Run SQL queries (with safety validation)
+- `execute_transaction` — Run batched DML statements atomically
+- `list_tables` — Get all tables/views
+- `get_table_structure` — Column definitions
+- `get_table_row_count` — Pagination support
+- `create_database` — Create new local libSQL file
+- `get_database_version` — Retrieve libSQL version
+
+### Implementation
+
+**File:** `src-tauri/src/engines/turso.rs`
+
+```rust
+pub struct TursoEngine {
+    connection: RwLock<Option<Connection>>,
+    db_path: RwLock<Option<String>>,
+}
+```
 
 ### Tasks
 
-- [ ] Add `libsql` crate dependency
-- [ ] Implement `TursoEngine` struct
+- [x] Add `libsql` crate dependency
+- [x] Implement `TursoEngine` struct
+- [x] Support remote connections with auth token
+- [x] Support local libSQL file connections
 - [ ] Support embedded replica mode
 - [ ] Handle remote sync status
 - [ ] Update connection dialog UI
@@ -161,7 +189,26 @@ See [`changelog/`](./changelog/) for completed features.
 ### Dependencies
 
 ```toml
-libsql = "0.x"
+libsql = "0.9.5"
+```
+
+### Usage
+
+```rust
+// Remote Turso database
+let config = ConnectionConfig::turso_remote(
+    "conn-id".to_string(),
+    "My Turso DB".to_string(),
+    "my-db.turso.io".to_string(),
+    "my-auth-token".to_string(),
+);
+
+// Local libSQL file
+let config = ConnectionConfig::turso_local(
+    "conn-id".to_string(),
+    "Local libSQL".to_string(),
+    "/path/to/db.libsql".to_string(),
+);
 ```
 
 ---
@@ -290,12 +337,13 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 
 ## Timeline (Estimated)
 
-| Version | Target  | Focus           | Status      |
-| ------- | ------- | --------------- | -----------|
-| v0.2.8  | Q1 2026 | SQLite UX polish| ✅ Complete |
-| v0.3    | Q2 2026 | Turso support   | 📋 Planned |
-| v0.4    | Q3 2026 | PostgreSQL      | 📋 Planned |
-| v0.5    | Q4 2026 | MySQL           | 📋 Planned |
+| Version | Target  | Focus                  | Status      |
+| ------- | ------- | ---------------------- | ----------- |
+| v0.2.8  | Q1 2026 | SQLite UX polish       | ✅ Complete |
+| v0.3.0  | Q2 2026 | Turso support          | ✅ Complete |
+| v0.3.1  | Q2 2026 | Embedded replicas, UI  | 📋 Planned  |
+| v0.4    | Q3 2026 | PostgreSQL             | 📋 Planned  |
+| v0.5    | Q4 2026 | MySQL                  | 📋 Planned  |
 
 ---
 

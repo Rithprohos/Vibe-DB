@@ -8,15 +8,13 @@ use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
 
-/// Connects to a SQLite database file.
+/// Connects to a database.
 #[tauri::command]
 pub async fn connect_database(
     state: tauri::State<'_, Arc<AppState>>,
-    path: String,
-    name: String,
+    config: ConnectionConfig,
 ) -> Result<String, String> {
-    let id = format!("conn-{}", uuid::Uuid::new_v4());
-    let config = ConnectionConfig::sqlite(id.clone(), name, path);
+    let id = config.id.clone();
 
     state
         .registry
@@ -66,7 +64,10 @@ pub async fn list_tables(
         .get_engine(&id)
         .await
         .map_err(|error| error.to_string())?;
-    engine.list_tables().await.map_err(|error| error.to_string())
+    engine
+        .list_tables()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 /// Gets the column structure of a table.
@@ -309,7 +310,10 @@ pub async fn get_table_data(
         query.push_str(" WHERE ");
         query.push_str(&where_sql);
     }
-    if let Some(order_by_col) = order_by.as_deref().map(str::trim).filter(|name| !name.is_empty())
+    if let Some(order_by_col) = order_by
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
     {
         query.push_str(" ORDER BY ");
         query.push_str(&quote_identifier(order_by_col));
@@ -374,7 +378,10 @@ pub async fn get_database_version(
         .get_engine(&id)
         .await
         .map_err(|error| error.to_string())?;
-    engine.get_version().await.map_err(|error| error.to_string())
+    engine
+        .get_version()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 async fn get_connection_id(

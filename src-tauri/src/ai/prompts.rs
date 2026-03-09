@@ -106,7 +106,11 @@ pub fn build_schema_context(schema: &[super::SchemaTable]) -> String {
         context.push_str(&format!("Table: {}\n", table.name));
         for col in &table.columns {
             let pk_marker = if col.is_pk { " (PK)" } else { "" };
-            let null_marker = if col.is_nullable { " NULL" } else { " NOT NULL" };
+            let null_marker = if col.is_nullable {
+                " NULL"
+            } else {
+                " NOT NULL"
+            };
             context.push_str(&format!(
                 "  - {}{}: {}{}\n",
                 col.name, pk_marker, col.col_type, null_marker

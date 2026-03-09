@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Database, Wrench, Zap, FileText, Plus, X, Table as TableIcon } from 'lucide-react';
+import { Database, Wrench, Zap, FileText, Plus, X, Table as TableIcon, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ContextMenu,
@@ -44,6 +44,8 @@ export default function TabBar() {
         return <TableIcon size={14} className="text-emerald-500" />;
       case 'edit-table':
         return <Wrench size={14} className="text-amber-500" />;
+      case 'create-view':
+        return <Eye size={14} className="text-sky-500" />;
       default:
         return <FileText size={14} className="text-muted-foreground" />;
     }

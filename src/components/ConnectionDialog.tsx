@@ -7,10 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil } from 'lucide-react';
+import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil, Globe, Key, Cloud } from 'lucide-react';
 import EditConnectionDialog from './EditConnectionDialog';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function ConnectionDialog() {
   const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
@@ -21,8 +22,11 @@ export default function ConnectionDialog() {
   const activeConnection = connections.find(c => c.id === activeSidebarConnectionId);
   const activeConnectionsCount = connections.filter(c => c.connId).length;
 
+  const [type, setType] = useState<'sqlite' | 'turso'>('sqlite');
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
+  const [host, setHost] = useState('');
+  const [authToken, setAuthToken] = useState('');
   const [error, setError] = useState('');
   const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
@@ -104,8 +108,12 @@ export default function ConnectionDialog() {
   };
 
   const handleConnect = () => {
-    if (!path.trim()) {
+    if (type === 'sqlite' && !path.trim()) {
       setError('Please provide a database path');
+      return;
+    }
+    if (type === 'turso' && (!host.trim() && !path.trim())) {
+      setError('Please provide either a database URL or a local file path');
       return;
     }
     if (!tag) {
@@ -120,9 +128,11 @@ export default function ConnectionDialog() {
 
     const conn: Connection = {
       id: `conn-${Date.now()}`,
-      name: name || path.split('/').pop() || 'Database',
-      path: path.trim(),
-      type: 'sqlite',
+      name: name || (type === 'sqlite' ? path.split('/').pop() : host.split('/').pop()) || 'Database',
+      path: path.trim() || undefined,
+      host: host.trim() || undefined,
+      authToken: authToken.trim() || undefined,
+      type,
       lastUsed: Date.now(),
       tag,
     };
@@ -154,10 +164,12 @@ export default function ConnectionDialog() {
           <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center space-x-2 text-xl font-bold tracking-tight">
               <Database className="text-primary" />
-              <span>SQLite Connection</span>
+              <span>{type === 'sqlite' ? 'SQLite' : 'Turso'} Connection</span>
             </DialogTitle>
             <DialogDescription className="text-muted-foreground mt-1 text-xs">
-              Open an existing database or create a new one to connect.
+              {type === 'sqlite' 
+                ? 'Open an existing database or create a new one to connect.'
+                : 'Connect to your Turso database or use a local libSQL file.'}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -184,11 +196,21 @@ export default function ConnectionDialog() {
                       onClick={() => handleSwitchTo(conn)}
                     >
                       <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                        <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        {conn.type === 'turso' ? (
+                          <Cloud size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        ) : (
+                          <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <div className="text-sm font-medium text-foreground truncate">{conn.name}</div>
+                          <span className={cn(
+                            "px-1 py-0 rounded-[3px] text-[7px] font-bold uppercase tracking-tight",
+                            conn.type === 'turso' ? "bg-cyan-500/10 text-cyan-400" : "bg-muted text-muted-foreground"
+                          )}>
+                            {conn.type}
+                          </span>
                           {conn.tag && (
                             <span className={cn(
                               "px-1.5 py-0 rounded-[4px] text-[8px] font-bold uppercase tracking-widest border",
@@ -200,7 +222,9 @@ export default function ConnectionDialog() {
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5 opacity-70">{conn.path}</div>
+                        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5 opacity-70">
+                          {conn.type === 'turso' ? (conn.host || conn.path) : conn.path}
+                        </div>
                       </div>
                       <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
                       <button
@@ -243,9 +267,25 @@ export default function ConnectionDialog() {
                   New Connection
                 </span>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add a fresh SQLite file or create one.
+                  Choose a database engine and provide details.
                 </p>
               </div>
+
+              <div className="mb-6">
+                <Tabs value={type} onValueChange={(v) => setType(v as 'sqlite' | 'turso')}>
+                  <TabsList className="grid w-full grid-cols-2 bg-background/80 border border-border/60">
+                    <TabsTrigger value="sqlite" className="text-[10px] uppercase tracking-wider font-bold h-8">
+                      <Database size={12} className="mr-2" />
+                      SQLite
+                    </TabsTrigger>
+                    <TabsTrigger value="turso" className="text-[10px] uppercase tracking-wider font-bold h-8">
+                      <Cloud size={12} className="mr-2" />
+                      Turso
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
               <div className="grid gap-5">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -253,21 +293,68 @@ export default function ConnectionDialog() {
                   </Label>
                   <Input
                     id="name"
-                    placeholder="My Database"
+                    placeholder={type === 'sqlite' ? "My SQLite DB" : "My Turso DB"}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="bg-background border-border focus-visible:ring-primary h-11 transition-all focus:bg-background"
                   />
                 </div>
 
+                {type === 'turso' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="host" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Database URL
+                      </Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Globe size={14} />
+                        </div>
+                        <Input
+                          id="host"
+                          placeholder="libsql://your-db.turso.io"
+                          value={host}
+                          onChange={(e) => {
+                            setHost(e.target.value);
+                            setError('');
+                          }}
+                          className="pl-9 bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="authToken" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Auth Token
+                      </Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Key size={14} />
+                        </div>
+                        <Input
+                          id="authToken"
+                          type="password"
+                          placeholder="your-auth-token"
+                          value={authToken}
+                          onChange={(e) => {
+                            setAuthToken(e.target.value);
+                            setError('');
+                          }}
+                          className="pl-9 bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="path" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Database File
+                    {type === 'sqlite' ? 'Database File' : 'Local Path (Optional)'}
                   </Label>
                   <div className="flex space-x-2">
                     <Input
                       id="path"
-                      placeholder="/path/to/database.db"
+                      placeholder={type === 'sqlite' ? "/path/to/database.db" : "/optional/local/path.db"}
                       value={path}
                       onChange={(e) => {
                         setPath(e.target.value);
@@ -283,14 +370,16 @@ export default function ConnectionDialog() {
                     >
                       <FolderOpen size={18} className="text-muted-foreground hover:text-foreground" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleCreateNew}
-                      className="px-3 border-primary/30 text-primary hover:bg-primary/10 h-11 transition-colors group"
-                      title="Create New Database"
-                    >
-                      <Plus size={18} className="group-hover:neon-text" />
-                    </Button>
+                    {type === 'sqlite' && (
+                      <Button
+                        variant="outline"
+                        onClick={handleCreateNew}
+                        className="px-3 border-primary/30 text-primary hover:bg-primary/10 h-11 transition-colors group"
+                        title="Create New Database"
+                      >
+                        <Plus size={18} className="group-hover:neon-text" />
+                      </Button>
+                    )}
                   </div>
                   {error && (
                     <p className="text-xs text-destructive font-medium mt-2 p-2 bg-destructive/10 rounded-sm border border-destructive/20 animate-fade-in">
@@ -345,7 +434,7 @@ export default function ConnectionDialog() {
           </Button>
           <Button
             onClick={handleConnect}
-            disabled={!path.trim() || !tag}
+            disabled={(!path.trim() && !host.trim()) || !tag}
             className="px-8 font-semibold tracking-wide w-full sm:w-auto"
           >
             Connect

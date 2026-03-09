@@ -17,12 +17,18 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
 
   const [name, setName] = useState('');
   const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();
+  const [host, setHost] = useState('');
+  const [authToken, setAuthToken] = useState('');
+  const [path, setPath] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (connection && open) {
       setName(connection.name);
       setTag(connection.tag);
+      setHost(connection.host || '');
+      setAuthToken(connection.authToken || '');
+      setPath(connection.path || '');
       setError('');
     }
   }, [connection, open]);
@@ -38,6 +44,9 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
     updateConnection(connection.id, {
       name: name.trim(),
       tag,
+      host: connection.type === 'turso' ? host.trim() : undefined,
+      authToken: connection.type === 'turso' ? authToken.trim() : undefined,
+      path: path.trim() || undefined,
     });
 
     onOpenChange(false);
@@ -108,13 +117,53 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
               )}
             </div>
 
+            {connection.type === 'turso' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-host" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Database URL
+                  </Label>
+                  <Input
+                    id="edit-host"
+                    placeholder="libsql://your-db.turso.io"
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-token" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Auth Token
+                  </Label>
+                  <Input
+                    id="edit-token"
+                    type="password"
+                    placeholder="your-auth-token"
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                    className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                  />
+                </div>
+              </>
+            )}
+
             <div className="space-y-1.5 pt-1">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Database Path
+                {connection.type === 'turso' ? 'Local Path (Secondary)' : 'Database Path'}
               </Label>
-              <div className="text-[11px] text-muted-foreground font-mono p-2 bg-secondary/50 rounded-md border border-border/50 truncate">
-                {connection.path}
-              </div>
+              {connection.type === 'sqlite' ? (
+                <div className="text-[11px] text-muted-foreground font-mono p-2 bg-secondary/50 rounded-md border border-border/50 truncate">
+                  {connection.path}
+                </div>
+              ) : (
+                <Input
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  placeholder="/optional/local/path.db"
+                  className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                />
+              )}
             </div>
           </div>
         </div>

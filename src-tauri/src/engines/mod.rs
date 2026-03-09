@@ -1,9 +1,11 @@
 pub mod sqlite;
 mod traits;
+pub mod turso;
 pub mod types;
 
 pub use sqlite::SqliteEngine;
 pub use traits::DatabaseEngine;
+pub use turso::TursoEngine;
 pub use types::{ColumnInfo, ConnectionConfig, EngineType, QueryResult, TableInfo};
 
 use std::collections::HashMap;
@@ -55,6 +57,7 @@ impl EngineRegistry {
     pub async fn connect(&self, config: ConnectionConfig) -> EngineResult<String> {
         let engine: Arc<dyn DatabaseEngine> = match config.engine_type {
             EngineType::Sqlite => Arc::new(SqliteEngine::new()),
+            EngineType::Turso => Arc::new(TursoEngine::new()),
             #[allow(unreachable_patterns)]
             _ => {
                 return Err(EngineError::UnsupportedEngine(format!(

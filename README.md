@@ -13,7 +13,7 @@
 
 ---
 
-A modern, high-performance SQLite database manager built with Tauri v2 and React. Engineered for speed, security, and a premium developer experience.
+A modern, high-performance database manager built with Tauri v2 and React. Supports SQLite and Turso (libSQL). Engineered for speed, security, and a premium developer experience.
 
 ![VibeDB](https://img.shields.io/badge/version-0.2.7-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -32,7 +32,7 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
 
 - **🚀 High Performance** — TanStack virtualization across table browsing, query results, logs, and sidebar lists, plus aggressive code-splitting for heavy UI paths.
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction.
-- **🌍 Multi-Engine Ready** — Trait-based abstraction (SQLite active; Turso, Postgres, MySQL coming soon).
+- **🌍 Multi-Engine Ready** — SQLite and Turso (libSQL) supported. PostgreSQL and MySQL coming soon.
 - **🏗️ Visual Table Builder** — Create tables with a polished GUI including real-time, syntax-highlighted SQL preview.
 - **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions.
 - **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
@@ -59,10 +59,10 @@ bun run tauri build
 ## 🏗️ Architecture
 
 - **Frontend**: React 19 + TypeScript + Zustand + Tailwind CSS
-- **Backend**: Rust + Tauri v2 + sqlx (Async SQLite)
+- **Backend**: Rust + Tauri v2 + sqlx (SQLite) + libsql (Turso)
 - **Editor**: CodeMirror 6 with SQL support
 - **State**: Persistent JSON via `tauri-plugin-store`
 
 ---
 
-_Crafted with vibe coding and AI assistance. See [ROADMAP.md](./ROADMAP.md) for the journey to v0.3 (Turso Edge Support)._
+_Crafted with vibe coding and AI assistance. See [ROADMAP.md](./ROADMAP.md) for upcoming features (PostgreSQL, MySQL support)._

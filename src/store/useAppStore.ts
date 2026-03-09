@@ -6,10 +6,12 @@ export interface Connection {
   id: string;
   connId?: string;
   name: string;
-  path: string;
-  type: "sqlite";
+  path?: string;
+  type: "sqlite" | "turso";
   lastUsed: number;
   tag?: "local" | "testing" | "development" | "production";
+  host?: string;
+  authToken?: string;
 }
 
 export interface TableInfo {
@@ -66,7 +68,8 @@ export type TabType =
   | "structure"
   | "query"
   | "create-table"
-  | "edit-table";
+  | "edit-table"
+  | "create-view";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
 export type AiProviderMode = "default" | "custom";
@@ -94,6 +97,13 @@ export interface AlertOptions {
 
 type BooleanSetter = boolean | ((prev: boolean) => boolean);
 
+export interface CreateViewDraft {
+  viewName: string;
+  sourceSql: string;
+  ifNotExists: boolean;
+  temporary: boolean;
+}
+
 export interface Tab {
   id: string;
   connectionId: string;
@@ -103,6 +113,7 @@ export interface Tab {
   query?: string;
   result?: QueryResult | null;
   error?: string;
+  createViewDraft?: CreateViewDraft;
 }
 
 interface AppState {
@@ -166,7 +177,12 @@ interface AppState {
   addConnection: (conn: Connection) => void;
   updateConnection: (
     id: string,
-    updates: Partial<Pick<Connection, "name" | "tag" | "connId" | "lastUsed">>,
+    updates: Partial<
+      Pick<
+        Connection,
+        "name" | "tag" | "connId" | "lastUsed" | "path" | "host" | "authToken"
+      >
+    >,
   ) => void;
   removeConnection: (id: string) => void;
   disconnectConnection: (id: string) => void;
@@ -255,7 +271,8 @@ export const useAppStore = create<AppState>()(
       setIsAiPanelOpen: (val) => set({ isAiPanelOpen: val }),
       setAiProviderMode: (mode) => set({ aiProviderMode: mode }),
       setAiActiveCustomProfileId: (id) => set({ aiActiveCustomProfileId: id }),
-      setAiCustomProviderKind: (providerKind) => set({ aiCustomProviderKind: providerKind }),
+      setAiCustomProviderKind: (providerKind) =>
+        set({ aiCustomProviderKind: providerKind }),
       setAiCustomName: (name) => set({ aiCustomName: name }),
       setAiCustomBaseUrl: (baseUrl) => set({ aiCustomBaseUrl: baseUrl }),
       setAiCustomModel: (model) => set({ aiCustomModel: model }),
@@ -265,17 +282,25 @@ export const useAppStore = create<AppState>()(
             ...profile,
             updatedAt: Date.now(),
           };
-          const nextProfiles = state.aiCustomProfiles.some((p) => p.id === profile.id)
-            ? state.aiCustomProfiles.map((p) => (p.id === profile.id ? updatedProfile : p))
+          const nextProfiles = state.aiCustomProfiles.some(
+            (p) => p.id === profile.id,
+          )
+            ? state.aiCustomProfiles.map((p) =>
+                p.id === profile.id ? updatedProfile : p,
+              )
             : [updatedProfile, ...state.aiCustomProfiles];
           return {
-            aiCustomProfiles: nextProfiles.sort((a, b) => b.updatedAt - a.updatedAt),
+            aiCustomProfiles: nextProfiles.sort(
+              (a, b) => b.updatedAt - a.updatedAt,
+            ),
             aiActiveCustomProfileId: profile.id,
           };
         }),
       removeAiCustomProfile: (id) =>
         set((state) => {
-          const nextProfiles = state.aiCustomProfiles.filter((p) => p.id !== id);
+          const nextProfiles = state.aiCustomProfiles.filter(
+            (p) => p.id !== id,
+          );
           const activeId =
             state.aiActiveCustomProfileId === id
               ? (nextProfiles[0]?.id ?? null)
@@ -286,7 +311,8 @@ export const useAppStore = create<AppState>()(
           };
         }),
       setTheme: (theme) => set({ theme }),
-      setDeveloperToolsEnabled: (enabled) => set({ developerToolsEnabled: enabled }),
+      setDeveloperToolsEnabled: (enabled) =>
+        set({ developerToolsEnabled: enabled }),
       setDatabaseVersion: (version) => set({ databaseVersion: version }),
 
       addConnection: (conn) =>
@@ -319,7 +345,11 @@ export const useAppStore = create<AppState>()(
           const hasActiveConnections = updated.some((c) => c.connId);
           const newTabs = state.tabs.filter((t) => t.connectionId !== id);
           let newActiveTabId = state.activeTabId;
-          if (state.tabs.some((t) => t.id === state.activeTabId && t.connectionId === id)) {
+          if (
+            state.tabs.some(
+              (t) => t.id === state.activeTabId && t.connectionId === id,
+            )
+          ) {
             newActiveTabId = newTabs.length > 0 ? newTabs[0].id : null;
           }
           return {
@@ -350,7 +380,12 @@ export const useAppStore = create<AppState>()(
             c.id === id ? c : { ...c, connId: undefined },
           ),
           tabs: state.tabs.filter((t) => t.connectionId === id),
-          activeTabId: state.activeTabId && state.tabs.find((t) => t.id === state.activeTabId)?.connectionId === id ? state.activeTabId : state.tabs.find((t) => t.connectionId === id)?.id ?? null,
+          activeTabId:
+            state.activeTabId &&
+            state.tabs.find((t) => t.id === state.activeTabId)?.connectionId ===
+              id
+              ? state.activeTabId
+              : (state.tabs.find((t) => t.connectionId === id)?.id ?? null),
         })),
 
       updateConnection: (id, updates) =>
@@ -394,7 +429,8 @@ export const useAppStore = create<AppState>()(
       clearLogs: () => set({ logs: [] }),
       setShowLogDrawer: (val) =>
         set((state) => ({
-          showLogDrawer: typeof val === 'function' ? val(state.showLogDrawer) : val,
+          showLogDrawer:
+            typeof val === "function" ? val(state.showLogDrawer) : val,
         })),
       setShowSettingsModal: (val) => set({ showSettingsModal: val }),
       showToast: (toast) =>
@@ -522,6 +558,8 @@ export const useAppStore = create<AppState>()(
           type: c.type,
           lastUsed: c.lastUsed,
           tag: c.tag,
+          host: c.host,
+          authToken: c.authToken,
         })),
         activeSidebarConnectionId: state.activeSidebarConnectionId,
         tabs: state.tabs,

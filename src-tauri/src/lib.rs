@@ -16,7 +16,7 @@ use commands::{
     get_table_structure, list_tables, set_active_connection,
 };
 use menu::setup_menu;
-use sql_helpers::build_create_table_sql;
+use sql_helpers::{build_create_table_sql, build_create_view_sql};
 use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +54,7 @@ pub fn run() {
             disconnect_database,
             set_active_connection,
             build_create_table_sql,
+            build_create_view_sql,
             list_tables,
             get_table_structure,
             execute_query,

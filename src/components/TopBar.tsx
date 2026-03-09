@@ -46,7 +46,7 @@ export default function TopBar() {
         <span>Vibe DB {activeConnection ? `— ${activeConnection.name}` : ''}</span>
         {databaseVersion && (
           <span className="text-[10px] text-muted-foreground/40 font-mono tracking-widest bg-secondary/50 px-1.5 py-0.5 rounded ml-1">
-            v{databaseVersion}
+            {databaseVersion}
           </span>
         )}
       </div>

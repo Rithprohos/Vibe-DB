@@ -55,6 +55,38 @@ impl ConnectionConfig {
             auth_token: None,
         }
     }
+
+    /// Creates a Turso remote connection configuration.
+    pub fn turso_remote(id: String, name: String, host: String, auth_token: String) -> Self {
+        Self {
+            id,
+            name,
+            engine_type: EngineType::Turso,
+            path: None,
+            host: Some(host),
+            port: None,
+            username: None,
+            password: None,
+            database: None,
+            auth_token: Some(auth_token),
+        }
+    }
+
+    /// Creates a Turso local file connection configuration.
+    pub fn turso_local(id: String, name: String, path: String) -> Self {
+        Self {
+            id,
+            name,
+            engine_type: EngineType::Turso,
+            path: Some(path),
+            host: None,
+            port: None,
+            username: None,
+            password: None,
+            database: None,
+            auth_token: None,
+        }
+    }
 }
 
 /// Information about a database table or view.

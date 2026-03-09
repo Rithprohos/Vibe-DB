@@ -4,7 +4,7 @@ import { listTables } from '../lib/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X } from 'lucide-react';
+import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X, Cloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -167,6 +167,23 @@ export default function Sidebar() {
       title: 'Create Table',
     });
   };
+  
+  const handleCreateView = () => {
+    if (!activeConnection) return;
+    const id = `create-view-${Date.now()}`;
+    addTab({
+      id,
+      connectionId: activeConnection.id,
+      type: 'create-view',
+      title: 'Create View',
+      createViewDraft: {
+        viewName: 'new_view',
+        sourceSql: 'SELECT * FROM table_name',
+        ifNotExists: true,
+        temporary: false,
+      },
+    });
+  };
 
   const handleEditTable = useCallback((tableName: string) => {
     if (!activeConnection) return;
@@ -192,13 +209,17 @@ export default function Sidebar() {
               className="relative flex items-center space-x-3 p-3 rounded-md bg-background border border-border cursor-pointer hover:border-primary/50 transition-colors group"
               onClick={() => setEditDialogOpen(true)}
             >
-              <Database size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
+              {activeConnection?.type === 'turso' ? (
+                <Cloud size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
+              ) : (
+                <Database size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
+              )}
               <div className="flex-1 min-w-0 pr-12">
                 <div className="text-sm font-medium text-foreground truncate leading-tight">
                   {activeConnection.name}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0">SQLite</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0">{activeConnection.type}</div>
                   {activeConnection.tag && (
                     <span className={cn(
                       "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border flex-shrink-0 whitespace-nowrap",
@@ -255,16 +276,20 @@ export default function Sidebar() {
                       );
                     }}
                   >
-                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                      <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                    </div>
+                    <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+                        {conn.type === 'turso' ? (
+                          <Cloud size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        ) : (
+                          <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        )}
+                      </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-foreground truncate leading-tight">
                         {conn.name}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                          {conn.type === 'sqlite' ? 'SQLite' : conn.type}
+                          {conn.type}
                         </span>
                         {conn.tag && (
                           <span className={cn(
@@ -307,15 +332,15 @@ export default function Sidebar() {
       {isConnected && (
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex px-3 gap-2 pb-3 border-b border-border">
-            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-accent/50" onClick={handleNewQuery}>
+            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/30" onClick={handleNewQuery}>
               <Plus size={14} />
               <span>Query</span>
             </Button>
-            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/30" onClick={handleCreateTable}>
+            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30" onClick={handleCreateTable}>
               <Plus size={14} />
               <span>Table</span>
             </Button>
-            <Button variant="outline" size="sm" className="space-x-1 border-border/50 bg-background/50 hover:bg-accent/50 px-2" onClick={handleRefresh}>
+            <Button variant="outline" size="sm" className="space-x-1 border-border/50 bg-background/50 hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/30 px-2" onClick={handleRefresh}>
               <RefreshCw size={14} />
             </Button>
           </div>
@@ -342,9 +367,21 @@ export default function Sidebar() {
                     {tablesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   </span>
                   <span className="flex-1">Tables</span>
-                  <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
-                    {filteredTables.length}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
+                      {filteredTables.length}
+                    </span>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-emerald-500/20 hover:text-emerald-400 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateTable();
+                      }}
+                      title="Create Table"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                 </div>
                 
                 {tablesOpen && (
@@ -402,58 +439,81 @@ export default function Sidebar() {
               </div>
 
               {/* Views */}
-              {filteredViews.length > 0 && (
-                <div className="space-y-1">
-                  <div
-                    className="flex items-center space-x-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors group px-2 py-1"
-                    onClick={() => setViewsOpen(!viewsOpen)}
-                  >
-                    <span className="text-[10px] transform transition-transform text-muted-foreground group-hover:text-primary">
-                      {viewsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                    </span>
-                    <span className="flex-1">Views</span>
+              <div className="space-y-1">
+                <div
+                  className="flex items-center space-x-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors group px-2 py-1"
+                  onClick={() => setViewsOpen(!viewsOpen)}
+                >
+                  <span className="text-[10px] transform transition-transform text-muted-foreground group-hover:text-primary">
+                    {viewsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </span>
+                  <span className="flex-1">Views</span>
+                  <div className="flex items-center gap-2">
                     <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
                       {filteredViews.length}
                     </span>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-indigo-500/20 hover:text-indigo-400 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateView();
+                      }}
+                      title="Create View"
+                    >
+                      <Plus size={12} />
+                    </button>
                   </div>
-                  
-                  {viewsOpen && (
-                    <div ref={viewsListRef} className="max-h-64 overflow-auto pr-1">
-                      <div style={{ height: `${viewVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-                        {viewVirtualizer.getVirtualItems().map((virtualItem) => {
-                          const t = filteredViews[virtualItem.index];
-                          return (
-                            <div
-                              key={t.name}
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                transform: `translateY(${virtualItem.start}px)`,
-                                paddingBottom: '2px',
-                              }}
-                            >
-                              <div
-                                className={cn(
-                                  "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                  selectedTable === t.name
-                                    ? "bg-primary/10 text-primary border border-primary/20"
-                                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                                )}
-                                onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
-                              >
-                                <Eye size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
-                                <span className="truncate">{t.name}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
+                
+                {viewsOpen && (
+                  <div ref={viewsListRef} className="max-h-80 overflow-auto pr-1">
+                    <div style={{ height: `${viewVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {viewVirtualizer.getVirtualItems().map((virtualItem) => {
+                        const t = filteredViews[virtualItem.index];
+                        return (
+                          <div
+                            key={t.name}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualItem.start}px)`,
+                              paddingBottom: '2px',
+                            }}
+                          >
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  className={cn(
+                                    "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
+                                    selectedTable === t.name
+                                      ? "bg-primary/10 text-primary border border-primary/20"
+                                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  )}
+                                  onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
+                                  onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
+                                >
+                                  <Eye size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
+                                  <span className="truncate">{t.name}</span>
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent className="w-48">
+                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}>
+                                  Open Data
+                                </ContextMenuItem>
+                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}>
+                                  Open Structure
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Empty state */}
               {filteredTables.length === 0 && filteredViews.length === 0 && !search && (

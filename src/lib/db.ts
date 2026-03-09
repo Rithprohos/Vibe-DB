@@ -57,12 +57,18 @@ export interface GenerateSqlResponse {
   explanation?: string;
 }
 
-export async function connectDatabase(
-  path: string,
-  name: string,
-): Promise<string> {
+export async function connectDatabase(conn: Connection): Promise<string> {
+  const config = {
+    id: conn.id,
+    name: conn.name,
+    engine_type: conn.type === "turso" ? "Turso" : "Sqlite",
+    path: conn.path,
+    host: conn.host,
+    auth_token: conn.authToken,
+  };
+
   return measureDevFetch("connect_database", () =>
-    invoke<string>("connect_database", { path, name }),
+    invoke<string>("connect_database", { config }),
   );
 }
 
@@ -175,13 +181,31 @@ export async function buildCreateTableSQL(
   );
 }
 
+export async function buildCreateViewSQL(
+  viewName: string,
+  selectSql: string,
+  ifNotExists: boolean,
+  temporary: boolean,
+): Promise<string> {
+  return measureDevFetch("build_create_view_sql", () =>
+    invoke<string>("build_create_view_sql", {
+      viewName,
+      selectSql,
+      ifNotExists,
+      temporary,
+    }),
+  );
+}
+
 export async function getDefaultAiProviderConfig(): Promise<DefaultAiProviderConfig> {
   return measureDevFetch("get_default_ai_provider_config", () =>
     invoke<DefaultAiProviderConfig>("get_default_ai_provider_config"),
   );
 }
 
-export async function pingAiProvider(request: AiProviderPingRequest): Promise<void> {
+export async function pingAiProvider(
+  request: AiProviderPingRequest,
+): Promise<void> {
   return measureDevFetch("ping_ai_provider", () =>
     invoke<void>("ping_ai_provider", { request }),
   );

@@ -19,6 +19,7 @@ const TableView = lazy(() => import('./components/TableView/index'));
 const TableStructure = lazy(() => import('./components/TableStructure'));
 const QueryEditor = lazy(() => import('./components/QueryEditor'));
 const CreateTable = lazy(() => import('./components/CreateTable'));
+const CreateView = lazy(() => import('./components/CreateView'));
 const EditTable = lazy(() => import('./components/EditTable'));
 const AiPanel = lazy(() => import('./components/AiPanel'));
 const AlertModal = lazy(() => import('./components/AlertModal'));
@@ -71,7 +72,7 @@ export default function App() {
         
         // If not connected, connect to the tauri backend
         if (!connId) {
-          connId = await connectDatabase(conn.path, conn.name);
+          connId = await connectDatabase(conn);
           const version = await getDatabaseVersion(connId);
           addConnection(conn);
           updateConnection(conn.id, { connId, lastUsed: Date.now() });
@@ -301,6 +302,12 @@ export default function App() {
         return (
           <Suspense fallback={<ContentLoading />}>
             <CreateTable key={activeTab.id} tabId={activeTab.id} />
+          </Suspense>
+        );
+      case 'create-view':
+        return (
+          <Suspense fallback={<ContentLoading />}>
+            <CreateView key={activeTab.id} tabId={activeTab.id} />
           </Suspense>
         );
       case 'edit-table':

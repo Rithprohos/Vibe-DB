@@ -169,7 +169,10 @@ pub fn build_create_table_sql(
 ) -> Result<String, String> {
     let trimmed_table_name = table_name.trim();
     validate_identifier(trimmed_table_name, "Table")?;
-    if trimmed_table_name.to_ascii_lowercase().starts_with("sqlite_") {
+    if trimmed_table_name
+        .to_ascii_lowercase()
+        .starts_with("sqlite_")
+    {
         return Err("Table name cannot start with 'sqlite_'".to_string());
     }
 
@@ -234,6 +237,62 @@ pub fn build_create_table_sql(
     ))
 }
 
+fn normalize_view_select_sql(select_sql: &str) -> Result<String, String> {
+    let trimmed = select_sql.trim();
+    if trimmed.is_empty() {
+        return Err("View query is required".to_string());
+    }
+
+    let without_trailing_semicolon = trimmed.trim_end_matches(';').trim_end();
+    if without_trailing_semicolon.is_empty() {
+        return Err("View query is required".to_string());
+    }
+
+    if without_trailing_semicolon.contains(';') {
+        return Err("View query must contain a single SELECT statement".to_string());
+    }
+
+    let stripped = without_trailing_semicolon
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("--"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let upper = stripped.trim_start().to_ascii_uppercase();
+    if !(upper.starts_with("SELECT") || upper.starts_with("WITH")) {
+        return Err("View query must start with SELECT or WITH".to_string());
+    }
+
+    Ok(without_trailing_semicolon.to_string())
+}
+
+/// Builds a validated CREATE VIEW SQL statement from a view name and source query.
+#[tauri::command]
+pub fn build_create_view_sql(
+    view_name: String,
+    select_sql: String,
+    if_not_exists: bool,
+    temporary: bool,
+) -> Result<String, String> {
+    let trimmed_view_name = view_name.trim();
+    validate_identifier(trimmed_view_name, "View")?;
+    if trimmed_view_name
+        .to_ascii_lowercase()
+        .starts_with("sqlite_")
+    {
+        return Err("View name cannot start with 'sqlite_'".to_string());
+    }
+
+    let normalized_select_sql = normalize_view_select_sql(&select_sql)?;
+    let temporary_sql = if temporary { " TEMP" } else { "" };
+    let if_not_exists_sql = if if_not_exists { " IF NOT EXISTS" } else { "" };
+
+    Ok(format!(
+        "CREATE{temporary_sql} VIEW{if_not_exists_sql} {} AS\n{};",
+        quote_identifier(trimmed_view_name),
+        normalized_select_sql
+    ))
+}
+
 fn escape_sql_string(value: &str) -> String {
     value.replace('\'', "''")
 }
@@ -254,5 +313,99 @@ fn format_sql_literal(value: &str, is_numeric: bool) -> String {
         trimmed.to_string()
     } else {
         format!("'{}'", escape_sql_string(trimmed))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_create_view_sql;
+
+    #[test]
+    fn build_create_view_sql_basic() {
+        let sql = build_create_view_sql(
+            "active_users".to_string(),
+            "SELECT * FROM users".to_string(),
+            false,
+            false,
+        )
+        .expect("expected SQL");
+
+        assert_eq!(sql, "CREATE VIEW \"active_users\" AS\nSELECT * FROM users;");
+    }
+
+    #[test]
+    fn build_create_view_sql_temp_if_not_exists() {
+        let sql = build_create_view_sql(
+            "recent_orders".to_string(),
+            "WITH latest AS (SELECT * FROM orders) SELECT * FROM latest".to_string(),
+            true,
+            true,
+        )
+        .expect("expected SQL");
+
+        assert_eq!(
+            sql,
+            "CREATE TEMP VIEW IF NOT EXISTS \"recent_orders\" AS\nWITH latest AS (SELECT * FROM orders) SELECT * FROM latest;"
+        );
+    }
+
+    #[test]
+    fn build_create_view_sql_rejects_bad_identifier() {
+        let error = build_create_view_sql(
+            "123_invalid".to_string(),
+            "SELECT 1".to_string(),
+            false,
+            false,
+        )
+        .expect_err("expected validation error");
+
+        assert!(error.contains("View name must start with a letter or underscore"));
+    }
+
+    #[test]
+    fn build_create_view_sql_rejects_sqlite_prefix() {
+        let error = build_create_view_sql(
+            "sqlite_my_view".to_string(),
+            "SELECT 1".to_string(),
+            false,
+            false,
+        )
+        .expect_err("expected sqlite_ prefix error");
+
+        assert_eq!(error, "View name cannot start with 'sqlite_'");
+    }
+
+    #[test]
+    fn build_create_view_sql_rejects_empty_query() {
+        let error = build_create_view_sql("my_view".to_string(), "   ".to_string(), false, false)
+            .expect_err("expected empty query error");
+
+        assert_eq!(error, "View query is required");
+    }
+
+    #[test]
+    fn build_create_view_sql_rejects_non_select_query() {
+        let error = build_create_view_sql(
+            "my_view".to_string(),
+            "UPDATE users SET name = 'x'".to_string(),
+            false,
+            false,
+        )
+        .expect_err("expected non-select error");
+
+        assert_eq!(error, "View query must start with SELECT or WITH");
+    }
+
+    #[test]
+    fn build_create_view_sql_rejects_multi_statement_query() {
+        let error = build_create_view_sql(
+            "my_view".to_string(),
+            "SELECT * FROM users; SELECT * FROM orders".to_string(),
+            false,
+            false,
+        )
+        .expect_err("expected single statement error");
+
+        assert_eq!(error, "View query must contain a single SELECT statement");
     }
 }

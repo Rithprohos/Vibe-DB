@@ -9,7 +9,7 @@ export function AboutSettings() {
           <Database size={32} className="text-primary" />
         </div>
         <h2 className="text-xl font-bold text-foreground">VibeDB</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Cross-platform SQLite Manager</p>
+        <p className="mt-1 text-sm text-muted-foreground">Premium Database Manager</p>
         <div className="mt-2 text-xs font-mono text-muted-foreground/60">
           Version {packageJson.version}
         </div>
@@ -17,7 +17,7 @@ export function AboutSettings() {
 
       <div className="rounded-lg border border-border bg-secondary/30 p-4">
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
-          A premium, high-performance SQLite database manager built with Tauri v2, React, and
+          A premium, high-performance database manager built with Tauri v2, React, and
           Rust. Designed with AI-assisted &quot;vibe coding&quot; for a superior developer experience.
         </p>
       </div>
