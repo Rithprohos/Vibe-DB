@@ -119,7 +119,10 @@ export default function DatabaseBar() {
                               TAG_STYLES[conn.tag]
                             )}
                           >
-                            {conn.tag}
+                            {conn.tag === 'production' ? 'PROD' : 
+                             conn.tag === 'development' ? 'DEV' : 
+                             conn.tag === 'testing' ? 'TEST' : 
+                             conn.tag}
                           </span>
                         )}
                       </div>

@@ -96,6 +96,7 @@ See [`changelog/`](./changelog/) for completed features.
 - [x] Create View source query upgraded to CodeMirror with SQL syntax highlighting for consistency with Query Editor
 - [x] Manual view preview added with limited sample rows before executing `CREATE VIEW`
 - [x] Create View draft now survives tab switching without resetting, while typing stays responsive by avoiding persisted-store writes on each keystroke
+- [x] Shortened environment tags in DatabaseBar (`PROD`, `DEV`, `TEST`) to prevent layout overflow in narrow view
 
 ### Upcoming Tasks
 
