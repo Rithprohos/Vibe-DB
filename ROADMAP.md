@@ -12,7 +12,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v2.0.0)
+## Current State (v0.3.0)
 
 | Database | Status    | Notes                     |
 | -------- | --------- | ------------------------- |
@@ -32,6 +32,7 @@ Multi-database engine support for VibeDB.
 - `create_database` — Create new SQLite file
 - `get_database_version` — Retrieve SQLite version
 - `build_create_table_sql` — Generate validated `CREATE TABLE` SQL from structured input
+- `build_create_view_sql` — Generate validated `CREATE VIEW` SQL from structured input
 
 ### Query Safety (Implemented)
 
@@ -88,6 +89,14 @@ See [`changelog/`](./changelog/) for completed features.
 | Query Folders   | Medium   | Organize saved queries into folders/categories                           |
 | Query Templates | Low      | Pre-built queries for common operations (create table, insert, etc.)     |
 
+### Completed in v0.3.0
+
+- [x] Dedicated Create View tab shipped from the sidebar Views flow instead of opening a generic query template
+- [x] Create View now includes validated metadata fields (`View Name`, `TEMP`, `IF NOT EXISTS`) plus generated SQL preview
+- [x] Create View source query upgraded to CodeMirror with SQL syntax highlighting for consistency with Query Editor
+- [x] Manual view preview added with limited sample rows before executing `CREATE VIEW`
+- [x] Create View draft now survives tab switching without resetting, while typing stays responsive by avoiding persisted-store writes on each keystroke
+
 ### Upcoming Tasks
 
 **AI Panel Improvements**
@@ -142,7 +151,7 @@ See [`changelog/`](./changelog/) for completed features.
 
 ---
 
-## Phase 2: Turso Support (v2.0.0) ✅ Complete
+## Phase 2: Turso Support (v0.3.0) ✅ Complete
 
 [Turso](https://turso.tech/) — LibSQL/SQLite-compatible edge database.
 
@@ -339,7 +348,7 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 
 | Version | Target  | Focus                     | Status      |
 | ------- | ------- | ------------------------- | ----------- |
-| v2.0.0  | Q1 2026 | Turso & UI Revitalization | ✅ Complete |
+| v0.3.0  | Q1 2026 | Turso & UI Revitalization | ✅ Complete |
 | v0.3.1  | Q2 2026 | Embedded replicas, UI     | 📋 Planned  |
 | v0.4    | Q3 2026 | PostgreSQL                | 📋 Planned  |
 | v0.5    | Q4 2026 | MySQL                     | 📋 Planned  |

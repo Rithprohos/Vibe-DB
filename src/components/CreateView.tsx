@@ -1,5 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useAppStore, type QueryResult } from "../store/useAppStore";
+import {
+  useAppStore,
+  type CreateViewDraft,
+  type QueryResult,
+} from "../store/useAppStore";
 import { buildCreateViewSQL, executeQuery, listTables } from "../lib/db";
 import { validateViewName } from "../lib/tableName";
 import { copyToClipboard } from "../lib/copy";
@@ -27,12 +31,13 @@ interface Props {
 }
 
 const PREVIEW_LIMIT = 50;
-const DEFAULT_CREATE_VIEW_DRAFT = {
+const DEFAULT_CREATE_VIEW_DRAFT: CreateViewDraft = {
   viewName: "new_view",
   sourceSql: "SELECT * FROM table_name",
   ifNotExists: true,
   temporary: false,
-} as const;
+};
+const createViewDraftCache = new Map<string, CreateViewDraft>();
 const EMPTY_ARRAY: { name: string }[] = [];
 const BASIC_SETUP = {
   lineNumbers: true,
@@ -92,7 +97,6 @@ export default function CreateView({ tabId }: Props) {
   const connections = useAppStore((s) => s.connections);
   const tablesByConnection = useAppStore((s) => s.tablesByConnection);
   const setTables = useAppStore((s) => s.setTables);
-  const updateTab = useAppStore((s) => s.updateTab);
   const openTableTab = useAppStore((s) => s.openTableTab);
   const closeTab = useAppStore((s) => s.closeTab);
   const showToast = useAppStore((s) => s.showToast);
@@ -103,14 +107,20 @@ export default function CreateView({ tabId }: Props) {
     [connections, tab?.connectionId],
   );
   const connId = activeConnection?.connId;
-  const createViewDraft = tab?.createViewDraft ?? DEFAULT_CREATE_VIEW_DRAFT;
   const tables = tab?.connectionId
     ? (tablesByConnection[tab.connectionId] ?? EMPTY_ARRAY)
     : EMPTY_ARRAY;
-  const viewName = createViewDraft.viewName;
-  const sourceSql = createViewDraft.sourceSql;
-  const ifNotExists = createViewDraft.ifNotExists;
-  const temporary = createViewDraft.temporary;
+  const [draft, setDraft] = useState(() => {
+    return (
+      createViewDraftCache.get(tabId) ??
+      tab?.createViewDraft ??
+      DEFAULT_CREATE_VIEW_DRAFT
+    );
+  });
+  const viewName = draft.viewName;
+  const sourceSql = draft.sourceSql;
+  const ifNotExists = draft.ifNotExists;
+  const temporary = draft.temporary;
 
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -127,6 +137,10 @@ export default function CreateView({ tabId }: Props) {
     return nextSchema;
   }, [tables]);
 
+  useEffect(() => {
+    createViewDraftCache.set(tabId, draft);
+  }, [draft, tabId]);
+
   const updateCreateViewDraft = useCallback(
     (
       updates: Partial<{
@@ -136,14 +150,12 @@ export default function CreateView({ tabId }: Props) {
         temporary: boolean;
       }>,
     ) => {
-      updateTab(tabId, {
-        createViewDraft: {
-          ...createViewDraft,
-          ...updates,
-        },
-      });
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        ...updates,
+      }));
     },
-    [createViewDraft, tabId, updateTab],
+    [],
   );
 
   const liveViewNameError = useMemo(() => {
@@ -205,6 +217,7 @@ export default function CreateView({ tabId }: Props) {
   }, [viewName, sourceSql, ifNotExists, temporary]);
 
   const handleCancel = useCallback(() => {
+    createViewDraftCache.delete(tabId);
     closeTab(tabId);
   }, [closeTab, tabId]);
 
@@ -280,7 +293,7 @@ export default function CreateView({ tabId }: Props) {
       }
 
       const trimmedViewName = viewName.trim();
-      updateTab(tabId, { title: `✓ ${trimmedViewName}` });
+      createViewDraftCache.delete(tabId);
       closeTab(tabId);
       if (activeConnection) {
         openTableTab(activeConnection.id, trimmedViewName, "data");
@@ -304,9 +317,8 @@ export default function CreateView({ tabId }: Props) {
     setTables,
     showToast,
     sourceSql,
-    tabId,
     temporary,
-    updateTab,
+    tabId,
     viewName,
   ]);
 

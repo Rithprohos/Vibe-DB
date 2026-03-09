@@ -1,6 +1,6 @@
 {
   "name": "vibe-db",
-  "version": "2.0.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Cross-platform database manager with AI-powered code generation",
