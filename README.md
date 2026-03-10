@@ -16,7 +16,7 @@
 A modern, high-performance database manager built with Tauri v2 and React. Supports SQLite and Turso (libSQL). Engineered for speed, security, and a premium developer experience.
 
 ![VibeDB](https://img.shields.io/badge/version-0.2.7-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 [![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet)](./ROADMAP.md)
 
