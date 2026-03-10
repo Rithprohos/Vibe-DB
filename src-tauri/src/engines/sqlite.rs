@@ -4,7 +4,7 @@ use sqlx::{Column, Row};
 use tokio::sync::RwLock;
 
 use super::traits::DatabaseEngine;
-use super::types::{ColumnInfo, ConnectionConfig, QueryResult, TableInfo};
+use super::types::{ColumnInfo, ConnectionConfig, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, TableStructure};
 use super::{EngineError, EngineResult};
 
 /// SQLite database engine implementation using sqlx.
@@ -31,15 +31,31 @@ impl SqliteEngine {
             ));
         }
 
-        // Prevent control characters in identifiers while still allowing
-        // legitimate SQLite names such as those containing spaces.
+        // Prevent control characters and statement separators in identifiers
         if trimmed.chars().any(|c| c.is_control()) {
             return Err(EngineError::QueryError(format!(
                 "Invalid table name '{}': contains control characters",
                 trimmed
             )));
         }
+
+        // Reject semicolons (statement separator) to prevent injection
+        if trimmed.contains(';') {
+            return Err(EngineError::QueryError(format!(
+                "Invalid table name '{}': contains semicolon",
+                trimmed
+            )));
+        }
+
+        // Reject hyphens - they require quoting and can be ambiguous
+        if trimmed.contains('-') {
+            return Err(EngineError::QueryError(format!(
+                "Invalid table name '{}': contains hyphen",
+                trimmed
+            )));
+        }
         Ok(())
+
     }
 
     fn quote_identifier(identifier: &str) -> String {
@@ -179,14 +195,8 @@ impl DatabaseEngine for SqliteEngine {
             EngineError::ConfigError("Database path is required for SQLite".to_string())
         })?;
 
-        if !std::path::Path::new(path).exists() {
-            return Err(EngineError::ConnectionFailed(format!(
-                "Database file not found: {}",
-                path
-            )));
-        }
-
-        let connection_string = format!("sqlite:{}?mode=rw", path);
+        // Create file if it doesn't exist (rwc = read-write-create)
+        let connection_string = format!("sqlite:{}?mode=rwc", path);
 
         // Keep a single SQLite connection to avoid schema visibility races
         // across pooled connections after ALTER TABLE operations.
@@ -237,7 +247,7 @@ impl DatabaseEngine for SqliteEngine {
         Ok(tables)
     }
 
-    async fn get_table_structure(&self, table_name: &str) -> EngineResult<Vec<ColumnInfo>> {
+    async fn get_table_structure(&self, table_name: &str) -> EngineResult<TableStructure> {
         Self::validate_table_name(table_name)?;
 
         let pool = self.pool.read().await;
@@ -245,17 +255,17 @@ impl DatabaseEngine for SqliteEngine {
             EngineError::ConnectionFailed("Not connected to database".to_string())
         })?;
 
-        let query = format!(
-            "PRAGMA table_info({})",
-            Self::quote_identifier(table_name.trim())
-        );
+        let table_name_trimmed = table_name.trim();
+        let quoted_table = Self::quote_identifier(table_name_trimmed);
 
-        let rows = sqlx::query(&query)
+        // Get columns
+        let column_query = format!("PRAGMA table_info({})", quoted_table);
+        let column_rows = sqlx::query(&column_query)
             .fetch_all(pool)
             .await
             .map_err(|e| EngineError::QueryError(e.to_string()))?;
 
-        let columns = rows
+        let columns: Vec<ColumnInfo> = column_rows
             .iter()
             .map(|row| ColumnInfo {
                 cid: row.get("cid"),
@@ -267,7 +277,61 @@ impl DatabaseEngine for SqliteEngine {
             })
             .collect();
 
-        Ok(columns)
+        // Get indexes
+        let index_query = format!("PRAGMA index_list({})", quoted_table);
+        let index_rows = sqlx::query(&index_query)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        let mut indexes: Vec<IndexInfo> = Vec::new();
+        for index_row in &index_rows {
+            let index_name: String = index_row.get("name");
+            let unique: i32 = index_row.get("unique");
+
+            // Get columns for this index
+            let index_info_query = format!(
+                "PRAGMA index_info({})",
+                Self::quote_identifier(&index_name)
+            );
+            let index_info_rows = sqlx::query(&index_info_query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+            let index_columns: Vec<String> = index_info_rows
+                .iter()
+                .map(|row| row.get::<String, _>("name"))
+                .collect();
+
+            indexes.push(IndexInfo {
+                name: index_name,
+                unique: unique != 0,
+                columns: index_columns,
+            });
+        }
+
+        // Get foreign keys
+        let fk_query = format!("PRAGMA foreign_key_list({})", quoted_table);
+        let fk_rows = sqlx::query(&fk_query)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        let foreign_keys: Vec<ForeignKeyInfo> = fk_rows
+            .iter()
+            .map(|row| ForeignKeyInfo {
+                from_col: row.get("from"),
+                to_table: row.get("table"),
+                to_col: row.get("to"),
+            })
+            .collect();
+
+        Ok(TableStructure {
+            columns,
+            indexes,
+            foreign_keys,
+        })
     }
 
     async fn execute_query(&self, query: &str) -> EngineResult<QueryResult> {

@@ -7,6 +7,7 @@ export interface Connection {
   lastUsed: number;
   tag?: "local" | "testing" | "development" | "production";
   host?: string;
+  hasAuthToken?: boolean;
   authToken?: string;
 }
 
@@ -22,6 +23,24 @@ export interface ColumnInfo {
   notnull: number;
   dflt_value: string | null;
   pk: number;
+}
+
+export interface IndexInfo {
+  name: string;
+  unique: boolean;
+  columns: string[];
+}
+
+export interface ForeignKeyInfo {
+  from_col: string;
+  to_table: string;
+  to_col: string;
+}
+
+export interface TableStructureData {
+  columns: ColumnInfo[];
+  indexes: IndexInfo[];
+  foreign_keys: ForeignKeyInfo[];
 }
 
 export interface QueryResult {
@@ -53,7 +72,7 @@ export interface TableViewState {
   hasLoadedData: boolean;
   totalRows: number;
   hasLoadedRowCount: boolean;
-  structure: ColumnInfo[];
+  structure: TableStructureData | null;
   hasLoadedStructure: boolean;
   page: number;
   pageSize: number;
@@ -199,7 +218,14 @@ export interface AppState {
     updates: Partial<
       Pick<
         Connection,
-        "name" | "tag" | "connId" | "lastUsed" | "path" | "host" | "authToken"
+        | "name"
+        | "tag"
+        | "connId"
+        | "lastUsed"
+        | "path"
+        | "host"
+        | "hasAuthToken"
+        | "authToken"
       >
     >,
   ) => void;

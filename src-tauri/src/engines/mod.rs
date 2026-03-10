@@ -6,7 +6,7 @@ pub mod types;
 pub use sqlite::SqliteEngine;
 pub use traits::DatabaseEngine;
 pub use turso::TursoEngine;
-pub use types::{ColumnInfo, ConnectionConfig, EngineType, QueryResult, TableInfo};
+pub use types::{ColumnInfo, ConnectionConfig, EngineType, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, TableStructure};
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -2,59 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { executeQuery, getTableStructure, listTables } from '../lib/db';
 import {
   useAppStore,
-  type ColumnInfo,
-  type Tab,
+  type TableStructureData,
   type TableInfo,
 } from '../store/useAppStore';
 import { validateColumnName, validateTableName } from '../lib/tableName';
 import {
   getDataTypesForEngine,
   getEngineTypeLabel,
-  getSqliteTypeColor,
 } from '../lib/createTableConstants';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectLabel,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertCircle,
-  Loader2,
-  PencilRuler,
-  RefreshCw,
-  Table2,
-  Trash2,
-  Type,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  EditTableErrorBanner,
+  EditTableHeader,
+  EditTableOperationsPanel,
+  EditTableSchemaSidebar,
+} from './edit-table/Sections';
+import { getTableTabTitle, quoteIdentifier, validateIndexName } from './edit-table/shared';
 
 interface Props {
   tableName: string;
   tabId: string;
-}
-
-const FORM_FIELD_CLASS =
-  'h-9 bg-background border-border placeholder:text-muted-foreground/40 text-sm ' +
-  'font-medium focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary';
-const FIELD_ERROR_CLASS =
-  'border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive';
-
-function quoteIdentifier(name: string): string {
-  return `"${name.split('"').join('""')}"`;
-}
-
-function getTableTabTitle(type: Tab['type'], tableName: string): string {
-  if (type === 'data') return `${tableName} (Data)`;
-  if (type === 'structure') return `${tableName} (Structure)`;
-  if (type === 'edit-table') return `${tableName} (Edit)`;
-  return tableName;
 }
 
 export default function EditTable({ tableName, tabId }: Props) {
@@ -75,7 +41,13 @@ export default function EditTable({ tableName, tabId }: Props) {
   const engineType = connection?.type ?? 'sqlite';
 
   const [currentTableName, setCurrentTableName] = useState(tableName);
-  const [columns, setColumns] = useState<ColumnInfo[]>([]);
+  const [tableStructure, setTableStructure] = useState<TableStructureData | null>(null);
+  const columns = useMemo(() => tableStructure?.columns ?? [], [tableStructure]);
+  const indexes = useMemo(() => tableStructure?.indexes ?? [], [tableStructure]);
+  const manageableIndexes = useMemo(
+    () => indexes.filter((index) => !index.name.startsWith('sqlite_autoindex_')),
+    [indexes],
+  );
   const [loadingColumns, setLoadingColumns] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -88,6 +60,11 @@ export default function EditTable({ tableName, tabId }: Props) {
 
   const [renameColumnFrom, setRenameColumnFrom] = useState('');
   const [renameColumnTo, setRenameColumnTo] = useState('');
+  const [newIndexName, setNewIndexName] = useState('');
+  const [newIndexColumns, setNewIndexColumns] = useState<string[]>([]);
+  const [newIndexUnique, setNewIndexUnique] = useState(false);
+  const [dropIndexName, setDropIndexName] = useState('');
+  const [dropIndexConfirm, setDropIndexConfirm] = useState(false);
 
   const [dropColumnName, setDropColumnName] = useState('');
   const [dropConfirm, setDropConfirm] = useState(false);
@@ -121,6 +98,22 @@ export default function EditTable({ tableName, tabId }: Props) {
     if (!nextName || nextName === renameColumnFrom.trim()) return null;
     return validateColumnName(nextName);
   }, [renameColumnTo, renameColumnFrom]);
+  const newIndexNameError = useMemo(() => {
+    const trimmed = newIndexName.trim();
+    if (!trimmed) return null;
+    return validateIndexName(trimmed);
+  }, [newIndexName]);
+  const selectedCreateIndexColumns = useMemo(
+    () => newIndexColumns.filter((columnName) => columns.some((column) => column.name === columnName)),
+    [newIndexColumns, columns],
+  );
+  const createIndexColumnsError = useMemo(() => {
+    if (!newIndexName.trim()) return null;
+    if (selectedCreateIndexColumns.length === 0) {
+      return 'Select at least one column';
+    }
+    return null;
+  }, [newIndexName, selectedCreateIndexColumns.length]);
   const engineDataTypes = useMemo(
     () => getDataTypesForEngine(engineType),
     [engineType],
@@ -153,10 +146,11 @@ export default function EditTable({ tableName, tabId }: Props) {
       const retryDelayMs = options?.retryDelayMs ?? 80;
       const ensureColumnName = options?.ensureColumnName?.trim();
 
-      let cols: ColumnInfo[] = [];
+      let structureData: Awaited<ReturnType<typeof getTableStructure>> | null = null;
       let hasEnsuredColumn = false;
       for (let attempt = 0; attempt <= retries; attempt += 1) {
-        cols = await getTableStructure(targetTableName, connId);
+        structureData = await getTableStructure(targetTableName, connId);
+        const cols = structureData.columns;
         hasEnsuredColumn = !ensureColumnName || cols.some((c) => c.name === ensureColumnName);
         if (hasEnsuredColumn) {
           break;
@@ -167,7 +161,8 @@ export default function EditTable({ tableName, tabId }: Props) {
       }
 
       if (!isMountedRef.current) return false;
-      setColumns(cols);
+      setTableStructure(structureData);
+      const cols = structureData?.columns ?? [];
       if (cols.length > 0) {
         const firstColumnName = cols[0].name;
         const preferredColumnName = options?.preferredColumnName?.trim();
@@ -228,6 +223,24 @@ export default function EditTable({ tableName, tabId }: Props) {
   useEffect(() => {
     refreshStructure(currentTableName);
   }, [refreshStructure, currentTableName]);
+
+  useEffect(() => {
+    setNewIndexColumns((prev) =>
+      prev.filter((columnName) => columns.some((column) => column.name === columnName)),
+    );
+  }, [columns]);
+
+  useEffect(() => {
+    setDropIndexName((prev) => {
+      if (prev && manageableIndexes.some((index) => index.name === prev)) {
+        return prev;
+      }
+      return manageableIndexes[0]?.name ?? '';
+    });
+    if (!manageableIndexes.length) {
+      setDropIndexConfirm(false);
+    }
+  }, [manageableIndexes]);
 
   const renameRelatedTabs = useCallback((oldName: string, newName: string) => {
     if (!connectionId) return;
@@ -391,6 +404,81 @@ export default function EditTable({ tableName, tabId }: Props) {
     showToast,
   ]);
 
+  const toggleIndexColumn = useCallback((columnName: string) => {
+    setNewIndexColumns((prev) => (
+      prev.includes(columnName)
+        ? prev.filter((existing) => existing !== columnName)
+        : [...prev, columnName]
+    ));
+  }, []);
+
+  const handleCreateIndex = useCallback(async () => {
+    const indexName = newIndexName.trim();
+    if (!indexName) return;
+
+    const nameError = validateIndexName(indexName);
+    if (nameError) {
+      setError(nameError);
+      showToast({ type: 'error', message: 'Invalid index name' });
+      return;
+    }
+
+    const alreadyExists = indexes.some(
+      (index) => index.name.toLowerCase() === indexName.toLowerCase(),
+    );
+    if (alreadyExists) {
+      setError(`Index "${indexName}" already exists`);
+      showToast({ type: 'error', message: 'Duplicate index name' });
+      return;
+    }
+
+    if (selectedCreateIndexColumns.length === 0) {
+      setError('Select at least one column for the index');
+      showToast({ type: 'error', message: 'No index columns selected' });
+      return;
+    }
+
+    const uniqueSql = newIndexUnique ? 'UNIQUE ' : '';
+    const quotedColumns = selectedCreateIndexColumns.map((columnName) => quoteIdentifier(columnName));
+    const sql =
+      `CREATE ${uniqueSql}INDEX ${quoteIdentifier(indexName)} ` +
+      `ON ${quoteIdentifier(currentTableName)} (${quotedColumns.join(', ')})`;
+    const ok = await runAlter('create-index', sql, `Created index ${indexName}`);
+    if (!ok) return;
+
+    setNewIndexName('');
+    setNewIndexUnique(false);
+    setNewIndexColumns([]);
+    await refreshStructure();
+  }, [
+    currentTableName,
+    indexes,
+    newIndexName,
+    newIndexUnique,
+    refreshStructure,
+    runAlter,
+    selectedCreateIndexColumns,
+    showToast,
+  ]);
+
+  const handleDropIndex = useCallback(async () => {
+    const indexName = dropIndexName.trim();
+    if (!indexName || !dropIndexConfirm) return;
+
+    if (indexName.startsWith('sqlite_autoindex_')) {
+      setError('System-managed SQLite auto indexes cannot be dropped.');
+      showToast({ type: 'error', message: 'Cannot drop system index' });
+      return;
+    }
+
+    const sql = `DROP INDEX ${quoteIdentifier(indexName)}`;
+    const ok = await runAlter('drop-index', sql, `Dropped index ${indexName}`);
+    if (!ok) return;
+
+    setDropIndexConfirm(false);
+    await refreshStructure();
+  }, [dropIndexConfirm, dropIndexName, refreshStructure, runAlter, showToast]);
+
   const handleDropColumn = useCallback(async () => {
     const column = dropColumnName.trim();
     if (!column || !dropConfirm) return;
@@ -399,10 +487,10 @@ export default function EditTable({ tableName, tabId }: Props) {
     setLoadingColumns(true);
     setError('');
 
-    let existingColumns: ColumnInfo[] = [];
+    let existingStructure: Awaited<ReturnType<typeof getTableStructure>> | null = null;
     try {
-      existingColumns = await getTableStructure(currentTableName, connId);
-      setColumns(existingColumns);
+      existingStructure = await getTableStructure(currentTableName, connId);
+      setTableStructure(existingStructure);
     } catch (e: any) {
       setLoadingColumns(false);
       setError(e?.toString?.() ?? 'Failed to refresh schema before drop');
@@ -410,7 +498,7 @@ export default function EditTable({ tableName, tabId }: Props) {
       return;
     }
 
-    const exactColumn = existingColumns.find((c) => c.name === column);
+    const exactColumn = existingStructure?.columns.find((c) => c.name === column);
     if (!exactColumn) {
       setLoadingColumns(false);
       setError(
@@ -441,375 +529,80 @@ export default function EditTable({ tableName, tabId }: Props) {
   ]);
 
   const isBusy = useCallback((action: string) => busyAction === action, [busyAction]);
+  const handleRefreshSchema = useCallback(() => {
+    void refreshStructure(currentTableName);
+  }, [currentTableName, refreshStructure]);
 
   return (
     <div className="h-full overflow-auto bg-background custom-scrollbar-hide">
       <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-4">
-        <header className="rounded-md border border-border bg-surface/30 backdrop-blur-sm">
-          <div className="border-b border-border/60 px-4 py-3 md:px-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={
-                    "flex h-8 w-8 items-center justify-center rounded-sm " +
-                    "border border-primary/30 bg-primary/10"
-                  }
-                >
-                  <PencilRuler size={15} className="text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">Edit Table</h2>
-                  <p className="text-[11px] text-muted-foreground">
-                    Apply ALTER TABLE operations on{' '}
-                    <span className="font-mono text-foreground">
-                      {currentTableName}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refreshStructure(currentTableName)}
-                disabled={loadingColumns}
-                className="border-border/60 bg-background/40 text-xs"
-              >
-                {loadingColumns ? (
-                  <Loader2 size={12} className="mr-1.5 animate-spin" />
-                ) : (
-                  <RefreshCw size={12} className="mr-1.5" />
-                )}
-                Refresh Schema
-              </Button>
-            </div>
-          </div>
+        <EditTableHeader
+          currentTableName={currentTableName}
+          loadingColumns={loadingColumns}
+          columns={columns}
+          indexes={indexes}
+          connectionName={connection?.name}
+          onRefresh={handleRefreshSchema}
+        />
 
-          <div className="grid grid-cols-2 gap-3 px-4 py-3 text-[11px] md:grid-cols-4 md:px-5">
-            <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
-              <div className="text-muted-foreground">Columns</div>
-              <div className="mt-1 font-mono text-foreground">{columns.length}</div>
-            </div>
-            <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
-              <div className="text-muted-foreground">Primary Keys</div>
-              <div className="mt-1 font-mono text-foreground">
-                {columns.filter(c => c.pk === 1).length}
-              </div>
-            </div>
-            <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
-              <div className="text-muted-foreground">Required</div>
-              <div className="mt-1 font-mono text-foreground">
-                {columns.filter(c => c.notnull === 1).length}
-              </div>
-            </div>
-            <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
-              <div className="text-muted-foreground">Connection</div>
-              <div className="mt-1 truncate font-mono text-foreground">
-                {connection?.name ?? 'Unknown'}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {error && (
-          <div
-            className={
-              "flex items-start gap-2 rounded-sm border " +
-              "border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
-            }
-          >
-            <AlertCircle size={14} className="mt-0.5 shrink-0" />
-            <span className="whitespace-pre-wrap break-words">{error}</span>
-          </div>
-        )}
+        {error && <EditTableErrorBanner error={error} />}
 
         <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
-          <div className="space-y-4">
-            <section className="rounded-md border border-border bg-surface/20 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Table2 size={14} className="text-primary" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Rename Table
-                </h3>
-              </div>
-              <div className="flex flex-col gap-2 md:flex-row">
-                <Input
-                  value={nextTableName}
-                  onChange={(e) => setNextTableName(e.target.value)}
-                  placeholder="New table name"
-                  className={cn(FORM_FIELD_CLASS, renameTableNameError && FIELD_ERROR_CLASS)}
-                />
-                <Button
-                  onClick={handleRenameTable}
-                  disabled={
-                    loadingColumns ||
-                    isBusy('rename-table') ||
-                    !nextTableName.trim() ||
-                    nextTableName.trim() === currentTableName ||
-                    Boolean(renameTableNameError)
-                  }
-                  className="h-9 md:min-w-[130px]"
-                >
-                  {isBusy('rename-table') ? (
-                    <Loader2 size={14} className="mr-1.5 animate-spin" />
-                  ) : null}
-                  Rename
-                </Button>
-              </div>
-              {renameTableNameError && (
-                <p className="mt-2 text-[11px] text-destructive">{renameTableNameError}</p>
-              )}
-            </section>
+          <EditTableOperationsPanel
+            loadingColumns={loadingColumns}
+            isBusy={isBusy}
+            columns={columns}
+            manageableIndexes={manageableIndexes}
+            currentTableName={currentTableName}
+            engineTypeLabel={engineTypeLabel}
+            engineDataTypes={engineDataTypes}
+            nextTableName={nextTableName}
+            onNextTableNameChange={setNextTableName}
+            renameTableNameError={renameTableNameError}
+            onRenameTable={() => void handleRenameTable()}
+            newColumnName={newColumnName}
+            onNewColumnNameChange={setNewColumnName}
+            newColumnNameError={newColumnNameError}
+            newColumnType={newColumnType}
+            onNewColumnTypeChange={setNewColumnType}
+            newColumnDefault={newColumnDefault}
+            onNewColumnDefaultChange={setNewColumnDefault}
+            newColumnNotNull={newColumnNotNull}
+            onNewColumnNotNullChange={setNewColumnNotNull}
+            onAddColumn={() => void handleAddColumn()}
+            renameColumnFrom={renameColumnFrom}
+            onRenameColumnFromChange={setRenameColumnFrom}
+            renameColumnTo={renameColumnTo}
+            onRenameColumnToChange={setRenameColumnTo}
+            renameColumnToError={renameColumnToError}
+            onRenameColumn={() => void handleRenameColumn()}
+            newIndexName={newIndexName}
+            onNewIndexNameChange={setNewIndexName}
+            newIndexNameError={newIndexNameError}
+            newIndexUnique={newIndexUnique}
+            onNewIndexUniqueChange={setNewIndexUnique}
+            newIndexColumns={newIndexColumns}
+            onToggleIndexColumn={toggleIndexColumn}
+            selectedCreateIndexColumnsCount={selectedCreateIndexColumns.length}
+            createIndexColumnsError={createIndexColumnsError}
+            onCreateIndex={() => void handleCreateIndex()}
+            dropIndexName={dropIndexName}
+            onDropIndexNameChange={setDropIndexName}
+            dropIndexConfirm={dropIndexConfirm}
+            onDropIndexConfirmChange={setDropIndexConfirm}
+            onDropIndex={() => void handleDropIndex()}
+            dropColumnName={dropColumnName}
+            onDropColumnNameChange={setDropColumnName}
+            dropConfirm={dropConfirm}
+            onDropConfirmChange={setDropConfirm}
+            onDropColumn={() => void handleDropColumn()}
+          />
 
-            <section className="rounded-md border border-border bg-surface/20 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Type size={14} className="text-primary" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Add Column
-                </h3>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <Input
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                  placeholder="Column name"
-                  className={cn(FORM_FIELD_CLASS, newColumnNameError && FIELD_ERROR_CLASS)}
-                />
-                <Select value={newColumnType} onValueChange={setNewColumnType}>
-                  <SelectTrigger className={cn(FORM_FIELD_CLASS, 'justify-start gap-2')}>
-                    <span
-                      className={cn(
-                        'font-mono text-xs font-semibold tracking-wider',
-                        getSqliteTypeColor(newColumnType),
-                      )}
-                    >
-                      {newColumnType}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent className="border-border/80">
-                    <SelectGroup>
-                      <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {engineTypeLabel}
-                      </SelectLabel>
-                      {engineDataTypes.map((typeOption) => (
-                        <SelectItem
-                          key={typeOption.value}
-                          value={typeOption.value}
-                          className={cn(
-                            'font-mono text-xs font-semibold tracking-wider focus:bg-background/70',
-                            getSqliteTypeColor(typeOption.value),
-                          )}
-                        >
-                          {typeOption.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={newColumnDefault}
-                  onChange={(e) => setNewColumnDefault(e.target.value)}
-                  placeholder="DEFAULT value/expression (optional)"
-                  className={cn(FORM_FIELD_CLASS, 'md:col-span-2')}
-                />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                  <Checkbox checked={newColumnNotNull} onCheckedChange={(v) => setNewColumnNotNull(!!v)} />
-                  NOT NULL
-                </label>
-                <Button
-                  onClick={handleAddColumn}
-                  disabled={
-                    loadingColumns ||
-                    isBusy('add-column') ||
-                    !newColumnName.trim() ||
-                    Boolean(newColumnNameError)
-                  }
-                  className="h-8"
-                >
-                  {isBusy('add-column') ? (
-                    <Loader2 size={13} className="mr-1.5 animate-spin" />
-                  ) : null}
-                  Add Column
-                </Button>
-              </div>
-              {newColumnNameError && (
-                <p className="mt-2 text-[11px] text-destructive">{newColumnNameError}</p>
-              )}
-            </section>
-
-            <section className="rounded-md border border-border bg-surface/20 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <PencilRuler size={14} className="text-primary" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Rename Column
-                </h3>
-              </div>
-              <div className="grid gap-2 md:grid-cols-[1fr,1fr,auto]">
-                <Select value={renameColumnFrom} onValueChange={setRenameColumnFrom}>
-                  <SelectTrigger className={FORM_FIELD_CLASS}>
-                    <SelectValue placeholder="Current column" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {columns.map((column) => (
-                      <SelectItem
-                        key={`rename-${column.cid}-${column.name}`}
-                        value={column.name}
-                      >
-                        {column.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={renameColumnTo}
-                  onChange={(e) => setRenameColumnTo(e.target.value)}
-                  placeholder="New column name"
-                  className={cn(FORM_FIELD_CLASS, renameColumnToError && FIELD_ERROR_CLASS)}
-                />
-                <Button
-                  onClick={handleRenameColumn}
-                  disabled={
-                    loadingColumns ||
-                    isBusy('rename-column') ||
-                    !renameColumnFrom.trim() ||
-                    !renameColumnTo.trim() ||
-                    Boolean(renameColumnToError)
-                  }
-                  className="h-9"
-                >
-                  {isBusy('rename-column') ? (
-                    <Loader2 size={13} className="mr-1.5 animate-spin" />
-                  ) : null}
-                  Rename
-                </Button>
-              </div>
-              {renameColumnToError && (
-                <p className="mt-2 text-[11px] text-destructive">{renameColumnToError}</p>
-              )}
-            </section>
-
-            <section className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Trash2 size={14} className="text-destructive" />
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-destructive/90">
-                  Drop Column
-                </h3>
-              </div>
-              <div className="grid gap-2 md:grid-cols-[1fr,auto,auto] md:items-center">
-                <Select value={dropColumnName} onValueChange={setDropColumnName}>
-                  <SelectTrigger className={FORM_FIELD_CLASS}>
-                    <SelectValue placeholder="Choose column to drop" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {columns.map((column) => (
-                      <SelectItem
-                        key={`drop-${column.cid}-${column.name}`}
-                        value={column.name}
-                      >
-                        {column.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <label
-                  className={
-                    "inline-flex items-center gap-2 rounded-md border " +
-                    "border-border/70 bg-background/30 px-3 py-2 text-xs text-muted-foreground"
-                  }
-                >
-                  <Checkbox
-                    checked={dropConfirm}
-                    onCheckedChange={(v) => setDropConfirm(!!v)}
-                  />
-                  Confirm
-                </label>
-                <Button
-                  variant="destructive"
-                  onClick={handleDropColumn}
-                  disabled={
-                    loadingColumns ||
-                    isBusy('drop-column') ||
-                    !dropColumnName.trim() ||
-                    !dropConfirm
-                  }
-                  className="h-9"
-                >
-                  {isBusy('drop-column') ? (
-                    <Loader2 size={13} className="mr-1.5 animate-spin" />
-                  ) : null}
-                  Drop
-                </Button>
-              </div>
-            </section>
-          </div>
-
-          <aside className="rounded-md border border-border bg-surface/30 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Current Schema
-                </h3>
-                <p className="text-[11px] text-muted-foreground">
-                  Live structure after each operation
-                </p>
-              </div>
-              <span
-                className={
-                  "rounded-md border border-border/60 bg-background/50 " +
-                  "px-2 py-1 text-[10px] font-mono text-muted-foreground"
-                }
-              >
-                {columns.length} cols
-              </span>
-            </div>
-
-            <div className="max-h-[70vh] overflow-auto custom-scrollbar-hide">
-              {loadingColumns ? (
-                <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
-                  <Loader2 size={13} className="animate-spin" />
-                  Loading table structure...
-                </div>
-              ) : columns.length === 0 ? (
-                <div className="px-4 py-6 text-xs text-muted-foreground">
-                  No columns found for this table.
-                </div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-secondary/70 backdrop-blur-sm">
-                    <tr className="border-b border-border/60 text-muted-foreground">
-                      <th className="px-4 py-2 text-left font-semibold uppercase tracking-wider">Name</th>
-                      <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider">Type</th>
-                      <th className="px-3 py-2 text-center font-semibold uppercase tracking-wider">NN</th>
-                      <th className="px-3 py-2 text-center font-semibold uppercase tracking-wider">PK</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {columns.map((column, index) => (
-                      <tr
-                        key={`${column.cid}-${column.name}`}
-                        className={cn(
-                          'border-b border-border/40',
-                          index % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20',
-                        )}
-                      >
-                        <td className="px-4 py-2 font-medium text-foreground">{column.name}</td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {column.col_type || '—'}
-                        </td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">
-                          {column.notnull ? 'Y' : 'N'}
-                        </td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">
-                          {column.pk ? 'Y' : 'N'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </aside>
+          <EditTableSchemaSidebar
+            loadingColumns={loadingColumns}
+            columns={columns}
+            indexes={indexes}
+          />
         </div>
       </div>
     </div>

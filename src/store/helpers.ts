@@ -18,7 +18,7 @@ export function createDefaultTableViewState(): TableViewState {
     hasLoadedData: false,
     totalRows: 0,
     hasLoadedRowCount: false,
-    structure: [],
+    structure: null,
     hasLoadedStructure: false,
     page: 0,
     pageSize: DEFAULT_TABLE_PAGE_SIZE,

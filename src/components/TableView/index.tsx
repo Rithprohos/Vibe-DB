@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useCallback, useRef, useState, startTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Key, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Hash, Key, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 import {
@@ -109,6 +109,8 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     fetchRowCount(appliedFilters);
   }, [fetchStructure, fetchRowCount, appliedFilters]);
 
+  const columnInfos = useMemo(() => structure?.columns ?? [], [structure]);
+
   const {
     newRowData,
     setNewRowData,
@@ -120,7 +122,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     setError: setNewRowError
   } = useNewRow(
     tableName,
-    structure,
+    columnInfos,
     activeConnection,
     refreshVisibleData,
   );
@@ -141,7 +143,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     setError: setCellError
   } = useCellEditing(
     tableName,
-    structure,
+    columnInfos,
     activeConnection,
     tableData,
     refreshVisibleData,
@@ -235,12 +237,32 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   }, []);
 
   const columnInfoByName = useMemo(() => {
-    const map: Record<string, (typeof structure)[number]> = {};
-    structure.forEach((column) => {
+    const map: Record<string, (typeof columnInfos)[number]> = {};
+    columnInfos.forEach((column) => {
       map[column.name] = column;
     });
     return map;
-  }, [structure]);
+  }, [columnInfos]);
+
+  const indexMetaByColumnName = useMemo(() => {
+    const map: Record<string, { unique: boolean; names: string[] }> = {};
+    const indexes = structure?.indexes ?? [];
+    indexes.forEach((index) => {
+      index.columns.forEach((columnName) => {
+        const existing = map[columnName];
+        if (existing) {
+          existing.unique = existing.unique || index.unique;
+          existing.names.push(index.name);
+          return;
+        }
+        map[columnName] = {
+          unique: index.unique,
+          names: [index.name],
+        };
+      });
+    });
+    return map;
+  }, [structure?.indexes]);
 
   const handleRefreshAll = useCallback(() => {
     fetchStructure();
@@ -335,6 +357,11 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       let type = columnInfo?.col_type.toLowerCase() || 'text';
       if (type === 'integer') type = 'int';
       const isPk = columnInfo?.pk;
+      const indexMeta = indexMetaByColumnName[colName];
+      const hasIndex = Boolean(indexMeta);
+      const indexTooltip = hasIndex
+        ? `${indexMeta.unique ? 'Unique index' : 'Index'}: ${indexMeta.names.join(', ')}`
+        : undefined;
       
       cols.push({
         accessorKey: colName,
@@ -345,6 +372,19 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
           >
             <div className="flex items-center space-x-2 overflow-hidden">
               {isPk && <Key size={10} className="text-amber-500/80 shrink-0" />}
+              {hasIndex && !isPk && (
+                <span
+                  title={indexTooltip}
+                  className={cn(
+                    'inline-flex shrink-0 items-center justify-center rounded-[3px] border px-1 py-[1px]',
+                    indexMeta?.unique
+                      ? 'border-primary/45 bg-primary/15 text-primary'
+                      : 'border-foreground/25 bg-muted/70 text-foreground/80',
+                  )}
+                >
+                  <Hash size={11} strokeWidth={2.2} />
+                </span>
+              )}
               <span className={cn(
                 "text-[11px] tracking-tight truncate shrink-0",
                 isPk ? "text-amber-500/90 font-black uppercase" : "font-bold text-foreground/90"
@@ -366,7 +406,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     });
 
     return cols;
-  }, [allRowsChecked, columnInfoByName, gridCols, handleSort, handleToggleAllRowsChecked, someRowsChecked, sortCol, sortDir, tableData.length]);
+  }, [allRowsChecked, columnInfoByName, gridCols, handleSort, handleToggleAllRowsChecked, indexMetaByColumnName, someRowsChecked, sortCol, sortDir, tableData.length]);
 
   const table = useReactTable({
     data: [],

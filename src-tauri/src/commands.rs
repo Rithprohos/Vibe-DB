@@ -1,5 +1,5 @@
 use crate::app_state::AppState;
-use crate::engines::{ColumnInfo, ConnectionConfig, DatabaseEngine, QueryResult, TableInfo};
+use crate::engines::{ConnectionConfig, DatabaseEngine, QueryResult, TableInfo, TableStructure};
 use crate::sql_helpers::{
     build_where_clause, extract_count, normalize_order_dir, quote_identifier, FilterConditionInput,
 };
@@ -70,13 +70,13 @@ pub async fn list_tables(
         .map_err(|error| error.to_string())
 }
 
-/// Gets the column structure of a table.
+/// Gets the complete structure of a table including columns, indexes, and foreign keys.
 #[tauri::command]
 pub async fn get_table_structure(
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     table_name: String,
-) -> Result<Vec<ColumnInfo>, String> {
+) -> Result<TableStructure, String> {
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
         .registry
@@ -239,7 +239,7 @@ pub async fn get_filtered_row_count(
         .await
         .map_err(|error| error.to_string())?;
     let filter_items = filters.unwrap_or_default();
-    let where_clause = build_where_clause(&filter_items, &structure)?;
+    let where_clause = build_where_clause(&filter_items, &structure.columns)?;
 
     let mut query = format!(
         "SELECT COUNT(*) as count FROM {}",
@@ -303,7 +303,7 @@ pub async fn get_table_data(
         .map_err(|error| error.to_string())?;
     let filter_items = filters.unwrap_or_default();
     let has_filters = !filter_items.is_empty();
-    let where_clause = build_where_clause(&filter_items, &structure)?;
+    let where_clause = build_where_clause(&filter_items, &structure.columns)?;
 
     let mut query = format!("SELECT * FROM {}", quote_identifier(table_name.trim()));
     if let Some(where_sql) = where_clause {

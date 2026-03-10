@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef } from "./createTableConstants";
-import type { Connection, TableInfo, ColumnInfo, QueryResult } from "../store/useAppStore";
+import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
 import {
   clearStoredAiApiKey,
@@ -93,9 +93,9 @@ export async function listTables(connId?: string): Promise<TableInfo[]> {
 export async function getTableStructure(
   tableName: string,
   connId?: string,
-): Promise<ColumnInfo[]> {
+): Promise<TableStructureData> {
   return measureDevFetch("get_table_structure", () =>
-    invoke<ColumnInfo[]>("get_table_structure", { tableName, connId }),
+    invoke<TableStructureData>("get_table_structure", { tableName, connId }),
   );
 }
 

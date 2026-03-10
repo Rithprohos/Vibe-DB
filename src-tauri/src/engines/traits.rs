@@ -1,4 +1,4 @@
-use super::types::{ColumnInfo, ConnectionConfig, QueryResult, TableInfo};
+use super::types::{ConnectionConfig, QueryResult, TableInfo, TableStructure};
 use super::EngineResult;
 use async_trait::async_trait;
 
@@ -27,8 +27,8 @@ pub trait DatabaseEngine: Send + Sync {
     /// Lists all tables and views in the database.
     async fn list_tables(&self) -> EngineResult<Vec<TableInfo>>;
 
-    /// Gets the column structure for a specific table.
-    async fn get_table_structure(&self, table_name: &str) -> EngineResult<Vec<ColumnInfo>>;
+    /// Gets the complete structure for a specific table including columns, indexes, and foreign keys.
+    async fn get_table_structure(&self, table_name: &str) -> EngineResult<TableStructure>;
 
     /// Executes a SQL query and returns the results.
     ///

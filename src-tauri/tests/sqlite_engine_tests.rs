@@ -138,18 +138,18 @@ async fn test_sqlite_engine_get_table_structure() {
         .await;
 
     // Get structure
-    let columns: Vec<ColumnInfo> = engine.get_table_structure("test_table").await.unwrap();
-    assert_eq!(columns.len(), 5);
+    let structure = engine.get_table_structure("test_table").await.unwrap();
+    assert_eq!(structure.columns.len(), 5);
 
     // Check id column
-    assert_eq!(columns[0].name, "id");
-    assert_eq!(columns[0].col_type, "INTEGER");
-    assert!(columns[0].pk);
+    assert_eq!(structure.columns[0].name, "id");
+    assert_eq!(structure.columns[0].col_type, "INTEGER");
+    assert!(structure.columns[0].pk);
 
     // Check name column
-    assert_eq!(columns[1].name, "name");
-    assert!(columns[1].notnull);
-    assert_eq!(columns[1].dflt_value, Some("'unknown'".to_string()));
+    assert_eq!(structure.columns[1].name, "name");
+    assert!(structure.columns[1].notnull);
+    assert_eq!(structure.columns[1].dflt_value, Some("'unknown'".to_string()));
 
     engine.disconnect().await;
     let _ = std::fs::remove_file(&temp_path);

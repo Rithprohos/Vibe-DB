@@ -3,7 +3,7 @@ use libsql::{Builder, Connection};
 use tokio::sync::RwLock;
 
 use super::traits::DatabaseEngine;
-use super::types::{ColumnInfo, ConnectionConfig, QueryResult, TableInfo};
+use super::types::{ColumnInfo, ConnectionConfig, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, TableStructure};
 use super::{EngineError, EngineResult};
 
 /// Turso/libSQL database engine implementation.
@@ -259,7 +259,7 @@ impl DatabaseEngine for TursoEngine {
         Ok(tables)
     }
 
-    async fn get_table_structure(&self, table_name: &str) -> EngineResult<Vec<ColumnInfo>> {
+    async fn get_table_structure(&self, table_name: &str) -> EngineResult<TableStructure> {
         Self::validate_table_name(table_name)?;
 
         let connection = self.connection.read().await;
@@ -267,26 +267,23 @@ impl DatabaseEngine for TursoEngine {
             EngineError::ConnectionFailed("Not connected to database".to_string())
         })?;
 
-        let query = format!(
-            "PRAGMA table_info({})",
-            Self::quote_identifier(table_name.trim())
-        );
+        let table_name_trimmed = table_name.trim();
+        let quoted_table = Self::quote_identifier(table_name_trimmed);
 
+        // Get columns
+        let column_query = format!("PRAGMA table_info({})", quoted_table);
         let stmt = conn
-            .prepare(&query)
+            .prepare(&column_query)
             .await
             .map_err(|e| EngineError::QueryError(e.to_string()))?;
-
-        let rows = stmt
+        let mut column_rows = stmt
             .query(())
             .await
             .map_err(|e| EngineError::QueryError(e.to_string()))?;
 
         let mut columns = Vec::new();
-        let mut rows = rows;
-
         loop {
-            match rows.next().await {
+            match column_rows.next().await {
                 Ok(Some(row)) => {
                     let cid: i64 = row
                         .get(0)
@@ -319,7 +316,108 @@ impl DatabaseEngine for TursoEngine {
             }
         }
 
-        Ok(columns)
+        // Get indexes
+        let index_query = format!("PRAGMA index_list({})", quoted_table);
+        let stmt = conn
+            .prepare(&index_query)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        let mut index_rows = stmt
+            .query(())
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        let mut indexes: Vec<IndexInfo> = Vec::new();
+        loop {
+            match index_rows.next().await {
+                Ok(Some(row)) => {
+                    let index_name: String = row
+                        .get(1)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let unique: i32 = row
+                        .get(2)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+                    // Get columns for this index
+                    let index_info_query = format!(
+                        "PRAGMA index_info({})",
+                        Self::quote_identifier(&index_name)
+                    );
+                    let stmt = conn
+                        .prepare(&index_info_query)
+                        .await
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let mut index_info_rows = stmt
+                        .query(())
+                        .await
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+                    let mut index_columns = Vec::new();
+                    loop {
+                        match index_info_rows.next().await {
+                            Ok(Some(info_row)) => {
+                                let col_name: String = info_row
+                                    .get(2)
+                                    .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                                index_columns.push(col_name);
+                            }
+                            Ok(None) => break,
+                            Err(e) => return Err(EngineError::QueryError(e.to_string())),
+                        }
+                    }
+
+                    indexes.push(IndexInfo {
+                        name: index_name,
+                        unique: unique != 0,
+                        columns: index_columns,
+                    });
+                }
+                Ok(None) => break,
+                Err(e) => return Err(EngineError::QueryError(e.to_string())),
+            }
+        }
+
+        // Get foreign keys
+        let fk_query = format!("PRAGMA foreign_key_list({})", quoted_table);
+        let stmt = conn
+            .prepare(&fk_query)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        let mut fk_rows = stmt
+            .query(())
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        let mut foreign_keys = Vec::new();
+        loop {
+            match fk_rows.next().await {
+                Ok(Some(row)) => {
+                    let from_col: String = row
+                        .get(3)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let to_table: String = row
+                        .get(2)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let to_col: String = row
+                        .get(4)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+                    foreign_keys.push(ForeignKeyInfo {
+                        from_col,
+                        to_table,
+                        to_col,
+                    });
+                }
+                Ok(None) => break,
+                Err(e) => return Err(EngineError::QueryError(e.to_string())),
+            }
+        }
+
+        Ok(TableStructure {
+            columns,
+            indexes,
+            foreign_keys,
+        })
     }
 
     async fn execute_query(&self, query: &str) -> EngineResult<QueryResult> {

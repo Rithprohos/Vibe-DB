@@ -127,11 +127,11 @@ export default function AiPanel() {
       }
 
       try {
-        const columns = await getTableStructure(currentTableName, currentConnectionId);
+        const structure = await getTableStructure(currentTableName, currentConnectionId);
         if (!cancelled) {
           setCurrentTableSchema({
             name: currentTableName,
-            columns: columns.map(c => ({
+            columns: structure.columns.map(c => ({
               name: c.name,
               colType: c.col_type,
               isPk: c.pk === 1,

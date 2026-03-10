@@ -117,6 +117,39 @@ pub struct ColumnInfo {
     pub pk: bool,
 }
 
+/// Information about a table index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexInfo {
+    /// Index name
+    pub name: String,
+    /// Whether this is a unique index
+    pub unique: bool,
+    /// Column names in the index
+    pub columns: Vec<String>,
+}
+
+/// Information about a foreign key constraint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForeignKeyInfo {
+    /// Column name in the source table
+    pub from_col: String,
+    /// Target table name
+    pub to_table: String,
+    /// Column name in the target table
+    pub to_col: String,
+}
+
+/// Complete table structure including columns, indexes, and foreign keys.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableStructure {
+    /// Table columns
+    pub columns: Vec<ColumnInfo>,
+    /// Table indexes
+    pub indexes: Vec<IndexInfo>,
+    /// Foreign key constraints
+    pub foreign_keys: Vec<ForeignKeyInfo>,
+}
+
 /// Result of a SQL query execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryResult {

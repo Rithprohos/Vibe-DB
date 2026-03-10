@@ -39,7 +39,7 @@ export function DeveloperSettings() {
   const [confirmInsert, setConfirmInsert] = useState(false);
   const [loadingStructure, setLoadingStructure] = useState(false);
   const [runningInsert, setRunningInsert] = useState(false);
-  const [columns, setColumns] = useState<Awaited<ReturnType<typeof getTableStructure>>>([]);
+  const [tableStructure, setTableStructure] = useState<Awaited<ReturnType<typeof getTableStructure>> | null>(null);
   const [structureError, setStructureError] = useState('');
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export function DeveloperSettings() {
 
     const loadStructure = async () => {
       if (!selectedTable || !activeConnection?.connId) {
-        setColumns([]);
+        setTableStructure(null);
         setStructureError('');
         return;
       }
@@ -65,14 +65,14 @@ export function DeveloperSettings() {
       setStructureError('');
 
       try {
-        const nextColumns = await getTableStructure(selectedTable, activeConnection.connId);
+        const nextStructure = await getTableStructure(selectedTable, activeConnection.connId);
         if (!cancelled) {
-          setColumns(nextColumns);
+          setTableStructure(nextStructure);
         }
       } catch (error) {
         console.error('Failed to load table structure:', error);
         if (!cancelled) {
-          setColumns([]);
+          setTableStructure(null);
           setStructureError('Failed to inspect the selected table.');
         }
       } finally {
@@ -89,7 +89,7 @@ export function DeveloperSettings() {
     };
   }, [selectedTable, activeConnection?.connId]);
 
-  const insertableColumns = useMemo(() => getInsertableColumns(columns), [columns]);
+  const insertableColumns = useMemo(() => getInsertableColumns(tableStructure?.columns ?? []), [tableStructure]);
   const resolvedRowCount = useMemo(() => {
     const source = rowCount === 'custom' ? customRowCount : rowCount;
     const parsed = Number.parseInt(source, 10);
@@ -106,7 +106,7 @@ export function DeveloperSettings() {
 
     setRunningInsert(true);
     try {
-      const queries = buildSampleDataTransaction(selectedTable, columns, resolvedRowCount);
+      const queries = buildSampleDataTransaction(selectedTable, tableStructure?.columns ?? [], resolvedRowCount);
       const result = await executeTransaction(queries, activeConnection.connId);
       showAlert({
         title: 'Sample data generated',
@@ -131,7 +131,7 @@ export function DeveloperSettings() {
     confirmInsert,
     resolvedRowCount,
     insertableColumns.length,
-    columns,
+    tableStructure,
     showAlert,
   ]);
 

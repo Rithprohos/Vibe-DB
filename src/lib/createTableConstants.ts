@@ -18,7 +18,7 @@ export interface SqliteType {
   color: string;
 }
 
-export type SupportedEngine = "sqlite" | "postgres";
+export type SupportedEngine = "sqlite" | "turso" | "postgres";
 
 export interface DefaultOption {
   value: string;
@@ -31,12 +31,12 @@ interface DataTypeOption extends SqliteType {
 }
 
 const DATA_TYPE_OPTIONS: readonly DataTypeOption[] = [
-  { value: "INTEGER", label: "INTEGER", color: "text-amber-500", engines: ["sqlite", "postgres"] },
-  { value: "TEXT", label: "TEXT", color: "text-emerald-500", engines: ["sqlite", "postgres"] },
-  { value: "REAL", label: "REAL", color: "text-blue-500", engines: ["sqlite"] },
-  { value: "BLOB", label: "BLOB", color: "text-purple-500", engines: ["sqlite"] },
-  { value: "NUMERIC", label: "NUMERIC", color: "text-rose-500", engines: ["sqlite", "postgres"] },
-  { value: "VARCHAR", label: "VARCHAR", color: "text-teal-500", engines: ["sqlite", "postgres"] },
+  { value: "INTEGER", label: "INTEGER", color: "text-amber-500", engines: ["sqlite", "turso", "postgres"] },
+  { value: "TEXT", label: "TEXT", color: "text-emerald-500", engines: ["sqlite", "turso", "postgres"] },
+  { value: "REAL", label: "REAL", color: "text-blue-500", engines: ["sqlite", "turso"] },
+  { value: "BLOB", label: "BLOB", color: "text-purple-500", engines: ["sqlite", "turso"] },
+  { value: "NUMERIC", label: "NUMERIC", color: "text-rose-500", engines: ["sqlite", "turso", "postgres"] },
+  { value: "VARCHAR", label: "VARCHAR", color: "text-teal-500", engines: ["sqlite", "turso", "postgres"] },
   { value: "BIGINT", label: "BIGINT", color: "text-amber-400", engines: ["postgres"] },
 ] as const;
 
@@ -60,6 +60,7 @@ export function getDataTypesForEngine(engine: SupportedEngine): readonly SqliteT
 
 export function getEngineTypeLabel(engine: SupportedEngine): string {
   if (engine === "sqlite") return "SQLite types";
+  if (engine === "turso") return "Turso types";
   if (engine === "postgres") return "PostgreSQL types";
   return "Types";
 }

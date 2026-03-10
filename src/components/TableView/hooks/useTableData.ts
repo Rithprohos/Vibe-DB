@@ -6,7 +6,7 @@ import {
   getTableStructure,
   type QueryFilter,
 } from "@/lib/db";
-import type { QueryResult, ColumnInfo } from "@/store/useAppStore";
+import type { QueryResult, TableStructureData } from "@/store/useAppStore";
 
 export const useTableData = (tableName: string, tabId: string) => {
   const cachedState = useMemo(
@@ -24,7 +24,7 @@ export const useTableData = (tableName: string, tabId: string) => {
   const [page, setPage] = useState(() => cachedState?.page ?? 0);
   const [pageSize, setPageSizeState] = useState(() => cachedState?.pageSize ?? 100);
   const [totalRows, setTotalRows] = useState(() => cachedState?.totalRows ?? 0);
-  const [structure, setStructure] = useState<ColumnInfo[]>(() => cachedState?.structure ?? []);
+  const [structure, setStructure] = useState<TableStructureData | null>(() => cachedState?.structure ?? null);
   const [sortCol, setSortCol] = useState<string | null>(() => cachedState?.sortCol ?? null);
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">(
     () => cachedState?.sortDir ?? "ASC",
@@ -119,7 +119,7 @@ export const useTableData = (tableName: string, tabId: string) => {
 
   const gridCols = useMemo(() => {
     if (data && data.columns.length > 0) return data.columns;
-    return structure.map((s) => s.name);
+    return structure?.columns.map((s) => s.name) ?? [];
   }, [data, structure]);
 
   const tableData = useMemo(() => {
