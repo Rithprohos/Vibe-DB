@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAppStore, type Connection } from '../store/useAppStore';
+import {
+  clearStoredConnectionAuthToken,
+  saveStoredConnectionAuthToken,
+} from '../lib/connectionTokenStore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,37 +23,73 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
   const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();
   const [host, setHost] = useState('');
   const [authToken, setAuthToken] = useState('');
+  const [tokenTouched, setTokenTouched] = useState(false);
   const [path, setPath] = useState('');
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (connection && open) {
       setName(connection.name);
       setTag(connection.tag);
       setHost(connection.host || '');
-      setAuthToken(connection.authToken || '');
+      setAuthToken('');
+      setTokenTouched(false);
       setPath(connection.path || '');
       setError('');
+      setIsSaving(false);
     }
   }, [connection, open]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!connection) return;
     if (!name.trim()) return;
+    if (isSaving) return;
     if (!tag) {
       setError('Please select an environment label');
       return;
     }
 
-    updateConnection(connection.id, {
-      name: name.trim(),
-      tag,
-      host: connection.type === 'turso' ? host.trim() : undefined,
-      authToken: connection.type === 'turso' ? authToken.trim() : undefined,
-      path: path.trim() || undefined,
-    });
+    setIsSaving(true);
 
-    onOpenChange(false);
+    const trimmedHost = host.trim();
+    const trimmedPath = path.trim();
+
+    let hasAuthToken = Boolean(connection.hasAuthToken);
+    const isRemoteTurso = connection.type === 'turso' && Boolean(trimmedHost);
+
+    try {
+      if (connection.type === 'turso') {
+        if (!isRemoteTurso) {
+          await clearStoredConnectionAuthToken(connection.id);
+          hasAuthToken = false;
+        } else if (tokenTouched) {
+          const nextToken = authToken.trim();
+          if (nextToken) {
+            await saveStoredConnectionAuthToken(connection.id, nextToken);
+            hasAuthToken = true;
+          } else {
+            await clearStoredConnectionAuthToken(connection.id);
+            hasAuthToken = false;
+          }
+        }
+      }
+
+      updateConnection(connection.id, {
+        name: name.trim(),
+        tag,
+        host: connection.type === 'turso' ? (trimmedHost || undefined) : undefined,
+        authToken: undefined,
+        hasAuthToken: connection.type === 'turso' ? hasAuthToken : undefined,
+        path: trimmedPath || undefined,
+      });
+
+      onOpenChange(false);
+    } catch (e: any) {
+      setError(`Failed to update secure token: ${e}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!connection) return null;
@@ -83,7 +123,9 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                 className="bg-background border-border focus-visible:ring-primary h-10 transition-all"
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSave();
+                  if (e.key === 'Enter') {
+                    void handleSave();
+                  }
                 }}
               />
             </div>
@@ -139,11 +181,23 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                   <Input
                     id="edit-token"
                     type="password"
-                    placeholder="your-auth-token"
+                    placeholder={
+                      connection.hasAuthToken
+                        ? 'Saved token present (enter to replace)'
+                        : 'your-auth-token'
+                    }
                     value={authToken}
-                    onChange={(e) => setAuthToken(e.target.value)}
+                    onChange={(e) => {
+                      setAuthToken(e.target.value);
+                      setTokenTouched(true);
+                    }}
                     className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
                   />
+                  {connection.hasAuthToken && !tokenTouched && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Leave unchanged to keep the existing saved token.
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -177,11 +231,11 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
             Cancel
           </Button>
           <Button
-            onClick={handleSave}
-            disabled={!name.trim() || !tag}
+            onClick={() => void handleSave()}
+            disabled={!name.trim() || !tag || isSaving}
             className="shadow-glow px-8 rounded-full font-semibold tracking-wide"
           >
-            Save
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

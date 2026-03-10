@@ -11,6 +11,7 @@ pub fn setup_menu(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         None::<&str>,
     )?;
     let separator = PredefinedMenuItem::separator(app)?;
+    let quit = PredefinedMenuItem::quit(app, None)?;
     let undo = PredefinedMenuItem::undo(app, None)?;
     let redo = PredefinedMenuItem::redo(app, None)?;
     let cut = PredefinedMenuItem::cut(app, None)?;
@@ -19,7 +20,7 @@ pub fn setup_menu(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let select_all = PredefinedMenuItem::select_all(app, None)?;
 
     let app_submenu =
-        Submenu::with_items(app, "VibeDB", true, &[&about, &separator, &check_updates])?;
+        Submenu::with_items(app, "Vibe DB", true, &[&about, &separator, &check_updates, &separator, &quit])?;
     let edit_submenu = Submenu::with_items(
         app,
         "Edit",

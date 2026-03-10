@@ -63,6 +63,27 @@ bun run tauri build
 - **Editor**: CodeMirror 6 with SQL support
 - **State**: Persistent JSON via `tauri-plugin-store`
 
+## 🔐 Security Posture
+
+As of **March 10, 2026**, VibeDB includes important baseline protections, but security hardening is still in progress.
+
+### Implemented
+
+- Query safety checks block destructive patterns such as `DELETE`/`UPDATE` without `WHERE`, tautological predicates (`1=1`, `TRUE`), and common `OR 1=1` injection forms.
+- Sensitive secrets (AI API keys and Turso auth tokens) are persisted via `tauri-plugin-stronghold` encryption at rest.
+- Connection metadata and UI preferences are stored through `tauri-plugin-store` instead of browser localStorage.
+
+### Current Gaps / In Progress
+
+- Strict Content Security Policy (CSP) is not fully enforced yet in `tauri.conf.json`.
+- Tauri capability scopes are broader than desired and are being audited to remove unused permissions.
+- Current Stronghold unlock material is app-known; encryption is present, but machine-bound or user-provided secret protection is not complete yet.
+
+### Guidance
+
+- Treat current storage protections as a strong baseline, not a finalized security model.
+- Avoid storing high-sensitivity production credentials until the unlock model is upgraded to OS-backed secret storage or a user passphrase flow.
+
 ---
 
 _Crafted with vibe coding and AI assistance. See [ROADMAP.md](./ROADMAP.md) for upcoming features (PostgreSQL, MySQL support)._

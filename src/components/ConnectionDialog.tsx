@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { homeDir, documentDir } from '@tauri-apps/api/path';
 import { useAppStore, type Connection, MAX_ACTIVE_CONNECTIONS } from '../store/useAppStore';
+import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
 import { createDatabase } from '../lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,7 @@ export default function ConnectionDialog() {
       name: name || (type === 'sqlite' ? path.split('/').pop() : host.split('/').pop()) || 'Database',
       path: path.trim() || undefined,
       host: host.trim() || undefined,
+      hasAuthToken: type === 'turso' ? Boolean(authToken.trim()) : undefined,
       authToken: authToken.trim() || undefined,
       type,
       lastUsed: Date.now(),
@@ -152,6 +154,16 @@ export default function ConnectionDialog() {
     window.dispatchEvent(
       new CustomEvent('vibedb:connect', { detail: conn })
     );
+  };
+
+  const handleRemoveConnection = async (conn: Connection) => {
+    try {
+      await clearStoredConnectionAuthToken(conn.id);
+    } catch (e) {
+      console.error(`Failed to clear secure token for ${conn.id}:`, e);
+    } finally {
+      removeConnection(conn.id);
+    }
   };
 
   return (
@@ -241,7 +253,7 @@ export default function ConnectionDialog() {
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          removeConnection(conn.id);
+                          void handleRemoveConnection(conn);
                         }}
                         title="Remove"
                       >
