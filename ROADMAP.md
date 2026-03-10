@@ -197,6 +197,12 @@ pub struct TursoEngine {
 - [x] Handle remote sync status
 - [x] Update connection dialog UI
 
+### Stability Hardening (2026-03-10)
+
+- [x] Ensure Turso transactions always rollback on validation/execute/commit failures after `BEGIN`
+- [x] Propagate libSQL row-iteration errors instead of silently returning partial results
+- [x] Add Turso integration tests for connect/disconnect, safe query validation, transaction commit, and rollback behavior
+
 ### Dependencies
 
 ```toml

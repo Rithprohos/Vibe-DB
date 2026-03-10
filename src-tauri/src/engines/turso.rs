@@ -236,18 +236,24 @@ impl DatabaseEngine for TursoEngine {
         let mut tables = Vec::new();
         let mut rows = rows;
 
-        while let Ok(Some(row)) = rows.next().await {
-            let name: String = row
-                .get(0)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            let table_type: String = row
-                .get(1)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            tables.push(TableInfo {
-                name,
-                table_type,
-                schema: None,
-            });
+        loop {
+            match rows.next().await {
+                Ok(Some(row)) => {
+                    let name: String = row
+                        .get(0)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let table_type: String = row
+                        .get(1)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    tables.push(TableInfo {
+                        name,
+                        table_type,
+                        schema: None,
+                    });
+                }
+                Ok(None) => break,
+                Err(e) => return Err(EngineError::QueryError(e.to_string())),
+            }
         }
 
         Ok(tables)
@@ -279,32 +285,38 @@ impl DatabaseEngine for TursoEngine {
         let mut columns = Vec::new();
         let mut rows = rows;
 
-        while let Ok(Some(row)) = rows.next().await {
-            let cid: i64 = row
-                .get(0)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            let name: String = row
-                .get(1)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            let col_type: String = row
-                .get(2)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            let notnull: i32 = row
-                .get(3)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            let dflt_value: Option<String> = row.get(4).ok();
-            let pk: i32 = row
-                .get(5)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        loop {
+            match rows.next().await {
+                Ok(Some(row)) => {
+                    let cid: i64 = row
+                        .get(0)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let name: String = row
+                        .get(1)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let col_type: String = row
+                        .get(2)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let notnull: i32 = row
+                        .get(3)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    let dflt_value: Option<String> = row.get(4).ok();
+                    let pk: i32 = row
+                        .get(5)
+                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
 
-            columns.push(ColumnInfo {
-                cid,
-                name,
-                col_type,
-                notnull: notnull != 0,
-                dflt_value,
-                pk: pk != 0,
-            });
+                    columns.push(ColumnInfo {
+                        cid,
+                        name,
+                        col_type,
+                        notnull: notnull != 0,
+                        dflt_value,
+                        pk: pk != 0,
+                    });
+                }
+                Ok(None) => break,
+                Err(e) => return Err(EngineError::QueryError(e.to_string())),
+            }
         }
 
         Ok(columns)
@@ -357,14 +369,22 @@ impl DatabaseEngine for TursoEngine {
                 columns.push(col.name().to_string());
             }
 
-            while let Ok(Some(row)) = rows.next().await {
-                let mut row_values = Vec::new();
-                for i in 0..column_count {
-                    let idx: i32 = i as i32;
-                    let value: libsql::Value = row.get(idx).unwrap_or(libsql::Value::Null);
-                    row_values.push(Self::json_from_value(value));
+            loop {
+                match rows.next().await {
+                    Ok(Some(row)) => {
+                        let mut row_values = Vec::with_capacity(column_count);
+                        for i in 0..column_count {
+                            let idx: i32 = i as i32;
+                            let value: libsql::Value = row
+                                .get(idx)
+                                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                            row_values.push(Self::json_from_value(value));
+                        }
+                        result_rows.push(row_values);
+                    }
+                    Ok(None) => break,
+                    Err(e) => return Err(EngineError::QueryError(e.to_string())),
                 }
-                result_rows.push(row_values);
             }
 
             let row_count = result_rows.len();
@@ -409,48 +429,59 @@ impl DatabaseEngine for TursoEngine {
             .await
             .map_err(|e| EngineError::QueryError(e.to_string()))?;
 
-        for query in queries {
-            let trimmed = query.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
+        let transaction_result: EngineResult<()> = async {
+            for query in queries {
+                let trimmed = query.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
 
-            Self::validate_query_safety(trimmed)?;
+                Self::validate_query_safety(trimmed)?;
 
-            let stripped = trimmed
-                .lines()
-                .filter(|line| !line.trim().starts_with("--"))
-                .collect::<Vec<_>>()
-                .join("\n");
-            let normalized = stripped.trim().to_uppercase();
-            let first_keyword = normalized.split_whitespace().next().unwrap_or_default();
+                let stripped = trimmed
+                    .lines()
+                    .filter(|line| !line.trim().starts_with("--"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let normalized = stripped.trim().to_uppercase();
+                let first_keyword = normalized.split_whitespace().next().unwrap_or_default();
 
-            if !matches!(first_keyword, "INSERT" | "UPDATE" | "DELETE") {
-                conn.execute("ROLLBACK", ())
+                if !matches!(first_keyword, "INSERT" | "UPDATE" | "DELETE") {
+                    return Err(EngineError::QueryError(
+                        "Transaction only supports INSERT/UPDATE/DELETE statements".to_string(),
+                    ));
+                }
+
+                let affected = conn
+                    .execute(trimmed, ())
                     .await
                     .map_err(|e| EngineError::QueryError(e.to_string()))?;
-                return Err(EngineError::QueryError(
-                    "Transaction only supports INSERT/UPDATE/DELETE statements".to_string(),
-                ));
+
+                statements_executed += 1;
+                rows_affected_total += affected as u64;
             }
 
-            match conn.execute(trimmed, ()).await {
-                Ok(affected) => {
-                    statements_executed += 1;
-                    rows_affected_total += affected as u64;
-                }
-                Err(e) => {
-                    conn.execute("ROLLBACK", ())
-                        .await
-                        .map_err(|e| EngineError::QueryError(e.to_string()))?;
-                    return Err(EngineError::QueryError(e.to_string()));
-                }
+            Ok(())
+        }
+        .await;
+
+        if let Err(error) = transaction_result {
+            if let Err(rollback_error) = conn.execute("ROLLBACK", ()).await {
+                return Err(EngineError::QueryError(format!(
+                    "{error}; rollback failed: {rollback_error}"
+                )));
             }
+            return Err(error);
         }
 
-        conn.execute("COMMIT", ())
-            .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        if let Err(commit_error) = conn.execute("COMMIT", ()).await {
+            if let Err(rollback_error) = conn.execute("ROLLBACK", ()).await {
+                return Err(EngineError::QueryError(format!(
+                    "{commit_error}; rollback failed after commit error: {rollback_error}"
+                )));
+            }
+            return Err(EngineError::QueryError(commit_error.to_string()));
+        }
 
         Ok(QueryResult {
             columns: vec![],
@@ -486,15 +517,17 @@ impl DatabaseEngine for TursoEngine {
             .await
             .map_err(|e| EngineError::QueryError(e.to_string()))?;
 
-        if let Ok(Some(row)) = rows.next().await {
-            let count: i64 = row
-                .get(0)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            Ok(count)
-        } else {
-            Err(EngineError::QueryError(
+        match rows.next().await {
+            Ok(Some(row)) => {
+                let count: i64 = row
+                    .get(0)
+                    .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                Ok(count)
+            }
+            Ok(None) => Err(EngineError::QueryError(
                 "Failed to get row count".to_string(),
-            ))
+            )),
+            Err(e) => Err(EngineError::QueryError(e.to_string())),
         }
     }
 
@@ -534,13 +567,15 @@ impl DatabaseEngine for TursoEngine {
             .await
             .map_err(|e| EngineError::QueryError(e.to_string()))?;
 
-        if let Ok(Some(row)) = rows.next().await {
-            let version: String = row
-                .get(0)
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
-            Ok(format!("Turso (SQLite {})", version))
-        } else {
-            Ok("Turso".to_string())
+        match rows.next().await {
+            Ok(Some(row)) => {
+                let version: String = row
+                    .get(0)
+                    .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                Ok(format!("Turso (SQLite {})", version))
+            }
+            Ok(None) => Ok("Turso".to_string()),
+            Err(e) => Err(EngineError::QueryError(e.to_string())),
         }
     }
 }
