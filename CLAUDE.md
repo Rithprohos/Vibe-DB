@@ -64,7 +64,20 @@ pub trait DatabaseEngine: Send + Sync {
 
 ### State Management (Zustand)
 
-Single store in `src/store/useAppStore.ts`:
+Store composition is centralized in `src/store/useAppStore.ts`, with domain slices under `src/store/slices/`:
+
+- `connectionSlice.ts` — connection lifecycle and table lists
+- `tabsSlice.ts` — tab lifecycle + per-tab table-view state
+- `uiSlice.ts` — logs, toasts, theme, settings, alerts, metadata
+- `aiSlice.ts` — AI provider/profile state
+
+Shared store definitions:
+- `src/store/types.ts` — exported interfaces/types
+- `src/store/constants.ts` — limits/defaults (`MAX_*`)
+- `src/store/helpers.ts` — store helper logic
+- `src/store/storage.ts` — Tauri Store adapter used by `persist`
+
+Public hook remains:
 
 ```typescript
 interface AppState {
@@ -79,7 +92,7 @@ interface AppState {
 }
 ```
 
-**Critical:** Persistence uses `tauri-plugin-store` (not localStorage). Connection metadata is stored in `app_settings.json`; credentials will use `tauri-plugin-stronghold` when remote engines are added.
+**Critical:** Persistence uses `tauri-plugin-store` via `src/store/storage.ts` (not localStorage). Connection metadata is stored in `app_settings.json`; credentials will use `tauri-plugin-stronghold` when remote engines are added.
 
 **Performance patterns enforced throughout:**
 - Use granular selectors: `useAppStore(s => s.connections)` not `useAppStore(state => ({...}))`
@@ -127,7 +140,10 @@ Key variables: `--bg-primary`, `--bg-secondary`, `--accent-primary` (#00e599 neo
 
 | File | Purpose |
 |------|---------|
-| `src/store/useAppStore.ts` | Global state, persistence logic |
+| `src/store/useAppStore.ts` | Root Zustand store composition + persistence config |
+| `src/store/slices/*` | Domain-specific Zustand slices (`ai`, `connection`, `tabs`, `ui`) |
+| `src/store/types.ts` | Shared store/domain types |
+| `src/store/constants.ts` | Store limits/defaults |
 | `src/lib/db.ts` | Tauri invoke wrappers |
 | `src-tauri/src/commands.rs` | Tauri command implementations |
 | `src-tauri/src/lib.rs` | Tauri setup, plugins, command registration |
@@ -184,7 +200,7 @@ Defined in `App.tsx`:
 
 ## Constraints & Limits
 
-Defined in `src/store/useAppStore.ts`:
+Defined in `src/store/constants.ts`:
 - `MAX_TABS = 20` — Oldest auto-removed when exceeded
 - `MAX_RESULT_ROWS = 1000` — Results truncated beyond this
 - `MAX_ACTIVE_CONNECTIONS = 5` — UI limit

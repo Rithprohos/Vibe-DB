@@ -19,7 +19,7 @@
 | --------- | ------------------------------------------------ | --------------------------------------------------- |
 | Backend   | Rust + Tauri v2                                  | Commands in `src-tauri/src/lib.rs`                  |
 | Frontend  | React 19 + TypeScript                            | Vite dev server on port 1420                        |
-| State     | Zustand 5 + Tauri Store                          | `src/store/useAppStore.ts`, persisted via plugin    |
+| State     | Zustand 5 + Tauri Store                          | Root store in `src/store/useAppStore.ts`, composed from `src/store/slices/*`, persisted via plugin |
 | DB access | Trait-based `DatabaseEngine`                     | `src-tauri/src/engines/` — SqliteEngine implemented |
 | Plugins   | `sql`, `dialog`, `store`, `stronghold`, `opener` | SQL, file picker, persistence, secrets, opener      |
 | Styling   | Tailwind + shadcn/ui + CSS variables             | Radix primitives, `src/index.css` for vars          |
@@ -36,7 +36,17 @@ src/
 ├── App.tsx                  # Main layout, connection handler, tab routing
 ├── main.tsx                 # React entry point
 ├── index.css                # CSS variables design system (~1100 lines)
-├── store/useAppStore.ts     # Zustand — connections, tabs, tables, logs, theme
+├── store/
+│   ├── useAppStore.ts       # Root Zustand store composition + persist config
+│   ├── types.ts             # Shared store/domain types
+│   ├── constants.ts         # Limits/defaults (MAX_TABS, MAX_RESULT_ROWS, etc.)
+│   ├── helpers.ts           # Store helpers (table view defaults, selected tab logic)
+│   ├── storage.ts           # Tauri Store adapter for Zustand persistence
+│   └── slices/
+│       ├── aiSlice.ts
+│       ├── connectionSlice.ts
+│       ├── tabsSlice.ts
+│       └── uiSlice.ts
 ├── lib/
 │   ├── db.ts                # Tauri invoke wrappers (typed), client-side WHERE clause filtering
 │   ├── formatters.ts        # Cell value formatting utilities
@@ -161,7 +171,16 @@ pub trait DatabaseEngine: Send + Sync {
 
 ## State Management (Zustand)
 
-Key state slices in `useAppStore.ts`:
+The Zustand store is split by domain slices and composed in `src/store/useAppStore.ts`:
+
+- `connectionSlice` — connections, active connection, table map, connection lifecycle actions
+- `tabsSlice` — tab lifecycle, active tab, table-view state cache
+- `uiSlice` — logs, toasts, settings modal, theme, alerts, metadata
+- `aiSlice` — AI provider mode/profile state and actions
+
+Core shared definitions live in `src/store/types.ts`; limits/defaults are in `src/store/constants.ts`.
+
+Primary state shape:
 
 ```typescript
 interface AppState {
@@ -194,7 +213,7 @@ interface AppState {
 }
 ```
 
-**Constants**: `MAX_RESULT_ROWS = 1000`, `MAX_TABS = 20`, `MAX_ACTIVE_CONNECTIONS = 5`
+**Constants** (in `src/store/constants.ts`): `MAX_RESULT_ROWS = 1000`, `MAX_TABS = 20`, `MAX_ACTIVE_CONNECTIONS = 5`
 
 ---
 

@@ -24,7 +24,12 @@ bun run cargo:test
 ## Source Of Truth
 
 - [`package.json`](/Users/a1234/Documents/Project/vibe-db/package.json): scripts, deps, versions
-- [`src/store/useAppStore.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/useAppStore.ts): app state, limits, persisted settings
+- [`src/store/useAppStore.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/useAppStore.ts): root Zustand store composer + persistence config
+- [`src/store/slices/*`](/Users/a1234/Documents/Project/vibe-db/src/store/slices): state/action slices (`ai`, `connection`, `tabs`, `ui`)
+- [`src/store/types.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/types.ts): shared Zustand/domain types
+- [`src/store/constants.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/constants.ts): store limits/defaults (`MAX_*`, default page size)
+- [`src/store/helpers.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/helpers.ts): shared store helper logic
+- [`src/store/storage.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/storage.ts): Tauri Store-backed Zustand storage adapter
 - [`src/lib/db.ts`](/Users/a1234/Documents/Project/vibe-db/src/lib/db.ts): frontend wrappers around Tauri commands
 - [`src-tauri/src/commands.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/commands.rs): backend command implementations
 - [`src-tauri/src/lib.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/lib.rs): Tauri setup, plugins, command registration
@@ -34,7 +39,7 @@ bun run cargo:test
 
 ## Architecture
 
-- Frontend state lives in Zustand in `src/store/useAppStore.ts`.
+- Frontend state lives in Zustand with a root store in `src/store/useAppStore.ts` composed from slice modules in `src/store/slices`.
 - Persisted state uses Tauri Store via `app_settings.json`, not browser localStorage.
 - Backend DB operations are implemented in `src-tauri/src/commands.rs`.
 - `src-tauri/src/lib.rs` wires plugins and exposes commands.

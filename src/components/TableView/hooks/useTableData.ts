@@ -22,7 +22,7 @@ export const useTableData = (tableName: string, tabId: string) => {
   const [data, setData] = useState<QueryResult | null>(() => cachedState?.data ?? null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(() => cachedState?.page ?? 0);
-  const [pageSize, setPageSizeState] = useState(() => cachedState?.pageSize ?? 200);
+  const [pageSize, setPageSizeState] = useState(() => cachedState?.pageSize ?? 100);
   const [totalRows, setTotalRows] = useState(() => cachedState?.totalRows ?? 0);
   const [structure, setStructure] = useState<ColumnInfo[]>(() => cachedState?.structure ?? []);
   const [sortCol, setSortCol] = useState<string | null>(() => cachedState?.sortCol ?? null);
