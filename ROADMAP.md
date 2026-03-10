@@ -89,22 +89,12 @@ See [`changelog/`](./changelog/) for completed features.
 | Query Folders   | Medium   | Organize saved queries into folders/categories                           |
 | Query Templates | Low      | Pre-built queries for common operations (create table, insert, etc.)     |
 
-### Completed in v0.3.0
-
-- [x] Dedicated Create View tab shipped from the sidebar Views flow instead of opening a generic query template
-- [x] Create View now includes validated metadata fields (`View Name`, `TEMP`, `IF NOT EXISTS`) plus generated SQL preview
-- [x] Create View source query upgraded to CodeMirror with SQL syntax highlighting for consistency with Query Editor
-- [x] Manual view preview added with limited sample rows before executing `CREATE VIEW`
-- [x] Create View draft now survives tab switching without resetting, while typing stays responsive by avoiding persisted-store writes on each keystroke
-- [x] Shortened environment tags in DatabaseBar (`PROD`, `DEV`, `TEST`) to prevent layout overflow in narrow view
-
 ### Upcoming Tasks
 
 **AI Panel Improvements**
 
 - [ ] Add related tables support for JOIN queries (detect FK relationships)
 - [ ] Show generated SQL explanation/comments alongside the query
-- [x] Add "Copy SQL" button in addition to "Insert into Editor"
 - [ ] Allow custom temperature/max_tokens in AI settings
 - [ ] Cache generated SQL suggestions per table for quick reuse
 - [ ] Add SQL validation before inserting (check if query is valid for current schema)
@@ -113,7 +103,6 @@ See [`changelog/`](./changelog/) for completed features.
 - [ ] Import dialog (CSV/JSON/SQL)
 - [ ] Export dialog with format options
 - [ ] Index viewer panel
-- [x] Index manager actions in Edit Table (create/drop index)
 - [ ] Saved queries panel in sidebar
 - [ ] Save query dialog with name/description
 - [ ] Query library with search/filter
@@ -122,8 +111,6 @@ See [`changelog/`](./changelog/) for completed features.
 
 - [ ] Tune virtualization overscan and estimated row heights per view
 - [ ] Replace TableView spacer-row virtualization with absolutely positioned rows
-- [x] Fix sidebar context menu to dismiss immediately on first outside click
-- [x] Show startup auto-reconnect progress state (restoring token/connecting/loading schema) instead of static welcome screen
 - [ ] Add QueryEditor performance pass (syntax highlight + memoized parse path)
 - [ ] Add QueryEditor result column resizing and responsive inspector behavior
 - [ ] Extend Rust-emitted SQL logging to schema introspection paths (`list_tables`, etc.)
@@ -134,7 +121,6 @@ See [`changelog/`](./changelog/) for completed features.
 - [ ] Return typed rows with reusable column metadata maps
 - [ ] Debounce UI-triggered query refreshes
 - [ ] Keep metadata fetches separate from row fetches
-- [x] Restore cached table tab snapshots on tab revisit to avoid refetch-on-switch loading
 - [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
 - [ ] Expand Rust-side command timing instrumentation
 
@@ -142,7 +128,6 @@ See [`changelog/`](./changelog/) for completed features.
 
 - [ ] Implement strict CSP in `tauri.conf.json`
 - [ ] Audit Tauri capabilities (remove unused permissions)
-- [x] Document security posture in README
 
 ### Testing
 
@@ -165,7 +150,7 @@ See [`changelog/`](./changelog/) for completed features.
 | Connection via URL + Auth Token | High     | ✅ Implemented |
 | Local libSQL file support       | High     | ✅ Implemented |
 | Embedded replica support        | Medium   | 📋 Planned     |
-| Sync status display             | Low      | 📋 Planned     |
+| Sync status display             | Low      | ✅ Implemented |
 
 ### Turso Commands
 
@@ -192,19 +177,7 @@ pub struct TursoEngine {
 
 ### Tasks
 
-- [x] Add `libsql` crate dependency
-- [x] Implement `TursoEngine` struct
-- [x] Support remote connections with auth token
-- [x] Support local libSQL file connections
 - [ ] Support embedded replica mode
-- [x] Handle remote sync status
-- [x] Update connection dialog UI
-
-### Stability Hardening (2026-03-10)
-
-- [x] Ensure Turso transactions always rollback on validation/execute/commit failures after `BEGIN`
-- [x] Propagate libSQL row-iteration errors instead of silently returning partial results
-- [x] Add Turso integration tests for connect/disconnect, safe query validation, transaction commit, and rollback behavior
 
 ### Dependencies
 
