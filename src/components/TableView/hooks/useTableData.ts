@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import {
   getTableData,
@@ -9,19 +9,35 @@ import {
 import type { QueryResult, ColumnInfo } from "@/store/useAppStore";
 
 export const useTableData = (tableName: string, tabId: string) => {
+  const cachedState = useMemo(
+    () => useAppStore.getState().tableViewStateByTabId[tabId],
+    [tabId],
+  );
   const tab = useAppStore((s) => s.tabs.find((t) => t.id === tabId));
   const activeConnection = useAppStore((s) =>
     s.connections.find((c) => c.id === tab?.connectionId),
   );
+  const updateTableViewState = useAppStore((s) => s.updateTableViewState);
 
-  const [data, setData] = useState<QueryResult | null>(null);
+  const [data, setData] = useState<QueryResult | null>(() => cachedState?.data ?? null);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSizeState] = useState(200);
-  const [totalRows, setTotalRows] = useState(0);
-  const [structure, setStructure] = useState<ColumnInfo[]>([]);
-  const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
+  const [page, setPage] = useState(() => cachedState?.page ?? 0);
+  const [pageSize, setPageSizeState] = useState(() => cachedState?.pageSize ?? 200);
+  const [totalRows, setTotalRows] = useState(() => cachedState?.totalRows ?? 0);
+  const [structure, setStructure] = useState<ColumnInfo[]>(() => cachedState?.structure ?? []);
+  const [sortCol, setSortCol] = useState<string | null>(() => cachedState?.sortCol ?? null);
+  const [sortDir, setSortDir] = useState<"ASC" | "DESC">(
+    () => cachedState?.sortDir ?? "ASC",
+  );
+  const [hasLoadedData, setHasLoadedData] = useState(
+    () => cachedState?.hasLoadedData ?? false,
+  );
+  const [hasLoadedRowCount, setHasLoadedRowCount] = useState(
+    () => cachedState?.hasLoadedRowCount ?? false,
+  );
+  const [hasLoadedStructure, setHasLoadedStructure] = useState(
+    () => cachedState?.hasLoadedStructure ?? false,
+  );
   const structureRequestIdRef = useRef(0);
   const countRequestIdRef = useRef(0);
   const dataRequestIdRef = useRef(0);
@@ -36,6 +52,7 @@ export const useTableData = (tableName: string, tabId: string) => {
       );
       if (requestId !== structureRequestIdRef.current) return;
       setStructure(struct);
+      setHasLoadedStructure(true);
     } catch (e: any) {
       console.error(e);
     }
@@ -49,6 +66,7 @@ export const useTableData = (tableName: string, tabId: string) => {
         const count = await getTableRowCount(tableName, activeConnection.connId, filters);
         if (requestId !== countRequestIdRef.current) return;
         setTotalRows(count);
+        setHasLoadedRowCount(true);
       } catch (e: any) {
         console.error(e);
       }
@@ -73,6 +91,7 @@ export const useTableData = (tableName: string, tabId: string) => {
         );
         if (requestId !== dataRequestIdRef.current) return;
         setData(result);
+        setHasLoadedData(true);
       } catch (e: any) {
         console.error(e);
       } finally {
@@ -114,9 +133,40 @@ export const useTableData = (tableName: string, tabId: string) => {
     });
   }, [data, gridCols]);
 
+  useEffect(() => {
+    updateTableViewState(tabId, {
+      data,
+      hasLoadedData,
+      totalRows,
+      hasLoadedRowCount,
+      structure,
+      hasLoadedStructure,
+      page,
+      pageSize,
+      sortCol,
+      sortDir,
+    });
+  }, [
+    tabId,
+    data,
+    hasLoadedData,
+    totalRows,
+    hasLoadedRowCount,
+    structure,
+    hasLoadedStructure,
+    page,
+    pageSize,
+    sortCol,
+    sortDir,
+    updateTableViewState,
+  ]);
+
   return {
     data,
     loading,
+    hasLoadedData,
+    hasLoadedRowCount,
+    hasLoadedStructure,
     page,
     setPage,
     pageSize,

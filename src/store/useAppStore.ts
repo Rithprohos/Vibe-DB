@@ -44,6 +44,32 @@ export interface QueryResultLight {
   truncated?: boolean;
 }
 
+export interface TableFilterCondition {
+  id: string;
+  field: string;
+  operator: string;
+  value: string;
+  valueTo: string;
+}
+
+export interface TableViewState {
+  data: QueryResult | null;
+  hasLoadedData: boolean;
+  totalRows: number;
+  hasLoadedRowCount: boolean;
+  structure: ColumnInfo[];
+  hasLoadedStructure: boolean;
+  page: number;
+  pageSize: number;
+  sortCol: string | null;
+  sortDir: "ASC" | "DESC";
+  showFilterPanel: boolean;
+  filters: TableFilterCondition[];
+  appliedFilters: TableFilterCondition[];
+  isInspectorOpen: boolean;
+  selectedRowIndex: number | null;
+}
+
 export const MAX_RESULT_ROWS = 1000;
 export const MAX_TABS = 20;
 export const MAX_ACTIVE_CONNECTIONS = 5;
@@ -130,6 +156,7 @@ interface AppState {
   // Tabs
   tabs: Tab[];
   activeTabId: string | null;
+  tableViewStateByTabId: Record<string, TableViewState>;
 
   // Logs
   logs: SqlLog[];
@@ -201,6 +228,10 @@ interface AppState {
   closeOtherTabs: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTab: (id: string, updates: Partial<Tab>) => void;
+  updateTableViewState: (
+    tabId: string,
+    updates: Partial<TableViewState>,
+  ) => void;
   openTableTab: (
     connectionId: string,
     tableName: string,
@@ -221,6 +252,20 @@ interface AppState {
 }
 
 let tabCounter = 0;
+
+function pruneTableViewStateByTabs(
+  tableViewStateByTabId: Record<string, TableViewState>,
+  tabs: Tab[],
+): Record<string, TableViewState> {
+  if (tabs.length === 0) {
+    return {};
+  }
+
+  const activeIds = new Set(tabs.map((tab) => tab.id));
+  return Object.fromEntries(
+    Object.entries(tableViewStateByTabId).filter(([tabId]) => activeIds.has(tabId)),
+  );
+}
 
 // Initialize Tauri Store
 const tauriStore = new LazyStore("app_settings.json");
@@ -251,6 +296,7 @@ export const useAppStore = create<AppState>()(
       selectedTable: null,
       tabs: [],
       activeTabId: null,
+      tableViewStateByTabId: {},
       logs: [],
       showLogDrawer: false,
       toasts: [],
@@ -358,6 +404,10 @@ export const useAppStore = create<AppState>()(
             isConnected: hasActiveConnections,
             tabs: newTabs,
             activeTabId: newActiveTabId,
+            tableViewStateByTabId: pruneTableViewStateByTabs(
+              state.tableViewStateByTabId,
+              newTabs,
+            ),
           };
         }),
 
@@ -371,22 +421,30 @@ export const useAppStore = create<AppState>()(
           isConnected: false,
           tabs: [],
           activeTabId: null,
+          tableViewStateByTabId: {},
           selectedTable: null,
         })),
 
       closeOtherConnections: (id) =>
-        set((state) => ({
-          connections: state.connections.map((c) =>
-            c.id === id ? c : { ...c, connId: undefined },
-          ),
-          tabs: state.tabs.filter((t) => t.connectionId === id),
-          activeTabId:
-            state.activeTabId &&
-            state.tabs.find((t) => t.id === state.activeTabId)?.connectionId ===
-              id
-              ? state.activeTabId
-              : (state.tabs.find((t) => t.connectionId === id)?.id ?? null),
-        })),
+        set((state) => {
+          const nextTabs = state.tabs.filter((t) => t.connectionId === id);
+          return {
+            connections: state.connections.map((c) =>
+              c.id === id ? c : { ...c, connId: undefined },
+            ),
+            tabs: nextTabs,
+            activeTabId:
+              state.activeTabId &&
+              state.tabs.find((t) => t.id === state.activeTabId)?.connectionId ===
+                id
+                ? state.activeTabId
+                : (state.tabs.find((t) => t.connectionId === id)?.id ?? null),
+            tableViewStateByTabId: pruneTableViewStateByTabs(
+              state.tableViewStateByTabId,
+              nextTabs,
+            ),
+          };
+        }),
 
       updateConnection: (id, updates) =>
         set((state) => ({
@@ -478,6 +536,10 @@ export const useAppStore = create<AppState>()(
           return {
             tabs: newTabs,
             activeTabId: newActiveId,
+            tableViewStateByTabId: pruneTableViewStateByTabs(
+              state.tableViewStateByTabId,
+              newTabs,
+            ),
             selectedTable: newSelectedTable,
           };
         }),
@@ -486,14 +548,22 @@ export const useAppStore = create<AppState>()(
         set(() => ({
           tabs: [],
           activeTabId: null,
+          tableViewStateByTabId: {},
           selectedTable: null,
         })),
 
       closeOtherTabs: (id) =>
-        set((state) => ({
-          tabs: state.tabs.filter((t) => t.id === id),
-          activeTabId: id,
-        })),
+        set((state) => {
+          const nextTabs = state.tabs.filter((t) => t.id === id);
+          return {
+            tabs: nextTabs,
+            activeTabId: id,
+            tableViewStateByTabId: pruneTableViewStateByTabs(
+              state.tableViewStateByTabId,
+              nextTabs,
+            ),
+          };
+        }),
 
       setActiveTab: (id) =>
         set((state) => {
@@ -510,6 +580,33 @@ export const useAppStore = create<AppState>()(
       updateTab: (id, updates) =>
         set((state) => ({
           tabs: state.tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+        })),
+
+      updateTableViewState: (tabId, updates) =>
+        set((state) => ({
+          tableViewStateByTabId: {
+            ...state.tableViewStateByTabId,
+            [tabId]: {
+              ...(state.tableViewStateByTabId[tabId] ?? {
+                data: null,
+                hasLoadedData: false,
+                totalRows: 0,
+                hasLoadedRowCount: false,
+                structure: [],
+                hasLoadedStructure: false,
+                page: 0,
+                pageSize: 200,
+                sortCol: null,
+                sortDir: "ASC" as const,
+                showFilterPanel: false,
+                filters: [],
+                appliedFilters: [],
+                isInspectorOpen: false,
+                selectedRowIndex: null,
+              }),
+              ...updates,
+            },
+          },
         })),
 
       openTableTab: (connectionId, tableName, type) => {

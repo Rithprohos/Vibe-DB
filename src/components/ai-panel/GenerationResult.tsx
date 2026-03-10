@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowUpCircle, RotateCcw } from 'lucide-react';
+import { AlertCircle, ArrowUpCircle, Copy, RotateCcw } from 'lucide-react';
 
 import type { GenerationState } from './types';
 
@@ -6,12 +6,14 @@ interface GenerationResultProps {
   generation: GenerationState;
   onRetry: () => void;
   onInsert: () => void;
+  onCopy: () => void;
 }
 
 export function GenerationResult({
   generation,
   onRetry,
   onInsert,
+  onCopy,
 }: GenerationResultProps) {
   if (generation.type === 'error') {
     return (
@@ -36,20 +38,29 @@ export function GenerationResult({
 
   if (generation.type === 'success' && generation.sql) {
     return (
-      <div className="mt-2 bg-secondary border border-accent-secondary/30 rounded p-2.5 text-accent-secondary flex flex-col gap-2">
-        <div className="text-xs text-muted-foreground/50 font-sans flex justify-between items-center">
+      <div className="mt-2 border border-accent-secondary/25 bg-secondary/70 p-2.5 text-accent-secondary flex flex-col gap-2 rounded-md">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60 font-sans flex justify-between items-center">
           <span>✦ generated</span>
         </div>
-        <pre className="m-0 whitespace-pre-wrap text-accent-secondary text-sm">
+        <pre className="m-0 whitespace-pre-wrap text-accent-secondary text-sm leading-relaxed">
           {generation.sql}
         </pre>
-        <button
-          onClick={onInsert}
-          className="mt-1 w-full bg-accent/50 border border-accent-secondary/30 text-accent-secondary py-2 rounded-md cursor-pointer hover:bg-accent-secondary/20 transition-colors flex items-center justify-center gap-1.5 text-sm"
-        >
-          insert into editor
-          <ArrowUpCircle size={12} />
-        </button>
+        <div className="mt-1 flex items-center justify-end gap-1.5 border-t border-border/40 pt-2">
+          <button
+            onClick={onCopy}
+            className="h-7 px-2.5 bg-background/40 border border-border/50 text-muted-foreground cursor-pointer hover:bg-background/60 hover:text-foreground transition-colors flex items-center justify-center gap-1.5 text-[11px] uppercase tracking-wide rounded-sm"
+          >
+            <Copy size={12} />
+            Copy SQL
+          </button>
+          <button
+            onClick={onInsert}
+            className="h-7 px-2.5 bg-accent/35 border border-accent-secondary/30 text-accent-secondary cursor-pointer hover:bg-accent-secondary/20 transition-colors flex items-center justify-center gap-1.5 text-[11px] uppercase tracking-wide rounded-sm"
+          >
+            <ArrowUpCircle size={12} />
+            Insert
+          </button>
+        </div>
       </div>
     );
   }

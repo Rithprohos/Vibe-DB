@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Key, PanelRightOpen, PanelRightClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppStore } from '@/store/useAppStore';
 import {
   useReactTable,
   getCoreRowModel,
@@ -28,16 +29,28 @@ const PAGE_SIZE_OPTIONS = ['50', '100', '200', '500'] as const;
 
 export default function TableView({ tableName, tabId }: TableViewProps) {
   useDevRenderCounter('TableView', `${tableName}:${tabId}`);
+  const cachedState = useMemo(
+    () => useAppStore.getState().tableViewStateByTabId[tabId],
+    [tabId],
+  );
+  const updateTableViewState = useAppStore((s) => s.updateTableViewState);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const [commitFlash, setCommitFlash] = useState(false);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
-  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(
+    () => cachedState?.isInspectorOpen ?? false,
+  );
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(
+    () => cachedState?.selectedRowIndex ?? null,
+  );
   const [checkedRowIndices, setCheckedRowIndices] = useState<Set<number>>(() => new Set());
   const commitFlashTimerRef = useRef<number | null>(null);
 
   const {
     data,
     loading,
+    hasLoadedData,
+    hasLoadedRowCount,
+    hasLoadedStructure,
     page,
     setPage,
     pageSize,
@@ -67,7 +80,10 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     handleRemoveFilter,
     handleApplyFilters,
     handleClearAllFilters
-  } = useFilters(setPage);
+  } = useFilters(tabId, setPage);
+
+  const skipInitialDataFetchRef = useRef(hasLoadedData);
+  const skipInitialMetadataFetchRef = useRef(hasLoadedStructure && hasLoadedRowCount);
 
   const refreshVisibleData = useCallback(
     () => fetchData(appliedFilters),
@@ -76,11 +92,19 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   // Trigger data fetching for rows (page/sort/filter)
   useEffect(() => {
+    if (skipInitialDataFetchRef.current) {
+      skipInitialDataFetchRef.current = false;
+      return;
+    }
     fetchData(appliedFilters);
   }, [fetchData, appliedFilters]);
 
   // Fetch structure and total count only when filter/connection/table context changes
   useEffect(() => {
+    if (skipInitialMetadataFetchRef.current) {
+      skipInitialMetadataFetchRef.current = false;
+      return;
+    }
     fetchStructure();
     fetchRowCount(appliedFilters);
   }, [fetchStructure, fetchRowCount, appliedFilters]);
@@ -132,12 +156,19 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   );
 
   useEffect(() => {
+    updateTableViewState(tabId, {
+      isInspectorOpen,
+      selectedRowIndex,
+    });
+  }, [tabId, isInspectorOpen, selectedRowIndex, updateTableViewState]);
+
+  useEffect(() => {
     if (tableData.length === 0) {
       setSelectedRowIndex(null);
       return;
     }
 
-    setSelectedRowIndex((current) => {
+    setSelectedRowIndex((current: number | null) => {
       if (current === null) return 0;
       return current < tableData.length ? current : tableData.length - 1;
     });

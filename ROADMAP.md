@@ -104,7 +104,7 @@ See [`changelog/`](./changelog/) for completed features.
 
 - [ ] Add related tables support for JOIN queries (detect FK relationships)
 - [ ] Show generated SQL explanation/comments alongside the query
-- [ ] Add "Copy SQL" button in addition to "Insert into Editor"
+- [x] Add "Copy SQL" button in addition to "Insert into Editor"
 - [ ] Allow custom temperature/max_tokens in AI settings
 - [ ] Cache generated SQL suggestions per table for quick reuse
 - [ ] Add SQL validation before inserting (check if query is valid for current schema)
@@ -131,6 +131,7 @@ See [`changelog/`](./changelog/) for completed features.
 - [ ] Return typed rows with reusable column metadata maps
 - [ ] Debounce UI-triggered query refreshes
 - [ ] Keep metadata fetches separate from row fetches
+- [x] Restore cached table tab snapshots on tab revisit to avoid refetch-on-switch loading
 - [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
 - [ ] Expand Rust-side command timing instrumentation
 

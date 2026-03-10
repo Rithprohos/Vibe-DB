@@ -1,11 +1,23 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useAppStore } from "@/store/useAppStore";
 import type { FilterCondition } from "../types";
 import { BETWEEN_OPERATORS, UNARY_OPERATORS } from "../types";
 
-export const useFilters = (setPage: (p: number) => void) => {
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>([]);
+export const useFilters = (tabId: string, setPage: (p: number) => void) => {
+  const updateTableViewState = useAppStore((state) => state.updateTableViewState);
+  const cachedState = useMemo(
+    () => useAppStore.getState().tableViewStateByTabId[tabId],
+    [tabId],
+  );
+  const [showFilterPanel, setShowFilterPanel] = useState(
+    () => cachedState?.showFilterPanel ?? false,
+  );
+  const [filters, setFilters] = useState<FilterCondition[]>(
+    () => cachedState?.filters ?? [],
+  );
+  const [appliedFilters, setAppliedFilters] = useState<FilterCondition[]>(
+    () => cachedState?.appliedFilters ?? [],
+  );
   const activeFilterCount = useMemo(
     () =>
       appliedFilters.filter((f) => {
@@ -21,7 +33,15 @@ export const useFilters = (setPage: (p: number) => void) => {
     [appliedFilters],
   );
 
-  const handleAddFilter = (gridCols: string[]) => {
+  useEffect(() => {
+    updateTableViewState(tabId, {
+      showFilterPanel,
+      filters,
+      appliedFilters,
+    });
+  }, [tabId, showFilterPanel, filters, appliedFilters, updateTableViewState]);
+
+  const handleAddFilter = useCallback((gridCols: string[]) => {
     const defaultField = gridCols[0] || "";
     setFilters((prev) => [
       ...prev,
@@ -34,18 +54,18 @@ export const useFilters = (setPage: (p: number) => void) => {
       },
     ]);
     if (!showFilterPanel) setShowFilterPanel(true);
-  };
+  }, [showFilterPanel]);
 
-  const handleUpdateFilter = (
+  const handleUpdateFilter = useCallback((
     id: string,
     updates: Partial<FilterCondition>,
   ) => {
     setFilters((prev) =>
       prev.map((f) => (f.id === id ? { ...f, ...updates } : f)),
     );
-  };
+  }, []);
 
-  const handleRemoveFilter = (id: string) => {
+  const handleRemoveFilter = useCallback((id: string) => {
     setFilters((prev) => {
       const next = prev.filter((f) => f.id !== id);
       if (next.length === 0) {
@@ -57,19 +77,19 @@ export const useFilters = (setPage: (p: number) => void) => {
       }
       return next;
     });
-  };
+  }, [appliedFilters.length, setPage]);
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = useCallback(() => {
     setAppliedFilters([...filters]);
     setPage(0);
-  };
+  }, [filters, setPage]);
 
-  const handleClearAllFilters = () => {
+  const handleClearAllFilters = useCallback(() => {
     setFilters([]);
     setAppliedFilters([]);
     setShowFilterPanel(false);
     setPage(0);
-  };
+  }, [setPage]);
 
   return {
     showFilterPanel,

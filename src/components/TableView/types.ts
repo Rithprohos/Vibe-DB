@@ -1,6 +1,7 @@
-import type { ColumnInfo } from "../../store/useAppStore";
+import type { ColumnInfo, TableFilterCondition } from "../../store/useAppStore";
 
 export type { ColumnInfo };
+export type FilterCondition = TableFilterCondition;
 
 export interface TableViewProps {
   tableName: string;
@@ -10,14 +11,6 @@ export interface TableViewProps {
 export interface EditingCellState {
   rowIndex: number;
   colName: string;
-}
-
-export interface FilterCondition {
-  id: string;
-  field: string;
-  operator: string;
-  value: string;
-  valueTo: string;
 }
 
 export interface CellInputProps {

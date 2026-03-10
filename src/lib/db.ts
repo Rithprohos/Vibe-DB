@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef } from "./createTableConstants";
-import type { TableInfo, ColumnInfo, QueryResult } from "../store/useAppStore";
+import type { Connection, TableInfo, ColumnInfo, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
 import {
   clearStoredAiApiKey,

@@ -6,11 +6,13 @@ import { GenerationResult } from './ai-panel/GenerationResult';
 import { SchemaContextCard } from './ai-panel/SchemaContextCard';
 import { SuggestionList } from './ai-panel/SuggestionList';
 import type { GenerationState } from './ai-panel/types';
+import { copyToClipboard } from '../lib/copy';
 import {
   generateSql,
   getCustomAiApiKey,
   getDefaultAiProviderConfig,
   getTableStructure,
+  pingAiProvider,
   type SchemaTable,
 } from '../lib/db';
 import { useAppStore } from '../store/useAppStore';
@@ -21,6 +23,63 @@ const SUGGESTIONS = [
   "find 10 most recent records",
   "show column statistics",
 ];
+
+function shouldWarmUpProvider(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('not ready') ||
+    message.includes('warming') ||
+    message.includes('cold start') ||
+    message.includes('temporarily unavailable') ||
+    message.includes('503')
+  );
+}
+
+async function warmUpAndGenerate(params: {
+  prompt: string;
+  schema: SchemaTable;
+  providerKind: 'polli' | 'openai';
+  baseUrl: string;
+  model: string;
+  apiKey?: string | null;
+  useDefaultConfig: boolean;
+}): Promise<Awaited<ReturnType<typeof generateSql>>> {
+  try {
+    return await generateSql({
+      prompt: params.prompt,
+      schema: [params.schema],
+      providerKind: params.providerKind,
+      baseUrl: params.baseUrl,
+      model: params.model,
+      apiKey: params.apiKey,
+    });
+  } catch (error) {
+    if (!shouldWarmUpProvider(error)) {
+      throw error;
+    }
+
+    await pingAiProvider({
+      providerKind: params.providerKind,
+      baseUrl: params.baseUrl,
+      model: params.model,
+      apiKey: params.apiKey,
+      useDefaultConfig: params.useDefaultConfig,
+    });
+
+    return await generateSql({
+      prompt: params.prompt,
+      schema: [params.schema],
+      providerKind: params.providerKind,
+      baseUrl: params.baseUrl,
+      model: params.model,
+      apiKey: params.apiKey,
+    });
+  }
+}
 
 export default function AiPanel() {
   // Store selectors - granular for performance
@@ -47,6 +106,15 @@ export default function AiPanel() {
   const isVisible = isAiPanelOpen && isDataTabActive;
   const currentConnectionId = activeTab?.connectionId || activeSidebarConnectionId;
   const currentTableName = activeTab?.tableName || null;
+  const generatedSql = useMemo(() => {
+    if (!generation.sql) {
+      return "";
+    }
+
+    return generation.explanation
+      ? `-- ${generation.explanation}\n${generation.sql}`
+      : generation.sql;
+  }, [generation.explanation, generation.sql]);
 
   // Fetch schema for current table only
   useEffect(() => {
@@ -149,13 +217,14 @@ export default function AiPanel() {
       }
 
       const aiConfig = await getAiConfig();
-      const response = await generateSql({
+      const response = await warmUpAndGenerate({
         prompt: q,
-        schema: [currentTableSchema],
+        schema: currentTableSchema,
         providerKind: aiConfig.providerKind,
         baseUrl: aiConfig.baseUrl,
         model: aiConfig.model,
         apiKey: aiConfig.apiKey,
+        useDefaultConfig: aiProviderMode === 'default',
       });
 
       // Check if aborted
@@ -176,28 +245,33 @@ export default function AiPanel() {
         error: errorMessage,
       });
     }
-  }, [prompt, currentTableSchema, getAiConfig]);
+  }, [prompt, currentTableSchema, getAiConfig, aiProviderMode]);
 
   // Handle insert into editor
   const handleInsert = useCallback(() => {
-    if (!generation.sql) return;
-
-    const fullSql = generation.explanation
-      ? `-- ${generation.explanation}\n${generation.sql}`
-      : generation.sql;
+    if (!generatedSql) return;
 
     if (activeTabId && activeTab?.type === 'query') {
-      updateTab(activeTabId, { query: fullSql });
+      updateTab(activeTabId, { query: generatedSql });
     } else {
       addTab({
         id: `query-ai-${Date.now()}`,
         connectionId: currentConnectionId || "",
         type: 'query',
         title: 'AI Query',
-        query: fullSql,
+        query: generatedSql,
       });
     }
-  }, [generation.sql, generation.explanation, activeTabId, activeTab?.type, currentConnectionId, updateTab, addTab]);
+  }, [generatedSql, activeTabId, activeTab?.type, currentConnectionId, updateTab, addTab]);
+
+  const handleCopy = useCallback(() => {
+    if (!generatedSql) return;
+
+    void copyToClipboard(generatedSql, {
+      successMessage: 'AI SQL copied',
+      errorMessage: 'Failed to copy AI SQL',
+    });
+  }, [generatedSql]);
 
   // Handle retry
   const handleRetry = useCallback(() => {
@@ -252,6 +326,7 @@ export default function AiPanel() {
           generation={generation}
           onRetry={handleRetry}
           onInsert={handleInsert}
+          onCopy={handleCopy}
         />
       </div>
     </div>

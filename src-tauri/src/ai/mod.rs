@@ -72,11 +72,17 @@ pub fn get_default_ai_provider_config() -> DefaultAiProviderConfig {
 /// Ping/test the AI provider connectivity
 #[tauri::command]
 pub async fn ping_ai_provider(request: AiProviderPingRequest) -> Result<(), String> {
+    let api_key = request
+        .api_key
+        .as_deref()
+        .filter(|key| !key.trim().is_empty())
+        .or_else(|| config::resolve_default_api_key(request.use_default_config));
+
     client::ping_provider(
         &request.provider_kind,
         &request.base_url,
         &request.model,
-        request.api_key.as_deref(),
+        api_key,
     )
     .await
     .map_err(|e| e.to_string())

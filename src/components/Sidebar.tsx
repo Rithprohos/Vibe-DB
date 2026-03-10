@@ -41,6 +41,7 @@ export default function Sidebar() {
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [isResizing, setIsResizing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -136,12 +137,15 @@ export default function Sidebar() {
   });
 
   const handleRefresh = async () => {
-    if (!activeConnection?.connId) return;
+    if (!activeConnection?.connId || isRefreshing) return;
+    setIsRefreshing(true);
     try {
       const result = await listTables(activeConnection.connId);
       setTables(activeConnection.id, result);
     } catch (e) {
       console.error('Failed to refresh:', e);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -340,8 +344,14 @@ export default function Sidebar() {
               <Plus size={14} />
               <span>Table</span>
             </Button>
-            <Button variant="outline" size="sm" className="space-x-1 border-border/50 bg-background/50 hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/30 px-2" onClick={handleRefresh}>
-              <RefreshCw size={14} />
+            <Button
+              variant="outline"
+              size="sm"
+              className="space-x-1 border-border/50 bg-background/50 hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/30 px-2"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
             </Button>
           </div>
 
