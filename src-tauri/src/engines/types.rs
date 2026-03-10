@@ -37,6 +37,8 @@ pub struct ConnectionConfig {
     pub database: Option<String>,
     /// Authentication token (for Turso, etc.)
     pub auth_token: Option<String>,
+    /// SSL mode (for PostgreSQL)
+    pub ssl_mode: Option<String>,
 }
 
 impl ConnectionConfig {
@@ -53,6 +55,7 @@ impl ConnectionConfig {
             password: None,
             database: None,
             auth_token: None,
+            ssl_mode: None,
         }
     }
 
@@ -69,6 +72,7 @@ impl ConnectionConfig {
             password: None,
             database: None,
             auth_token: Some(auth_token),
+            ssl_mode: None,
         }
     }
 
@@ -85,6 +89,33 @@ impl ConnectionConfig {
             password: None,
             database: None,
             auth_token: None,
+            ssl_mode: None,
+        }
+    }
+
+    /// Creates a PostgreSQL connection configuration.
+    pub fn postgres(
+        id: String,
+        name: String,
+        host: String,
+        port: u16,
+        username: String,
+        password: Option<String>,
+        database: Option<String>,
+        ssl_mode: Option<String>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            engine_type: EngineType::Postgres,
+            path: None,
+            host: Some(host),
+            port: Some(port),
+            username: Some(username),
+            password,
+            database,
+            auth_token: None,
+            ssl_mode,
         }
     }
 }

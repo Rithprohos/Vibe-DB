@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useCallback, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { Cloud, Database, LoaderCircle } from 'lucide-react';
+import { Cloud, Database, LoaderCircle, Server } from 'lucide-react';
 import { useAppStore, type Connection } from './store/useAppStore';
 import { listTables, connectDatabase, getDatabaseVersion } from './lib/db';
 import {
   getStoredConnectionAuthToken,
   saveStoredConnectionAuthToken,
+  getStoredConnectionPassword,
+  saveStoredConnectionPassword,
 } from './lib/connectionTokenStore';
 import DatabaseBar from './components/DatabaseBar';
 import Sidebar from './components/Sidebar';
@@ -86,13 +88,14 @@ function ConnectionRestoreLoading({
     ? getConnectionProgressStepLabel(progress.step)
     : 'Checking saved connection...';
   const isTurso = progress?.connectionType === 'turso';
+  const isPostgres = progress?.connectionType === 'postgres';
 
   return (
     <div className="flex h-full w-full items-center justify-center bg-background p-8">
       <div className="w-full max-w-md rounded-md border border-border/70 bg-secondary/20 p-5">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-sm border border-border bg-background text-primary">
-            {isTurso ? <Cloud size={16} /> : <Database size={16} />}
+            {isTurso ? <Cloud size={16} /> : isPostgres ? <Server size={16} /> : <Database size={16} />}
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-foreground">{title}</div>
@@ -117,6 +120,10 @@ function isRemoteTursoConnection(connection: Connection): boolean {
   return connection.type === 'turso' && Boolean(connection.host?.trim());
 }
 
+function isPostgresConnection(connection: Connection): boolean {
+  return connection.type === 'postgres';
+}
+
 export default function App() {
   useDevRenderCounter('App');
 
@@ -126,6 +133,7 @@ export default function App() {
   const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
   const tabs = useAppStore(s => s.tabs);
   const activeTabId = useAppStore(s => s.activeTabId);
+  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
   const theme = useAppStore(s => s.theme);
   const setTables = useAppStore(s => s.setTables);
   const setIsConnected = useAppStore(s => s.setIsConnected);
@@ -177,6 +185,38 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncActiveDatabaseVersion = async () => {
+      const activeConnection = connections.find((c) => c.id === activeSidebarConnectionId);
+      if (!activeConnection?.connId) {
+        setDatabaseVersion(null);
+        return;
+      }
+
+      try {
+        const version = await getDatabaseVersion(activeConnection.connId);
+        if (!cancelled) {
+          const latestActiveId = useAppStore.getState().activeSidebarConnectionId;
+          if (latestActiveId === activeConnection.id) {
+            setDatabaseVersion(version);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setDatabaseVersion(null);
+        }
+      }
+    };
+
+    void syncActiveDatabaseVersion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSidebarConnectionId, connections, setDatabaseVersion]);
+
   const handleConnect = useCallback(
     async (conn: Connection, source: ConnectSource = 'manual') => {
       setConnectionProgress({
@@ -189,13 +229,18 @@ export default function App() {
       try {
         let connId = conn.connId;
         const remoteTurso = isRemoteTursoConnection(conn);
+        const isPostgres = isPostgresConnection(conn);
         let hasAuthToken: boolean | undefined = remoteTurso
           ? Boolean(conn.hasAuthToken)
           : undefined;
-        
+        let hasPassword: boolean | undefined = isPostgres
+          ? Boolean(conn.hasPassword)
+          : undefined;
+
         // If not connected, connect to the tauri backend
         if (!connId) {
           let authToken = conn.authToken?.trim() || undefined;
+          let password = conn.password?.trim() || undefined;
 
           if (!authToken && remoteTurso) {
             setConnectionProgress({
@@ -207,6 +252,16 @@ export default function App() {
             authToken = (await getStoredConnectionAuthToken(conn.id)) ?? undefined;
           }
 
+          if (!password && isPostgres && conn.hasPassword) {
+            setConnectionProgress({
+              connectionName: conn.name,
+              connectionType: conn.type,
+              source,
+              step: 'loading-token',
+            });
+            password = (await getStoredConnectionPassword(conn.id)) ?? undefined;
+          }
+
           if (remoteTurso && !authToken) {
             throw new Error('Auth token is required for remote Turso connections');
           }
@@ -215,17 +270,25 @@ export default function App() {
             await saveStoredConnectionAuthToken(conn.id, authToken);
           }
 
+          if (isPostgres && password) {
+            await saveStoredConnectionPassword(conn.id, password);
+          }
+
           const connectPayload: Connection = {
             ...conn,
             authToken,
+            password,
           };
 
           hasAuthToken = remoteTurso ? Boolean(authToken) : undefined;
+          hasPassword = isPostgres ? Boolean(password) : undefined;
 
           const persistedConnection: Connection = {
             ...conn,
             authToken: undefined,
+            password: undefined,
             hasAuthToken,
+            hasPassword,
           };
 
           setConnectionProgress({
@@ -241,14 +304,18 @@ export default function App() {
             connId,
             lastUsed: Date.now(),
             hasAuthToken,
+            hasPassword,
             authToken: undefined,
+            password: undefined,
           });
           setDatabaseVersion(version);
         } else {
           updateConnection(conn.id, {
             lastUsed: Date.now(),
             hasAuthToken,
+            hasPassword,
             authToken: undefined,
+            password: undefined,
           });
         }
 
@@ -372,7 +439,6 @@ export default function App() {
   const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
   const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
   const closeTab = useAppStore(s => s.closeTab);
-  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
   const [hasLoadedLogDrawer, setHasLoadedLogDrawer] = useState(() => useAppStore.getState().showLogDrawer);
 
   // Preload the lazy chunk so first open of logs feels instant.
@@ -465,8 +531,17 @@ export default function App() {
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const renderContent = () => {
+    if (connectionProgress) {
+      return (
+        <ConnectionRestoreLoading
+          startupCheckPending={!startupRestoreChecked}
+          progress={connectionProgress}
+        />
+      );
+    }
+
     if (!isConnected) {
-      if (!startupRestoreChecked || connectionProgress) {
+      if (!startupRestoreChecked) {
         return (
           <ConnectionRestoreLoading
             startupCheckPending={!startupRestoreChecked}
@@ -486,13 +561,13 @@ export default function App() {
           <Suspense fallback={<ContentLoading />}>
             <TableView key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
           </Suspense>
-        ) : null;
+        ) : <EmptyTabScreen />;
       case 'structure':
         return activeTab.tableName ? (
           <Suspense fallback={<ContentLoading />}>
             <TableStructure key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
           </Suspense>
-        ) : null;
+        ) : <EmptyTabScreen />;
       case 'query':
         return (
           <Suspense fallback={<ContentLoading />}>
@@ -516,9 +591,9 @@ export default function App() {
           <Suspense fallback={<ContentLoading />}>
             <EditTable key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />
           </Suspense>
-        ) : null;
+        ) : <EmptyTabScreen />;
       default:
-        return null;
+        return <EmptyTabScreen />;
     }
   };
 

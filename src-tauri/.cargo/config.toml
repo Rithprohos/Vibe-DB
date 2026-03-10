@@ -1,0 +1,17 @@
+[build]
+# Use a shared target directory or disable incremental compilation to save space
+# Uncomment if you want to disable incremental compilation entirely (slower rebuilds, smaller folder)
+# rustflags = ["-C", "incremental=false"]
+
+# Enable thin LTO for dev builds to reduce code size
+rustflags = ["-C", "link-arg=-Wl,-dead_strip"]
+
+[profile.dev]
+# Strip symbols in dev mode for smaller artifacts (optional - removes debug symbols)
+# strip = "debuginfo"
+
+# Alternative: use fat LTO for even smaller code (slower compile times)
+# lto = "thin"
+
+[registries.crates-io]
+protocol = "sparse"

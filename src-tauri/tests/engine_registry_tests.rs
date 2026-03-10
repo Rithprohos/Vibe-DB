@@ -77,10 +77,11 @@ async fn test_engine_registry_get_nonexistent() {
 async fn test_engine_registry_connect_unsupported_engine() {
     let registry = EngineRegistry::new();
 
+    // MySQL is defined but not yet implemented
     let config = ConnectionConfig {
         id: "test-id".to_string(),
         name: "Test".to_string(),
-        engine_type: EngineType::Postgres,
+        engine_type: EngineType::Mysql,
         path: None,
         host: None,
         port: None,
@@ -88,6 +89,7 @@ async fn test_engine_registry_connect_unsupported_engine() {
         password: None,
         database: None,
         auth_token: None,
+        ssl_mode: None,
     };
 
     let result: EngineResult<String> = registry.connect(config).await;

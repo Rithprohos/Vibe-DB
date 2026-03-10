@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil } from 'lucide-react';
 
 interface EditConnectionDialogProps {
@@ -25,6 +26,11 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
   const [authToken, setAuthToken] = useState('');
   const [tokenTouched, setTokenTouched] = useState(false);
   const [path, setPath] = useState('');
+  const [port, setPort] = useState('5432');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [database, setDatabase] = useState('');
+  const [sslMode, setSslMode] = useState<'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full'>('prefer');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -36,6 +42,11 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
       setAuthToken('');
       setTokenTouched(false);
       setPath(connection.path || '');
+      setPort(connection.port?.toString() || '5432');
+      setUsername(connection.username || '');
+      setPassword('');
+      setDatabase(connection.database || '');
+      setSslMode(connection.sslMode || 'prefer');
       setError('');
       setIsSaving(false);
     }
@@ -78,10 +89,16 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
       updateConnection(connection.id, {
         name: name.trim(),
         tag,
-        host: connection.type === 'turso' ? (trimmedHost || undefined) : undefined,
+        host: connection.type !== 'sqlite' ? (trimmedHost || undefined) : undefined,
         authToken: undefined,
         hasAuthToken: connection.type === 'turso' ? hasAuthToken : undefined,
         path: trimmedPath || undefined,
+        port: connection.type === 'postgres' ? (parseInt(port, 10) || 5432) : undefined,
+        username: connection.type === 'postgres' ? (username.trim() || undefined) : undefined,
+        password: connection.type === 'postgres' && password.trim() ? password.trim() : undefined,
+        hasPassword: connection.type === 'postgres' ? Boolean(password.trim() || connection.hasPassword) : undefined,
+        database: connection.type === 'postgres' ? (database.trim() || undefined) : undefined,
+        sslMode: connection.type === 'postgres' ? sslMode : undefined,
       });
 
       onOpenChange(false);
@@ -202,6 +219,105 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
               </>
             )}
 
+            {connection.type === 'postgres' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-host" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Host
+                  </Label>
+                  <Input
+                    id="edit-host"
+                    placeholder="localhost"
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-port" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Port
+                    </Label>
+                    <Input
+                      id="edit-port"
+                      placeholder="5432"
+                      value={port}
+                      onChange={(e) => setPort(e.target.value)}
+                      className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-database" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Database
+                    </Label>
+                    <Input
+                      id="edit-database"
+                      placeholder="postgres"
+                      value={database}
+                      onChange={(e) => setDatabase(e.target.value)}
+                      className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-username" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Username
+                  </Label>
+                  <Input
+                    id="edit-username"
+                    placeholder="postgres"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Password
+                  </Label>
+                  <Input
+                    id="edit-password"
+                    type="password"
+                    placeholder={
+                      connection.hasPassword
+                        ? 'Saved password present (enter to replace)'
+                        : 'your-password'
+                    }
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="bg-background border-border focus-visible:ring-primary h-10 transition-all font-mono text-xs"
+                  />
+                  {connection.hasPassword && !password && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Leave unchanged to keep the existing saved password.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-sslmode" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    SSL Mode
+                  </Label>
+                  <Select value={sslMode} onValueChange={(v) => setSslMode(v as typeof sslMode)}>
+                    <SelectTrigger className="bg-background border-border h-10 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="disable">Disable</SelectItem>
+                      <SelectItem value="prefer">Prefer (default)</SelectItem>
+                      <SelectItem value="require">Require</SelectItem>
+                      <SelectItem value="verify-ca">Verify CA</SelectItem>
+                      <SelectItem value="verify-full">Verify Full</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {connection.type !== 'postgres' && (
             <div className="space-y-1.5 pt-1">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {connection.type === 'turso' ? 'Local Path (Secondary)' : 'Database Path'}
@@ -219,6 +335,7 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                 />
               )}
             </div>
+            )}
           </div>
         </div>
 

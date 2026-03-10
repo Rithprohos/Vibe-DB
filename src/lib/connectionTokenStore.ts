@@ -5,6 +5,7 @@ const CONNECTION_STRONGHOLD_CLIENT = "vibedb-connections";
 const CONNECTION_STRONGHOLD_PASSWORD = "vibedb-credentials-stronghold-v1";
 const CONNECTION_STRONGHOLD_SNAPSHOT = "credentials.hold";
 const CONNECTION_KEY_PREFIX = "conn_auth_token::";
+const CONNECTION_PASSWORD_PREFIX = "conn_password::";
 const CONNECTION_STORE_STEP_TIMEOUT_MS = 15000;
 
 const textEncoder = new TextEncoder();
@@ -131,6 +132,61 @@ export async function clearStoredConnectionAuthToken(
 ): Promise<void> {
   await withConnectionTokenStoreLock(async () => {
     const key = resolveConnectionTokenStoreName(connectionId);
+    const { stronghold, store } = await getConnectionTokenStoreContext();
+    await withConnectionStoreTimeout("remove", store.remove(key));
+    await withConnectionStoreTimeout("save", stronghold.save());
+  });
+}
+
+function resolveConnectionPasswordStoreName(connectionId: string): string {
+  const raw = connectionId.trim();
+  if (!raw) {
+    throw new Error("Connection ID cannot be empty");
+  }
+  return `${CONNECTION_PASSWORD_PREFIX}${raw}`;
+}
+
+export async function getStoredConnectionPassword(
+  connectionId: string,
+): Promise<string | null> {
+  return await withConnectionTokenStoreLock(async () => {
+    const key = resolveConnectionPasswordStoreName(connectionId);
+    const { store } = await getConnectionTokenStoreContext();
+    const value = await withConnectionStoreTimeout("get", store.get(key));
+    if (!value) {
+      return null;
+    }
+
+    const decoded = textDecoder.decode(value).trim();
+    return decoded || null;
+  });
+}
+
+export async function saveStoredConnectionPassword(
+  connectionId: string,
+  password: string,
+): Promise<void> {
+  const trimmed = password.trim();
+  if (!trimmed) {
+    throw new Error("Connection password cannot be empty");
+  }
+
+  await withConnectionTokenStoreLock(async () => {
+    const key = resolveConnectionPasswordStoreName(connectionId);
+    const { stronghold, store } = await getConnectionTokenStoreContext();
+    await withConnectionStoreTimeout(
+      "insert",
+      store.insert(key, Array.from(textEncoder.encode(trimmed))),
+    );
+    await withConnectionStoreTimeout("save", stronghold.save());
+  });
+}
+
+export async function clearStoredConnectionPassword(
+  connectionId: string,
+): Promise<void> {
+  await withConnectionTokenStoreLock(async () => {
+    const key = resolveConnectionPasswordStoreName(connectionId);
     const { stronghold, store } = await getConnectionTokenStoreContext();
     await withConnectionStoreTimeout("remove", store.remove(key));
     await withConnectionStoreTimeout("save", stronghold.save());

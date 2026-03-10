@@ -8,11 +8,81 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil, Globe, Key, Cloud } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil, Globe, Key, Cloud, Server } from 'lucide-react';
 import EditConnectionDialog from './EditConnectionDialog';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+type PostgresSslMode = 'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full';
+
+interface ParsedPostgresUrl {
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  database?: string;
+  sslMode?: PostgresSslMode;
+}
+
+function parsePostgresConnectionUrl(raw: string): { value?: ParsedPostgresUrl; error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { error: 'Please provide a PostgreSQL connection URL' };
+  }
+
+  const normalized = /^postgres(ql)?:\/\//i.test(trimmed)
+    ? trimmed
+    : `postgresql://${trimmed}`;
+
+  let url: URL;
+  try {
+    url = new URL(normalized);
+  } catch {
+    return {
+      error:
+        'Invalid PostgreSQL URL format. Example: postgresql://user:pass@host:5432/dbname?sslmode=prefer',
+    };
+  }
+
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    return { error: 'URL must start with postgres:// or postgresql://' };
+  }
+
+  const host = url.hostname.trim();
+  const username = decodeURIComponent(url.username ?? '').trim();
+  const port = url.port ? Number.parseInt(url.port, 10) : 5432;
+  const database = url.pathname.replace(/^\/+/, '').trim() || undefined;
+  const password = url.password ? decodeURIComponent(url.password) : undefined;
+
+  if (!host) {
+    return { error: 'PostgreSQL URL is missing host' };
+  }
+  if (!username) {
+    return { error: 'PostgreSQL URL is missing username' };
+  }
+  if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+    return { error: 'PostgreSQL URL has an invalid port (must be 1-65535)' };
+  }
+
+  const sslModeRaw = url.searchParams.get('sslmode')?.toLowerCase();
+  const allowedSslModes: PostgresSslMode[] = ['disable', 'prefer', 'require', 'verify-ca', 'verify-full'];
+  if (sslModeRaw && !allowedSslModes.includes(sslModeRaw as PostgresSslMode)) {
+    return { error: "Invalid sslmode in URL. Use disable, prefer, require, verify-ca, or verify-full." };
+  }
+
+  return {
+    value: {
+      host,
+      port,
+      username,
+      password,
+      database,
+      sslMode: sslModeRaw as PostgresSslMode | undefined,
+    },
+  };
+}
 
 export default function ConnectionDialog() {
   const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
@@ -23,11 +93,19 @@ export default function ConnectionDialog() {
   const activeConnection = connections.find(c => c.id === activeSidebarConnectionId);
   const activeConnectionsCount = connections.filter(c => c.connId).length;
 
-  const [type, setType] = useState<'sqlite' | 'turso'>('sqlite');
+  const [type, setType] = useState<'sqlite' | 'turso' | 'postgres'>('sqlite');
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
   const [host, setHost] = useState('');
   const [authToken, setAuthToken] = useState('');
+  // PostgreSQL-specific fields
+  const [port, setPort] = useState('5432');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [database, setDatabase] = useState('');
+  const [sslMode, setSslMode] = useState<'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full'>('prefer');
+  const [postgresInputMode, setPostgresInputMode] = useState<'fields' | 'url'>('fields');
+  const [postgresUrl, setPostgresUrl] = useState('');
   const [error, setError] = useState('');
   const [tag, setTag] = useState<'local' | 'testing' | 'development' | 'production'>();
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
@@ -109,6 +187,13 @@ export default function ConnectionDialog() {
   };
 
   const handleConnect = () => {
+    let resolvedHost = host.trim();
+    let resolvedPort = parseInt(port, 10) || 5432;
+    let resolvedUsername = username.trim();
+    let resolvedPassword = password.trim();
+    let resolvedDatabase = database.trim();
+    let resolvedSslMode: PostgresSslMode = sslMode;
+
     if (type === 'sqlite' && !path.trim()) {
       setError('Please provide a database path');
       return;
@@ -116,6 +201,26 @@ export default function ConnectionDialog() {
     if (type === 'turso' && (!host.trim() && !path.trim())) {
       setError('Please provide either a database URL or a local file path');
       return;
+    }
+    if (type === 'postgres') {
+      if (postgresInputMode === 'url') {
+        const parsed = parsePostgresConnectionUrl(postgresUrl);
+        if (parsed.error || !parsed.value) {
+          setError(parsed.error || 'Invalid PostgreSQL URL');
+          return;
+        }
+        resolvedHost = parsed.value.host;
+        resolvedPort = parsed.value.port;
+        resolvedUsername = parsed.value.username;
+        resolvedPassword = parsed.value.password?.trim() || '';
+        resolvedDatabase = parsed.value.database?.trim() || '';
+        resolvedSslMode = parsed.value.sslMode || sslMode;
+      }
+
+      if (!resolvedHost || !resolvedUsername) {
+        setError('Please provide host and username for PostgreSQL connection');
+        return;
+      }
     }
     if (!tag) {
       setError('Please select an environment label');
@@ -127,13 +232,25 @@ export default function ConnectionDialog() {
       return;
     }
 
+    const defaultNameSource = type === 'sqlite'
+      ? path.split('/').pop()
+      : type === 'postgres'
+      ? resolvedHost
+      : host.split('/').pop();
+
     const conn: Connection = {
       id: `conn-${Date.now()}`,
-      name: name || (type === 'sqlite' ? path.split('/').pop() : host.split('/').pop()) || 'Database',
+      name: name || defaultNameSource || 'Database',
       path: path.trim() || undefined,
-      host: host.trim() || undefined,
+      host: type === 'postgres' ? resolvedHost || undefined : host.trim() || undefined,
+      port: type === 'postgres' ? resolvedPort : undefined,
+      username: type === 'postgres' ? resolvedUsername : undefined,
+      hasPassword: type === 'postgres' ? Boolean(resolvedPassword) : undefined,
+      password: type === 'postgres' ? resolvedPassword || undefined : undefined,
+      database: type === 'postgres' ? resolvedDatabase || undefined : undefined,
+      sslMode: type === 'postgres' ? resolvedSslMode : undefined,
       hasAuthToken: type === 'turso' ? Boolean(authToken.trim()) : undefined,
-      authToken: authToken.trim() || undefined,
+      authToken: type === 'turso' ? authToken.trim() || undefined : undefined,
       type,
       lastUsed: Date.now(),
       tag,
@@ -176,12 +293,14 @@ export default function ConnectionDialog() {
           <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center space-x-2 text-xl font-bold tracking-tight">
               <Database className="text-primary" />
-              <span>{type === 'sqlite' ? 'SQLite' : 'Turso'} Connection</span>
+              <span>{type === 'sqlite' ? 'SQLite' : type === 'turso' ? 'Turso' : 'PostgreSQL'} Connection</span>
             </DialogTitle>
             <DialogDescription className="text-muted-foreground mt-1 text-xs">
-              {type === 'sqlite' 
+              {type === 'sqlite'
                 ? 'Open an existing database or create a new one to connect.'
-                : 'Connect to your Turso database or use a local libSQL file.'}
+                : type === 'turso'
+                ? 'Connect to your Turso database or use a local libSQL file.'
+                : 'Connect to your PostgreSQL server.'}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -210,6 +329,8 @@ export default function ConnectionDialog() {
                       <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
                         {conn.type === 'turso' ? (
                           <Cloud size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        ) : conn.type === 'postgres' ? (
+                          <Server size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                         ) : (
                           <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                         )}
@@ -219,7 +340,11 @@ export default function ConnectionDialog() {
                           <div className="text-sm font-medium text-foreground truncate">{conn.name}</div>
                           <span className={cn(
                             "px-1 py-0 rounded-[3px] text-[7px] font-bold uppercase tracking-tight",
-                            conn.type === 'turso' ? "bg-cyan-500/10 text-cyan-400" : "bg-muted text-muted-foreground"
+                            conn.type === 'turso'
+                              ? "bg-cyan-500/10 text-cyan-400"
+                              : conn.type === 'postgres'
+                              ? "bg-blue-500/10 text-blue-400"
+                              : "bg-muted text-muted-foreground"
                           )}>
                             {conn.type}
                           </span>
@@ -235,7 +360,11 @@ export default function ConnectionDialog() {
                           )}
                         </div>
                         <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5 opacity-70">
-                          {conn.type === 'turso' ? (conn.host || conn.path) : conn.path}
+                          {conn.type === 'turso'
+                            ? (conn.host || conn.path)
+                            : conn.type === 'postgres'
+                            ? `${conn.host}:${conn.port || 5432}/${conn.database || 'postgres'}`
+                            : conn.path}
                         </div>
                       </div>
                       <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
@@ -284,8 +413,8 @@ export default function ConnectionDialog() {
               </div>
 
               <div className="mb-6">
-                <Tabs value={type} onValueChange={(v) => setType(v as 'sqlite' | 'turso')}>
-                  <TabsList className="grid w-full grid-cols-2 bg-background/80 border border-border/60">
+                <Tabs value={type} onValueChange={(v) => setType(v as 'sqlite' | 'turso' | 'postgres')}>
+                  <TabsList className="grid w-full grid-cols-3 bg-background/80 border border-border/60">
                     <TabsTrigger value="sqlite" className="text-[10px] uppercase tracking-wider font-bold h-8">
                       <Database size={12} className="mr-2" />
                       SQLite
@@ -293,6 +422,10 @@ export default function ConnectionDialog() {
                     <TabsTrigger value="turso" className="text-[10px] uppercase tracking-wider font-bold h-8">
                       <Cloud size={12} className="mr-2" />
                       Turso
+                    </TabsTrigger>
+                    <TabsTrigger value="postgres" className="text-[10px] uppercase tracking-wider font-bold h-8">
+                      <Server size={12} className="mr-2" />
+                      PostgreSQL
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -305,7 +438,7 @@ export default function ConnectionDialog() {
                   </Label>
                   <Input
                     id="name"
-                    placeholder={type === 'sqlite' ? "My SQLite DB" : "My Turso DB"}
+                    placeholder={type === 'sqlite' ? "My SQLite DB" : type === 'turso' ? "My Turso DB" : "My PostgreSQL DB"}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="bg-background border-border focus-visible:ring-primary h-11 transition-all focus:bg-background"
@@ -359,6 +492,185 @@ export default function ConnectionDialog() {
                   </>
                 )}
 
+                {type === 'postgres' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Connection Input
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPostgresInputMode('fields');
+                            setError('');
+                          }}
+                          className={cn(
+                            'h-9 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-colors',
+                            postgresInputMode === 'fields'
+                              ? 'border-primary text-primary bg-primary/10'
+                              : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                          )}
+                        >
+                          Host & Fields
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPostgresInputMode('url');
+                            setError('');
+                          }}
+                          className={cn(
+                            'h-9 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-colors',
+                            postgresInputMode === 'url'
+                              ? 'border-primary text-primary bg-primary/10'
+                              : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                          )}
+                        >
+                          Full URL
+                        </button>
+                      </div>
+                    </div>
+
+                    {postgresInputMode === 'url' ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="postgresUrl" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          PostgreSQL URL <span className="text-destructive">*</span>
+                        </Label>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <Globe size={14} />
+                          </div>
+                          <Input
+                            id="postgresUrl"
+                            placeholder="postgresql://user:pass@host:5432/dbname?sslmode=prefer"
+                            value={postgresUrl}
+                            onChange={(e) => {
+                              setPostgresUrl(e.target.value);
+                              setError('');
+                            }}
+                            className="pl-9 bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          URL is parsed into host, port, username, password, database, and sslmode.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="host" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Host <span className="text-destructive">*</span>
+                          </Label>
+                          <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              <Globe size={14} />
+                            </div>
+                            <Input
+                              id="host"
+                              placeholder="localhost or db.example.com"
+                              value={host}
+                              onChange={(e) => {
+                                setHost(e.target.value);
+                                setError('');
+                              }}
+                              className="pl-9 bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                            />
+                          </div>
+                          {host.includes('://') && (
+                            <p className="text-[10px] text-amber-400">
+                              This looks like a full URL. Switch to "Full URL" input for PostgreSQL URL parsing.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="port" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              Port
+                            </Label>
+                            <Input
+                              id="port"
+                              placeholder="5432"
+                              value={port}
+                              onChange={(e) => setPort(e.target.value)}
+                              className="bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="database" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              Database
+                            </Label>
+                            <Input
+                              id="database"
+                              placeholder="postgres"
+                              value={database}
+                              onChange={(e) => setDatabase(e.target.value)}
+                              className="bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="username" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Username <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="username"
+                            placeholder="postgres"
+                            value={username}
+                            onChange={(e) => {
+                              setUsername(e.target.value);
+                              setError('');
+                            }}
+                            className="bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Password
+                          </Label>
+                          <Input
+                            id="password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="bg-background border-border font-mono text-xs focus-visible:ring-primary h-11 transition-all focus:bg-background"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="sslMode" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        SSL Mode
+                      </Label>
+                      <Select value={sslMode} onValueChange={(v) => setSslMode(v as typeof sslMode)}>
+                        <SelectTrigger className="bg-background border-border h-11 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="disable">Disable</SelectItem>
+                          <SelectItem value="prefer">Prefer (default)</SelectItem>
+                          <SelectItem value="require">Require</SelectItem>
+                          <SelectItem value="verify-ca">Verify CA</SelectItem>
+                          <SelectItem value="verify-full">Verify Full</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">
+                        {sslMode === 'disable' && 'No SSL connection.'}
+                        {sslMode === 'prefer' && 'Try SSL first, fallback to non-SSL.'}
+                        {sslMode === 'require' && 'SSL required but skip certificate verification.'}
+                        {sslMode === 'verify-ca' && 'SSL required with CA certificate verification.'}
+                        {sslMode === 'verify-full' && 'SSL required with full certificate verification (hostname + CA).'}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {type !== 'postgres' && (
                 <div className="space-y-2">
                   <Label htmlFor="path" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     {type === 'sqlite' ? 'Database File' : 'Local Path (Optional)'}
@@ -399,6 +711,7 @@ export default function ConnectionDialog() {
                     </p>
                   )}
                 </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -446,7 +759,11 @@ export default function ConnectionDialog() {
           </Button>
           <Button
             onClick={handleConnect}
-            disabled={(!path.trim() && !host.trim()) || !tag}
+            disabled={
+              (type === 'postgres'
+                ? (postgresInputMode === 'url' ? !postgresUrl.trim() : !host.trim() || !username.trim())
+                : !path.trim() && !host.trim()) || !tag
+            }
             className="px-8 font-semibold tracking-wide w-full sm:w-auto"
           >
             Connect

@@ -3,10 +3,18 @@ export interface Connection {
   connId?: string;
   name: string;
   path?: string;
-  type: "sqlite" | "turso";
+  type: "sqlite" | "turso" | "postgres";
   lastUsed: number;
   tag?: "local" | "testing" | "development" | "production";
+  // PostgreSQL-specific fields
   host?: string;
+  port?: number;
+  username?: string;
+  hasPassword?: boolean;
+  password?: string;
+  database?: string;
+  sslMode?: "disable" | "prefer" | "require" | "verify-ca" | "verify-full";
+  // Turso-specific fields
   hasAuthToken?: boolean;
   authToken?: string;
 }
@@ -14,6 +22,7 @@ export interface Connection {
 export interface TableInfo {
   name: string;
   table_type: string;
+  schema?: string;
 }
 
 export interface ColumnInfo {
@@ -215,19 +224,7 @@ export interface AppState {
   addConnection: (conn: Connection) => void;
   updateConnection: (
     id: string,
-    updates: Partial<
-      Pick<
-        Connection,
-        | "name"
-        | "tag"
-        | "connId"
-        | "lastUsed"
-        | "path"
-        | "host"
-        | "hasAuthToken"
-        | "authToken"
-      >
-    >,
+    updates: Partial<Connection>,
   ) => void;
   removeConnection: (id: string) => void;
   disconnectConnection: (id: string) => void;

@@ -2,6 +2,28 @@ import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Settings, Sparkles } from 'lucide-react';
 
+function formatDatabaseVersion(version: string): string {
+  const trimmed = version.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const pgMatch = trimmed.match(/^PostgreSQL\s+(\d+(?:\.\d+){0,2})/i);
+  if (pgMatch) {
+    const majorMinor = pgMatch[1];
+    if (/neon/i.test(trimmed)) {
+      return `PostgreSQL ${majorMinor} (Neon)`;
+    }
+    return `PostgreSQL ${majorMinor}`;
+  }
+
+  if (trimmed.length > 48) {
+    return `${trimmed.slice(0, 45)}...`;
+  }
+
+  return trimmed;
+}
+
 export default function TopBar() {
   const connections = useAppStore(s => s.connections);
   const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
@@ -28,6 +50,10 @@ export default function TopBar() {
     () => setShowSettingsModal(true),
     [setShowSettingsModal]
   );
+  const versionBadge = useMemo(
+    () => (databaseVersion ? formatDatabaseVersion(databaseVersion) : ''),
+    [databaseVersion]
+  );
 
   return (
     <div
@@ -45,8 +71,11 @@ export default function TopBar() {
       >
         <span>Vibe DB {activeConnection ? `— ${activeConnection.name}` : ''}</span>
         {databaseVersion && (
-          <span className="text-[10px] text-muted-foreground/40 font-mono tracking-widest bg-secondary/50 px-1.5 py-0.5 rounded ml-1">
-            {databaseVersion}
+          <span
+            title={databaseVersion}
+            className="inline-block max-w-[300px] truncate text-[10px] text-muted-foreground/40 font-mono tracking-wide bg-secondary/50 px-1.5 py-0.5 rounded ml-1"
+          >
+            {versionBadge}
           </span>
         )}
       </div>

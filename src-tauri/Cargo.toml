@@ -26,7 +26,7 @@ tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "tls-rustls"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 async-trait = "0.1"
 thiserror = "2"
@@ -38,6 +38,7 @@ tauri-plugin-process = "2"
 rust-argon2 = "1.0.0"
 reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls"] }
 libsql = "0.9.5"
+urlencoding = "2.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
@@ -47,9 +48,31 @@ tokio-test = "0.4"
 opt-level = 0
 debug = 1 # line tables only (speeds up linking and shrinks folder)
 split-debuginfo = "unpacked" # macOS specific space saver
+# Incremental compilation can bloat target folder; disable if space is critical
+# incremental = false
 
 [profile.dev.package."*"]
 opt-level = 2 # Build all dependencies with optimizations (reduces their artifact size)
 
+# Aggressive optimizations for heavy dependencies to reduce artifact size
+[profile.dev.package.sqlx]
+opt-level = 2
+[profile.dev.package.sqlx-core]
+opt-level = 2
+[profile.dev.package.sqlx-macros]
+opt-level = 2
+[profile.dev.package.tokio]
+opt-level = 2
+[profile.dev.package.libsql]
+opt-level = 2
+[profile.dev.package.libsql-ffi]
+opt-level = 2
 [profile.dev.package.scrypt]
 opt-level = 3
+
+# Smaller release binaries
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+codegen-units = 1

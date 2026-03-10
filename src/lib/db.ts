@@ -58,12 +58,20 @@ export interface GenerateSqlResponse {
 }
 
 export async function connectDatabase(conn: Connection): Promise<string> {
+  const engineType =
+    conn.type === "turso" ? "Turso" : conn.type === "postgres" ? "Postgres" : "Sqlite";
+
   const config = {
     id: conn.id,
     name: conn.name,
-    engine_type: conn.type === "turso" ? "Turso" : "Sqlite",
+    engine_type: engineType,
     path: conn.path,
     host: conn.host,
+    port: conn.port,
+    username: conn.username,
+    password: conn.password,
+    database: conn.database,
+    ssl_mode: conn.sslMode,
     auth_token: conn.authToken,
   };
 
@@ -171,12 +179,14 @@ export async function buildCreateTableSQL(
   tableName: string,
   columns: ColumnDef[],
   ifNotExists: boolean,
+  engineType: 'sqlite' | 'turso' | 'postgres' = 'sqlite',
 ): Promise<string> {
   return measureDevFetch("build_create_table_sql", () =>
     invoke<string>("build_create_table_sql", {
       tableName,
       columns,
       ifNotExists,
+      engineType,
     }),
   );
 }
