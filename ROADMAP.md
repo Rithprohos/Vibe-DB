@@ -113,6 +113,7 @@ See [`changelog/`](./changelog/) for completed features.
 - [ ] Import dialog (CSV/JSON/SQL)
 - [ ] Export dialog with format options
 - [ ] Index viewer panel
+- [x] Index manager actions in Edit Table (create/drop index)
 - [ ] Saved queries panel in sidebar
 - [ ] Save query dialog with name/description
 - [ ] Query library with search/filter
@@ -121,6 +122,8 @@ See [`changelog/`](./changelog/) for completed features.
 
 - [ ] Tune virtualization overscan and estimated row heights per view
 - [ ] Replace TableView spacer-row virtualization with absolutely positioned rows
+- [x] Fix sidebar context menu to dismiss immediately on first outside click
+- [x] Show startup auto-reconnect progress state (restoring token/connecting/loading schema) instead of static welcome screen
 - [ ] Add QueryEditor performance pass (syntax highlight + memoized parse path)
 - [ ] Add QueryEditor result column resizing and responsive inspector behavior
 - [ ] Extend Rust-emitted SQL logging to schema introspection paths (`list_tables`, etc.)
@@ -139,7 +142,7 @@ See [`changelog/`](./changelog/) for completed features.
 
 - [ ] Implement strict CSP in `tauri.conf.json`
 - [ ] Audit Tauri capabilities (remove unused permissions)
-- [ ] Document security posture in README
+- [x] Document security posture in README
 
 ### Testing
 
@@ -303,14 +306,15 @@ Security improvements for production readiness.
 | ------------------------- | ------------------- | -------------------------------------- |
 | `tauri-plugin-store`      | `app_settings.json` | Connection metadata, tags, preferences |
 | `tauri-plugin-stronghold` | `ai-config.hold`    | Encrypted AI API keys snapshot         |
+| `tauri-plugin-stronghold` | `credentials.hold`  | Encrypted Turso auth token snapshot    |
 
 ### Security Caveat (Current v0.2.8)
 
-The Stronghold integration now persists and reloads API keys correctly, but it does not yet provide strong machine-bound secret protection. The current unlock string is app-known, so the snapshot is encrypted at rest but not protected by an OS keychain secret or user-supplied master password. Treat this as a reliability milestone, not a final security posture.
+The Stronghold integration now persists and reloads AI API keys and Turso auth tokens correctly, but it does not yet provide strong machine-bound secret protection. The current unlock string is app-known, so snapshots are encrypted at rest but not protected by an OS keychain secret or user-supplied master password. Treat this as a reliability milestone, not a final security posture.
 
 ### Secure Credential Storage (Ready for v0.3+)
 
-Stronghold vault plumbing is installed and working for AI keys. Before using it for remote-engine passwords/tokens, the unlock model should be upgraded to an OS-backed secret or user-provided passphrase:
+Stronghold vault plumbing is installed and working for AI keys and Turso auth tokens. Before broadening this to remote-engine passwords/connection strings, the unlock model should be upgraded to an OS-backed secret or user-provided passphrase:
 
 | Engine     | Sensitive Data                |
 | ---------- | ----------------------------- |
@@ -349,6 +353,7 @@ Stronghold vault plumbing is installed and working for AI keys. Before using it 
 - [ ] Connection groups/folders
 - [ ] Import/export between engines
 - [ ] Schema migration tools
+- [ ] Multi-window support (VS Code style) — allow multiple independent windows with shared connections but isolated tabs/active connection per window
 
 ---
 

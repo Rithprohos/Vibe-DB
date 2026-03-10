@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { listTables } from '../lib/db';
+import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +43,8 @@ export default function Sidebar() {
   const [isResizing, setIsResizing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
+  const [contextMenuEpoch, setContextMenuEpoch] = useState(0);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -194,6 +197,16 @@ export default function Sidebar() {
     openTableTab(activeConnection.id, tableName, 'edit-table');
   }, [activeConnection, openTableTab]);
 
+  const handleRemoveConnection = useCallback(async (connectionId: string) => {
+    try {
+      await clearStoredConnectionAuthToken(connectionId);
+    } catch (e) {
+      console.error(`Failed to clear secure token for ${connectionId}:`, e);
+    } finally {
+      useAppStore.getState().removeConnection(connectionId);
+    }
+  }, []);
+
   return (
     <div 
       className={cn(
@@ -314,7 +327,7 @@ export default function Sidebar() {
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground/0 group-hover:text-muted-foreground transition-all"
                       onClick={(e) => {
                         e.stopPropagation();
-                        useAppStore.getState().removeConnection(conn.id);
+                        void handleRemoveConnection(conn.id);
                       }}
                       title="Remove connection"
                     >
@@ -399,6 +412,7 @@ export default function Sidebar() {
                     <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, position: 'relative' }}>
                       {tableVirtualizer.getVirtualItems().map((virtualItem) => {
                         const t = filteredTables[virtualItem.index];
+                        const menuKey = `table:${t.name}`;
                         return (
                           <div
                             key={t.name}
@@ -411,7 +425,10 @@ export default function Sidebar() {
                               paddingBottom: '2px',
                             }}
                           >
-                            <ContextMenu>
+                            <ContextMenu
+                              key={`${menuKey}:${contextMenuEpoch}`}
+                              onOpenChange={setIsContextMenuOpen}
+                            >
                               <ContextMenuTrigger asChild>
                                 <div
                                   className={cn(
@@ -428,14 +445,29 @@ export default function Sidebar() {
                                 </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent className="w-48">
-                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    openTableTab(activeConnection!.id, t.name, 'data');
+                                  }}
+                                >
                                   Open Data
                                 </ContextMenuItem>
-                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    openTableTab(activeConnection!.id, t.name, 'structure');
+                                  }}
+                                >
                                   Open Structure
                                 </ContextMenuItem>
                                 <ContextMenuSeparator />
-                                <ContextMenuItem onClick={() => handleEditTable(t.name)}>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    handleEditTable(t.name);
+                                  }}
+                                >
                                   Edit Table
                                 </ContextMenuItem>
                               </ContextMenuContent>
@@ -480,6 +512,7 @@ export default function Sidebar() {
                     <div style={{ height: `${viewVirtualizer.getTotalSize()}px`, position: 'relative' }}>
                       {viewVirtualizer.getVirtualItems().map((virtualItem) => {
                         const t = filteredViews[virtualItem.index];
+                        const menuKey = `view:${t.name}`;
                         return (
                           <div
                             key={t.name}
@@ -492,7 +525,10 @@ export default function Sidebar() {
                               paddingBottom: '2px',
                             }}
                           >
-                            <ContextMenu>
+                            <ContextMenu
+                              key={`${menuKey}:${contextMenuEpoch}`}
+                              onOpenChange={setIsContextMenuOpen}
+                            >
                               <ContextMenuTrigger asChild>
                                 <div
                                   className={cn(
@@ -509,10 +545,20 @@ export default function Sidebar() {
                                 </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent className="w-48">
-                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    openTableTab(activeConnection!.id, t.name, 'data');
+                                  }}
+                                >
                                   Open Data
                                 </ContextMenuItem>
-                                <ContextMenuItem onClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    openTableTab(activeConnection!.id, t.name, 'structure');
+                                  }}
+                                >
                                   Open Structure
                                 </ContextMenuItem>
                               </ContextMenuContent>
@@ -538,6 +584,21 @@ export default function Sidebar() {
             </div>
           </ScrollArea>
         </div>
+      )}
+
+      {isContextMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          onPointerDown={() => {
+            setContextMenuEpoch((value) => value + 1);
+            setIsContextMenuOpen(false);
+          }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setContextMenuEpoch((value) => value + 1);
+            setIsContextMenuOpen(false);
+          }}
+        />
       )}
       
       {/* Resizer handle */}
