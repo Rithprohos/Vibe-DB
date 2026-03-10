@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { executeTransaction } from "@/lib/db";
 import type { ColumnInfo } from "@/store/useAppStore";
-import { escapeSqlString, formatSqlValue, quoteIdentifier } from "@/lib/sql-helpers";
+import {
+  escapeSqlString,
+  formatSqlValue,
+  quoteIdentifier,
+  quoteTableName,
+} from "@/lib/sql-helpers";
 
 interface EditingCell {
   rowIndex: number;
@@ -210,7 +215,7 @@ export const useCellEditing = (
 
         const whereClause = buildWhereClause(row, pks);
         updateQueries.push(
-          `UPDATE ${quoteIdentifier(tableName)} SET ${setClause} WHERE ${whereClause};`,
+          `UPDATE ${quoteTableName(tableName)} SET ${setClause} WHERE ${whereClause};`,
         );
       }
 

@@ -439,7 +439,7 @@ export default function CreateTable({ tabId }: Props) {
           setSql('');
           return;
         }
-        const generatedSql = await buildCreateTableSQL(tableName, columns, ifNotExists);
+        const generatedSql = await buildCreateTableSQL(tableName, columns, ifNotExists, engineType);
         if (requestId !== sqlPreviewRequestIdRef.current) return;
         setSql(generatedSql);
       } catch {
@@ -447,7 +447,7 @@ export default function CreateTable({ tabId }: Props) {
         setSql('');
       }
     })();
-  }, [tableName, columns, ifNotExists]);
+  }, [tableName, columns, ifNotExists, engineType]);
 
   const handleSave = useCallback(async () => {
     if (!connId) {
@@ -474,7 +474,12 @@ export default function CreateTable({ tabId }: Props) {
     let sqlToRun = '';
 
     try {
-      sqlToRun = await buildCreateTableSQL(tableName, columns, ifNotExists);
+      sqlToRun = await buildCreateTableSQL(
+        tableName,
+        columns,
+        ifNotExists,
+        engineType,
+      );
       await executeQuery(sqlToRun, connId);
       // Refresh the tables list
       const tables = await listTables(connId);
@@ -499,6 +504,7 @@ export default function CreateTable({ tabId }: Props) {
     tableName,
     columns,
     ifNotExists,
+    engineType,
     setTables,
     activeConnection,
     updateTab,

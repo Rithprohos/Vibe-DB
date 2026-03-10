@@ -1,7 +1,8 @@
 use crate::app_state::AppState;
 use crate::engines::{ConnectionConfig, DatabaseEngine, QueryResult, TableInfo, TableStructure};
 use crate::sql_helpers::{
-    build_where_clause, extract_count, normalize_order_dir, quote_identifier, FilterConditionInput,
+    build_where_clause, extract_count, normalize_order_dir, quote_identifier,
+    quote_qualified_identifier, FilterConditionInput,
 };
 use crate::sql_logging::emit_sql_log;
 use std::sync::Arc;
@@ -189,7 +190,7 @@ pub async fn get_table_row_count(
         .map_err(|error| error.to_string())?;
     let sql = format!(
         "SELECT COUNT(*) as count FROM {}",
-        quote_identifier(table_name.trim())
+        quote_qualified_identifier(table_name.trim())
     );
 
     match engine.get_table_row_count(&table_name).await {
@@ -243,7 +244,7 @@ pub async fn get_filtered_row_count(
 
     let mut query = format!(
         "SELECT COUNT(*) as count FROM {}",
-        quote_identifier(table_name.trim())
+        quote_qualified_identifier(table_name.trim())
     );
     if let Some(where_sql) = where_clause {
         query.push_str(" WHERE ");
@@ -305,7 +306,10 @@ pub async fn get_table_data(
     let has_filters = !filter_items.is_empty();
     let where_clause = build_where_clause(&filter_items, &structure.columns)?;
 
-    let mut query = format!("SELECT * FROM {}", quote_identifier(table_name.trim()));
+    let mut query = format!(
+        "SELECT * FROM {}",
+        quote_qualified_identifier(table_name.trim())
+    );
     if let Some(where_sql) = where_clause {
         query.push_str(" WHERE ");
         query.push_str(&where_sql);

@@ -11,6 +11,13 @@ export function quoteIdentifier(name: string): string {
   return `"${name.split('"').join('""')}"`;
 }
 
+export function quoteTableName(name: string): string {
+  return name
+    .split('.')
+    .map((part) => quoteIdentifier(part.trim()))
+    .join('.');
+}
+
 export function validateIndexName(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return 'Index name is required';

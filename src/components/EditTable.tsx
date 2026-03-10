@@ -7,6 +7,11 @@ import {
 } from '../store/useAppStore';
 import { validateColumnName, validateTableName } from '../lib/tableName';
 import {
+  getQualifiedTableName,
+  replaceQualifiedTableName,
+  splitQualifiedTableName,
+} from '../lib/databaseObjects';
+import {
   getDataTypesForEngine,
   getEngineTypeLabel,
 } from '../lib/createTableConstants';
@@ -16,7 +21,12 @@ import {
   EditTableOperationsPanel,
   EditTableSchemaSidebar,
 } from './edit-table/Sections';
-import { getTableTabTitle, quoteIdentifier, validateIndexName } from './edit-table/shared';
+import {
+  getTableTabTitle,
+  quoteIdentifier,
+  quoteTableName,
+  validateIndexName,
+} from './edit-table/shared';
 
 interface Props {
   tableName: string;
@@ -52,7 +62,9 @@ export default function EditTable({ tableName, tabId }: Props) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const [nextTableName, setNextTableName] = useState(tableName);
+  const [nextTableName, setNextTableName] = useState(
+    splitQualifiedTableName(tableName).name,
+  );
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState('TEXT');
   const [newColumnNotNull, setNewColumnNotNull] = useState(false);
@@ -83,7 +95,7 @@ export default function EditTable({ tableName, tabId }: Props) {
 
   const renameTableNameError = useMemo(() => {
     const nextName = nextTableName.trim();
-    if (!nextName || nextName === currentTableName) return null;
+    if (!nextName || nextName === splitQualifiedTableName(currentTableName).name) return null;
     return validateTableName(nextName);
   }, [nextTableName, currentTableName]);
 
@@ -217,7 +229,7 @@ export default function EditTable({ tableName, tabId }: Props) {
 
   useEffect(() => {
     setCurrentTableName(tableName);
-    setNextTableName(tableName);
+    setNextTableName(splitQualifiedTableName(tableName).name);
   }, [tableName]);
 
   useEffect(() => {
@@ -288,24 +300,30 @@ export default function EditTable({ tableName, tabId }: Props) {
       return;
     }
 
-    const sql = `ALTER TABLE ${quoteIdentifier(currentTableName)} RENAME TO ${quoteIdentifier(trimmedNewName)}`;
+    const nextQualifiedTableName = replaceQualifiedTableName(
+      currentTableName,
+      trimmedNewName,
+    );
+    const sql = `ALTER TABLE ${quoteTableName(currentTableName)} RENAME TO ${quoteIdentifier(trimmedNewName)}`;
     const ok = await runAlter('rename-table', sql, `Renamed table to ${trimmedNewName}`);
     if (!ok) return;
 
     const refreshedTables = await refreshTables();
     if (
       refreshedTables &&
-      !refreshedTables.some((table) => table.name === trimmedNewName)
+      !refreshedTables.some(
+        (table) => getQualifiedTableName(table) === nextQualifiedTableName,
+      )
     ) {
       setError('Rename could not be verified from table metadata. UI state was not updated.');
       showToast({ type: 'error', message: 'Rename verification failed' });
       return;
     }
 
-    renameRelatedTabs(currentTableName, trimmedNewName);
-    setCurrentTableName(trimmedNewName);
+    renameRelatedTabs(currentTableName, nextQualifiedTableName);
+    setCurrentTableName(nextQualifiedTableName);
     setNextTableName(trimmedNewName);
-    const refreshedStructure = await refreshStructure(trimmedNewName, {
+    const refreshedStructure = await refreshStructure(nextQualifiedTableName, {
       setError: false,
     });
     if (!refreshedStructure) {
@@ -335,7 +353,7 @@ export default function EditTable({ tableName, tabId }: Props) {
     const defaultSql = newColumnDefault.trim() ? ` DEFAULT ${newColumnDefault.trim()}` : '';
     const notNullSql = newColumnNotNull ? ' NOT NULL' : '';
     const sql =
-      `ALTER TABLE ${quoteIdentifier(currentTableName)} ` +
+      `ALTER TABLE ${quoteTableName(currentTableName)} ` +
       `ADD COLUMN ${quoteIdentifier(trimmedName)} ` +
       `${newColumnType.trim() || 'TEXT'}${notNullSql}${defaultSql}`;
 
@@ -383,7 +401,7 @@ export default function EditTable({ tableName, tabId }: Props) {
     }
 
     const sql =
-      `ALTER TABLE ${quoteIdentifier(currentTableName)} ` +
+      `ALTER TABLE ${quoteTableName(currentTableName)} ` +
       `RENAME COLUMN ${quoteIdentifier(oldColumn)} TO ${quoteIdentifier(newColumn)}`;
     const ok = await runAlter(
       'rename-column',
@@ -442,7 +460,7 @@ export default function EditTable({ tableName, tabId }: Props) {
     const quotedColumns = selectedCreateIndexColumns.map((columnName) => quoteIdentifier(columnName));
     const sql =
       `CREATE ${uniqueSql}INDEX ${quoteIdentifier(indexName)} ` +
-      `ON ${quoteIdentifier(currentTableName)} (${quotedColumns.join(', ')})`;
+      `ON ${quoteTableName(currentTableName)} (${quotedColumns.join(', ')})`;
     const ok = await runAlter('create-index', sql, `Created index ${indexName}`);
     if (!ok) return;
 
@@ -511,7 +529,7 @@ export default function EditTable({ tableName, tabId }: Props) {
     setLoadingColumns(false);
 
     const sql =
-      `ALTER TABLE ${quoteIdentifier(currentTableName)} ` +
+      `ALTER TABLE ${quoteTableName(currentTableName)} ` +
       `DROP COLUMN ${quoteIdentifier(exactColumn.name)}`;
     const ok = await runAlter('drop-column', sql, `Dropped column ${column}`);
     if (!ok) return;

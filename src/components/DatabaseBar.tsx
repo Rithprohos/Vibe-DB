@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from 'react';
-import { Database, Plus, X, XCircle, XCircleIcon, Cloud } from 'lucide-react';
+import { Database, Plus, X, XCircle, XCircleIcon, Cloud, Server } from 'lucide-react';
 import { useAppStore, type Connection } from '../store/useAppStore';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -96,6 +97,14 @@ export default function DatabaseBar() {
                                 activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
                               )}
                             />
+                          ) : conn.type === 'postgres' ? (
+                            <Server
+                              size={18}
+                              className={cn(
+                                "transition-transform",
+                                activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
+                              )}
+                            />
                           ) : (
                             <Database
                               size={18}
@@ -132,6 +141,11 @@ export default function DatabaseBar() {
               </ContextMenuTrigger>
               <TooltipContent side="right" className="bg-popover text-popover-foreground border-border ml-1 px-3 py-1.5 shadow-xl">
                 <p className="font-medium text-sm">{conn.name}</p>
+                {getConnectionDatabaseName(conn) && (
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-primary/80">
+                    {getConnectionDatabaseName(conn)}
+                  </p>
+                )}
                 {conn.tag && <p className="text-[10px] uppercase opacity-70 mt-0.5">{conn.tag}</p>}
               </TooltipContent>
             </Tooltip>

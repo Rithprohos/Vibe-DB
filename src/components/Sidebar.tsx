@@ -5,11 +5,24 @@ import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X, Cloud } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X, Cloud, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDevRenderCounter } from '@/lib/dev-performance';
+import {
+  ALL_SCHEMAS_VALUE,
+  getQualifiedTableName,
+  getSchemaName,
+} from '@/lib/databaseObjects';
+import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -45,6 +58,7 @@ export default function Sidebar() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const [contextMenuEpoch, setContextMenuEpoch] = useState(0);
+  const [selectedSchema, setSelectedSchema] = useState(ALL_SCHEMAS_VALUE);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -105,13 +119,63 @@ export default function Sidebar() {
   }, [isResizing, resize, stopResizing]);
 
   const normalizedSearch = useMemo(() => search.trim().toLowerCase(), [search]);
+  const isPostgresConnection = activeConnection?.type === 'postgres';
+  const activeDatabaseName = useMemo(
+    () => (activeConnection ? getConnectionDatabaseName(activeConnection) : null),
+    [activeConnection],
+  );
+  const schemaOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    tables.forEach((table) => {
+      const schema = getSchemaName(table);
+      if (!schema) return;
+      counts.set(schema, (counts.get(schema) ?? 0) + 1);
+    });
+
+    return Array.from(counts.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([value, count]) => ({
+        value,
+        count,
+      }));
+  }, [tables]);
+  const showSchemaFilter = isPostgresConnection && schemaOptions.length > 0;
+  const showSchemaBadge = isPostgresConnection && schemaOptions.length > 1;
+  const defaultSchemaValue = useMemo(
+    () => (schemaOptions.length === 1 ? schemaOptions[0].value : ALL_SCHEMAS_VALUE),
+    [schemaOptions],
+  );
+
+  useEffect(() => {
+    setSelectedSchema(defaultSchemaValue);
+  }, [activeSidebarConnectionId, defaultSchemaValue]);
+
+  useEffect(() => {
+    if (
+      selectedSchema !== ALL_SCHEMAS_VALUE &&
+      !schemaOptions.some((schema) => schema.value === selectedSchema)
+    ) {
+      setSelectedSchema(defaultSchemaValue);
+    }
+  }, [defaultSchemaValue, schemaOptions, selectedSchema]);
 
   const { filteredTables, filteredViews } = useMemo(() => {
     const nextTables: typeof tables = [];
     const nextViews: typeof tables = [];
 
     tables.forEach((table) => {
-      if (normalizedSearch && !table.name.toLowerCase().includes(normalizedSearch)) {
+      const schemaName = getSchemaName(table);
+      if (
+        showSchemaFilter &&
+        selectedSchema !== ALL_SCHEMAS_VALUE &&
+        schemaName !== selectedSchema
+      ) {
+        return;
+      }
+
+      const haystack = `${table.name} ${schemaName ?? ''}`.toLowerCase();
+      if (normalizedSearch && !haystack.includes(normalizedSearch)) {
         return;
       }
 
@@ -123,7 +187,7 @@ export default function Sidebar() {
     });
 
     return { filteredTables: nextTables, filteredViews: nextViews };
-  }, [tables, normalizedSearch]);
+  }, [tables, normalizedSearch, selectedSchema, showSchemaFilter]);
 
   const tableVirtualizer = useVirtualizer({
     count: tablesOpen ? filteredTables.length : 0,
@@ -228,6 +292,8 @@ export default function Sidebar() {
             >
               {activeConnection?.type === 'turso' ? (
                 <Cloud size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
+              ) : activeConnection?.type === 'postgres' ? (
+                <Server size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
               ) : (
                 <Database size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
               )}
@@ -235,6 +301,11 @@ export default function Sidebar() {
                 <div className="text-sm font-medium text-foreground truncate leading-tight">
                   {activeConnection.name}
                 </div>
+                {activeDatabaseName && (
+                  <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.16em] text-primary/80">
+                    {activeDatabaseName}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mt-1">
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0">{activeConnection.type}</div>
                   {activeConnection.tag && (
@@ -269,6 +340,30 @@ export default function Sidebar() {
               open={editDialogOpen}
               onOpenChange={setEditDialogOpen}
             />
+            {showSchemaFilter && (
+              <div className="mt-3">
+                <div className="mb-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                    Schema
+                  </span>
+                </div>
+                <Select value={selectedSchema} onValueChange={setSelectedSchema}>
+                  <SelectTrigger className="h-8 border-border/40 bg-secondary/10 px-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/90 focus:ring-1 focus:ring-primary/20">
+                    <SelectValue placeholder="All schemas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schemaOptions.length > 1 && (
+                      <SelectItem value={ALL_SCHEMAS_VALUE}>All schemas</SelectItem>
+                    )}
+                    {schemaOptions.map((schema) => (
+                      <SelectItem key={schema.value} value={schema.value}>
+                        {schema.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </>
         ) : (
           <div className="space-y-3">
@@ -296,6 +391,8 @@ export default function Sidebar() {
                     <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
                         {conn.type === 'turso' ? (
                           <Cloud size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        ) : conn.type === 'postgres' ? (
+                          <Server size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                         ) : (
                           <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                         )}
@@ -371,7 +468,7 @@ export default function Sidebar() {
           <div className="p-3">
             <Input
               type="text"
-              placeholder="Search tables..."
+              placeholder={showSchemaFilter ? "Search tables or schemas..." : "Search tables..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent border-border/30 placeholder:text-muted-foreground/20 text-sm focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:border-primary/30 h-8"
@@ -412,10 +509,12 @@ export default function Sidebar() {
                     <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, position: 'relative' }}>
                       {tableVirtualizer.getVirtualItems().map((virtualItem) => {
                         const t = filteredTables[virtualItem.index];
-                        const menuKey = `table:${t.name}`;
+                        const qualifiedName = getQualifiedTableName(t);
+                        const schemaName = getSchemaName(t);
+                        const menuKey = `table:${qualifiedName}`;
                         return (
                           <div
-                            key={t.name}
+                            key={qualifiedName}
                             style={{
                               position: 'absolute',
                               top: 0,
@@ -433,22 +532,27 @@ export default function Sidebar() {
                                 <div
                                   className={cn(
                                     "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                    selectedTable === t.name
+                                    selectedTable === qualifiedName
                                       ? "bg-primary/10 text-primary border border-primary/20"
                                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                                   )}
-                                  onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
-                                  onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
+                                  onClick={() => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                                  onDoubleClick={() => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
                                 >
-                                  <LayoutTemplate size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
+                                  <LayoutTemplate size={14} className={selectedTable === qualifiedName ? "text-primary" : "text-muted-foreground"} />
                                   <span className="truncate">{t.name}</span>
+                                  {showSchemaBadge && schemaName && (
+                                    <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
+                                      {schemaName}
+                                    </span>
+                                  )}
                                 </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent className="w-48">
                                 <ContextMenuItem
                                   onClick={() => {
                                     setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, t.name, 'data');
+                                    openTableTab(activeConnection!.id, qualifiedName, 'data');
                                   }}
                                 >
                                   Open Data
@@ -456,7 +560,7 @@ export default function Sidebar() {
                                 <ContextMenuItem
                                   onClick={() => {
                                     setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, t.name, 'structure');
+                                    openTableTab(activeConnection!.id, qualifiedName, 'structure');
                                   }}
                                 >
                                   Open Structure
@@ -465,7 +569,7 @@ export default function Sidebar() {
                                 <ContextMenuItem
                                   onClick={() => {
                                     setIsContextMenuOpen(false);
-                                    handleEditTable(t.name);
+                                    handleEditTable(qualifiedName);
                                   }}
                                 >
                                   Edit Table
@@ -512,10 +616,12 @@ export default function Sidebar() {
                     <div style={{ height: `${viewVirtualizer.getTotalSize()}px`, position: 'relative' }}>
                       {viewVirtualizer.getVirtualItems().map((virtualItem) => {
                         const t = filteredViews[virtualItem.index];
-                        const menuKey = `view:${t.name}`;
+                        const qualifiedName = getQualifiedTableName(t);
+                        const schemaName = getSchemaName(t);
+                        const menuKey = `view:${qualifiedName}`;
                         return (
                           <div
-                            key={t.name}
+                            key={qualifiedName}
                             style={{
                               position: 'absolute',
                               top: 0,
@@ -533,22 +639,27 @@ export default function Sidebar() {
                                 <div
                                   className={cn(
                                     "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                    selectedTable === t.name
+                                    selectedTable === qualifiedName
                                       ? "bg-primary/10 text-primary border border-primary/20"
                                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                                   )}
-                                  onClick={() => openTableTab(activeConnection!.id, t.name, 'data')}
-                                  onDoubleClick={() => openTableTab(activeConnection!.id, t.name, 'structure')}
+                                  onClick={() => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                                  onDoubleClick={() => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
                                 >
-                                  <Eye size={14} className={selectedTable === t.name ? "text-primary" : "text-muted-foreground"} />
+                                  <Eye size={14} className={selectedTable === qualifiedName ? "text-primary" : "text-muted-foreground"} />
                                   <span className="truncate">{t.name}</span>
+                                  {showSchemaBadge && schemaName && (
+                                    <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
+                                      {schemaName}
+                                    </span>
+                                  )}
                                 </div>
                               </ContextMenuTrigger>
                               <ContextMenuContent className="w-48">
                                 <ContextMenuItem
                                   onClick={() => {
                                     setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, t.name, 'data');
+                                    openTableTab(activeConnection!.id, qualifiedName, 'data');
                                   }}
                                 >
                                   Open Data
@@ -556,7 +667,7 @@ export default function Sidebar() {
                                 <ContextMenuItem
                                   onClick={() => {
                                     setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, t.name, 'structure');
+                                    openTableTab(activeConnection!.id, qualifiedName, 'structure');
                                   }}
                                 >
                                   Open Structure
@@ -575,9 +686,15 @@ export default function Sidebar() {
               {filteredTables.length === 0 && filteredViews.length === 0 && !search && (
                 <div className="text-center py-8 px-4 border border-dashed border-border rounded-lg bg-background/30 mt-4">
                   <Inbox size={24} className="mx-auto text-muted-foreground mb-2 opacity-50" />
-                  <div className="text-sm font-medium text-foreground mb-1">No tables found</div>
+                  <div className="text-sm font-medium text-foreground mb-1">
+                    {selectedSchema === ALL_SCHEMAS_VALUE
+                      ? 'No tables found'
+                      : `No objects in ${selectedSchema}`}
+                  </div>
                   <div className="text-xs text-muted-foreground max-w-[160px] mx-auto">
-                    Create a table to get started with VibeDB
+                    {selectedSchema === ALL_SCHEMAS_VALUE
+                      ? 'Create a table to get started with VibeDB'
+                      : 'Choose another schema or create an object in this schema'}
                   </div>
                 </div>
               )}

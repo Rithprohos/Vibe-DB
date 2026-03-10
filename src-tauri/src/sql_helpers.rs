@@ -33,8 +33,46 @@ pub struct FilterConditionInput {
     value_to: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CreateTableDialect {
+    Sqlite,
+    Turso,
+    Postgres,
+}
+
+impl CreateTableDialect {
+    fn parse(engine_type: Option<&str>) -> Result<Self, String> {
+        match engine_type
+            .unwrap_or("sqlite")
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "sqlite" => Ok(Self::Sqlite),
+            "turso" => Ok(Self::Turso),
+            "postgres" => Ok(Self::Postgres),
+            other => Err(format!(
+                "Unsupported database engine for CREATE TABLE: {other}"
+            )),
+        }
+    }
+
+    fn rejects_sqlite_reserved_prefix(self) -> bool {
+        matches!(self, Self::Sqlite | Self::Turso)
+    }
+}
+
 pub fn quote_identifier(identifier: &str) -> String {
     format!("\"{}\"", identifier.replace('\"', "\"\""))
+}
+
+pub fn quote_qualified_identifier(identifier: &str) -> String {
+    identifier
+        .split('.')
+        .map(str::trim)
+        .map(quote_identifier)
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 pub fn validate_identifier(name: &str, label: &str) -> Result<(), String> {
@@ -166,14 +204,19 @@ pub fn build_create_table_sql(
     table_name: String,
     columns: Vec<CreateTableColumnInput>,
     if_not_exists: bool,
+    engine_type: Option<String>,
 ) -> Result<String, String> {
+    let dialect = CreateTableDialect::parse(engine_type.as_deref())?;
     let trimmed_table_name = table_name.trim();
     validate_identifier(trimmed_table_name, "Table")?;
-    if trimmed_table_name
-        .to_ascii_lowercase()
-        .starts_with("sqlite_")
-    {
-        return Err("Table name cannot start with 'sqlite_'".to_string());
+
+    if dialect.rejects_sqlite_reserved_prefix() {
+        if trimmed_table_name
+            .to_ascii_lowercase()
+            .starts_with("sqlite_")
+        {
+            return Err("Table name cannot start with 'sqlite_'".to_string());
+        }
     }
 
     let valid_columns: Vec<_> = columns
@@ -198,17 +241,36 @@ pub fn build_create_table_sql(
         .map(|column| {
             let mut parts = Vec::new();
             parts.push(quote_identifier(column.name.trim()));
-            parts.push(column.col_type.trim().to_string());
 
-            if column.primary_key {
-                parts.push("PRIMARY KEY".to_string());
+            let column_type = column.col_type.trim();
+            let serial_type = column
+                .auto_increment
+                .then(|| postgres_serial_type(column_type))
+                .flatten();
+
+            match dialect {
+                CreateTableDialect::Postgres => {
+                    if let Some(serial_type) = serial_type {
+                        parts.push(serial_type.to_string());
+                    } else {
+                        parts.push(column_type.to_string());
+                    }
+                    if column.primary_key {
+                        parts.push("PRIMARY KEY".to_string());
+                    }
+                }
+                CreateTableDialect::Sqlite | CreateTableDialect::Turso => {
+                    parts.push(column_type.to_string());
+                    if column.primary_key {
+                        parts.push("PRIMARY KEY".to_string());
+                    }
+                    if sqlite_auto_increment(column_type, column.primary_key, column.auto_increment)
+                    {
+                        parts.push("AUTOINCREMENT".to_string());
+                    }
+                }
             }
-            if column.auto_increment
-                && column.primary_key
-                && column.col_type.trim().eq_ignore_ascii_case("INTEGER")
-            {
-                parts.push("AUTOINCREMENT".to_string());
-            }
+
             if column.not_null && !column.primary_key {
                 parts.push("NOT NULL".to_string());
             }
@@ -230,11 +292,35 @@ pub fn build_create_table_sql(
         .collect();
 
     let if_not_exists_sql = if if_not_exists { " IF NOT EXISTS" } else { "" };
+
     Ok(format!(
         "CREATE TABLE{if_not_exists_sql} {} (\n{}\n);",
         quote_identifier(trimmed_table_name),
         column_defs.join(",\n")
     ))
+}
+
+fn sqlite_auto_increment(column_type: &str, is_primary_key: bool, auto_increment: bool) -> bool {
+    auto_increment && is_primary_key && column_type.eq_ignore_ascii_case("INTEGER")
+}
+
+fn postgres_serial_type(column_type: &str) -> Option<&'static str> {
+    if column_type.eq_ignore_ascii_case("SMALLINT")
+        || column_type.eq_ignore_ascii_case("SMALLSERIAL")
+    {
+        Some("SMALLSERIAL")
+    } else if column_type.eq_ignore_ascii_case("INTEGER")
+        || column_type.eq_ignore_ascii_case("INT")
+        || column_type.eq_ignore_ascii_case("SERIAL")
+    {
+        Some("SERIAL")
+    } else if column_type.eq_ignore_ascii_case("BIGINT")
+        || column_type.eq_ignore_ascii_case("BIGSERIAL")
+    {
+        Some("BIGSERIAL")
+    } else {
+        None
+    }
 }
 
 fn normalize_view_select_sql(select_sql: &str) -> Result<String, String> {
@@ -318,7 +404,10 @@ fn format_sql_literal(value: &str, is_numeric: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::build_create_view_sql;
+    use super::{
+        build_create_table_sql, build_create_view_sql, quote_qualified_identifier,
+        CreateTableColumnInput,
+    };
 
     #[test]
     fn build_create_view_sql_basic() {
@@ -407,5 +496,159 @@ mod tests {
         .expect_err("expected single statement error");
 
         assert_eq!(error, "View query must contain a single SELECT statement");
+    }
+
+    #[test]
+    fn quote_qualified_identifier_quotes_each_segment() {
+        assert_eq!(
+            quote_qualified_identifier("public.users"),
+            "\"public\".\"users\""
+        );
+    }
+
+    #[test]
+    fn build_create_table_sql_sqlite_with_autoincrement() {
+        let columns = vec![CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "INTEGER".to_string(),
+            primary_key: true,
+            auto_increment: true,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        }];
+
+        let sql = build_create_table_sql(
+            "users".to_string(),
+            columns,
+            false,
+            Some("sqlite".to_string()),
+        )
+        .expect("expected SQL");
+
+        assert!(
+            sql.contains("INTEGER PRIMARY KEY AUTOINCREMENT"),
+            "SQLite should use INTEGER PRIMARY KEY AUTOINCREMENT. Got: {}",
+            sql
+        );
+    }
+
+    #[test]
+    fn build_create_table_sql_postgres_with_serial() {
+        let columns = vec![CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "INTEGER".to_string(),
+            primary_key: true,
+            auto_increment: true,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        }];
+
+        let sql = build_create_table_sql(
+            "users".to_string(),
+            columns,
+            false,
+            Some("postgres".to_string()),
+        )
+        .expect("expected SQL");
+
+        assert!(
+            sql.contains("SERIAL PRIMARY KEY"),
+            "PostgreSQL should use SERIAL PRIMARY KEY. Got: {}",
+            sql
+        );
+        assert!(
+            !sql.contains("AUTOINCREMENT"),
+            "PostgreSQL should NOT contain AUTOINCREMENT. Got: {}",
+            sql
+        );
+    }
+
+    #[test]
+    fn build_create_table_sql_postgres_with_bigserial() {
+        let columns = vec![CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "BIGINT".to_string(),
+            primary_key: true,
+            auto_increment: true,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        }];
+
+        let sql = build_create_table_sql(
+            "events".to_string(),
+            columns,
+            false,
+            Some("postgres".to_string()),
+        )
+        .expect("expected SQL");
+
+        assert!(
+            sql.contains("BIGSERIAL PRIMARY KEY"),
+            "PostgreSQL BIGINT auto-increment should use BIGSERIAL. Got: {}",
+            sql
+        );
+        assert!(
+            !sql.contains("AUTOINCREMENT"),
+            "PostgreSQL should NOT contain AUTOINCREMENT. Got: {}",
+            sql
+        );
+    }
+
+    #[test]
+    fn build_create_table_sql_postgres_supports_if_not_exists() {
+        let columns = vec![CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "INTEGER".to_string(),
+            primary_key: true,
+            auto_increment: false,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        }];
+
+        let sql = build_create_table_sql(
+            "users".to_string(),
+            columns,
+            true,
+            Some("postgres".to_string()),
+        )
+        .expect("expected SQL");
+
+        assert!(
+            sql.starts_with("CREATE TABLE IF NOT EXISTS"),
+            "PostgreSQL should retain IF NOT EXISTS. Got: {}",
+            sql
+        );
+    }
+
+    #[test]
+    fn build_create_table_sql_rejects_unknown_engine() {
+        let columns = vec![CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "INTEGER".to_string(),
+            primary_key: true,
+            auto_increment: false,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        }];
+
+        let error = build_create_table_sql(
+            "users".to_string(),
+            columns,
+            false,
+            Some("mysql".to_string()),
+        )
+        .expect_err("expected unsupported engine error");
+
+        assert_eq!(error, "Unsupported database engine for CREATE TABLE: mysql");
     }
 }

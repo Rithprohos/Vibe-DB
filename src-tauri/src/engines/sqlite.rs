@@ -3,8 +3,12 @@ use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::{Column, Row};
 use tokio::sync::RwLock;
 
+use super::row_decode;
+use super::safety;
 use super::traits::DatabaseEngine;
-use super::types::{ColumnInfo, ConnectionConfig, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, TableStructure};
+use super::types::{
+    ColumnInfo, ConnectionConfig, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, TableStructure,
+};
 use super::{EngineError, EngineResult};
 
 /// SQLite database engine implementation using sqlx.
@@ -55,7 +59,6 @@ impl SqliteEngine {
             )));
         }
         Ok(())
-
     }
 
     fn quote_identifier(identifier: &str) -> String {
@@ -65,93 +68,7 @@ impl SqliteEngine {
     /// Detects dangerous query patterns like DELETE/UPDATE with tautological WHERE clauses.
     /// Returns an error if the query appears unsafe.
     pub fn validate_query_safety(query: &str) -> EngineResult<()> {
-        let stripped = query
-            .lines()
-            .filter(|line| !line.trim().starts_with("--"))
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        let upper = stripped.to_uppercase();
-        let upper = upper.trim();
-
-        let is_dangerous = upper.starts_with("DELETE")
-            || upper.starts_with("UPDATE")
-            || upper.starts_with("DROP")
-            || upper.starts_with("TRUNCATE");
-
-        if !is_dangerous {
-            return Ok(());
-        }
-
-        let has_tautology = Self::detect_tautology(&upper);
-
-        if has_tautology {
-            return Err(EngineError::QueryError(
-                "Unsafe query blocked: WHERE clause with tautology detected (e.g., 'WHERE 1=1'). \
-                 This would affect all rows. Add an explicit LIMIT or use a specific WHERE condition.".to_string()
-            ));
-        }
-
-        if upper.starts_with("DELETE") && !upper.contains("WHERE") {
-            return Err(EngineError::QueryError(
-                "Unsafe query blocked: DELETE without WHERE clause would delete all rows. \
-                 Add a WHERE clause to specify which rows to delete."
-                    .to_string(),
-            ));
-        }
-
-        if upper.starts_with("UPDATE") && !upper.contains("WHERE") {
-            return Err(EngineError::QueryError(
-                "Unsafe query blocked: UPDATE without WHERE clause would update all rows. \
-                 Add a WHERE clause to specify which rows to update."
-                    .to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// Detects tautological conditions in WHERE clauses.
-    fn detect_tautology(upper_query: &str) -> bool {
-        let patterns = [
-            "WHERE 1=1",
-            "WHERE 1 = 1",
-            "WHERE '1'='1'",
-            "WHERE '1' = '1'",
-            "WHERE TRUE",
-            "WHERE (1=1)",
-            "WHERE (1 = 1)",
-            "WHERE 0=0",
-            "WHERE 0 = 0",
-            "WHERE 'A'='A'",
-            "WHERE 'A' = 'A'",
-            "WHERE 1<>0",
-            "WHERE 1 <> 0",
-            "WHERE 1!=0",
-            "WHERE 1 != 0",
-            "WHERE NOT FALSE",
-        ];
-
-        let query_lower = upper_query
-            .replace("(", " ")
-            .replace(")", " ")
-            .replace("  ", " ");
-
-        for pattern in patterns {
-            let pattern_normalized = pattern.to_uppercase().replace("  ", " ");
-            if query_lower.contains(&pattern_normalized) {
-                return true;
-            }
-        }
-
-        let or_patterns = ["OR 1=1", "OR 1 = 1", "OR '1'='1'", "OR TRUE"];
-        for pattern in or_patterns {
-            if query_lower.contains(pattern) {
-                return true;
-            }
-        }
-
-        false
+        safety::validate_query_safety(query)
     }
 }
 
@@ -267,15 +184,17 @@ impl DatabaseEngine for SqliteEngine {
 
         let columns: Vec<ColumnInfo> = column_rows
             .iter()
-            .map(|row| ColumnInfo {
-                cid: row.get("cid"),
-                name: row.get("name"),
-                col_type: row.get("type"),
-                notnull: row.get::<i32, _>("notnull") != 0,
-                dflt_value: row.get("dflt_value"),
-                pk: row.get::<i32, _>("pk") != 0,
+            .map(|row| {
+                Ok(ColumnInfo {
+                    cid: row_decode::decode_sqlite_i64(row, "cid")?,
+                    name: row.get("name"),
+                    col_type: row.get("type"),
+                    notnull: row.get::<i32, _>("notnull") != 0,
+                    dflt_value: row.get("dflt_value"),
+                    pk: row.get::<i32, _>("pk") != 0,
+                })
             })
-            .collect();
+            .collect::<EngineResult<Vec<_>>>()?;
 
         // Get indexes
         let index_query = format!("PRAGMA index_list({})", quoted_table);
@@ -290,10 +209,8 @@ impl DatabaseEngine for SqliteEngine {
             let unique: i32 = index_row.get("unique");
 
             // Get columns for this index
-            let index_info_query = format!(
-                "PRAGMA index_info({})",
-                Self::quote_identifier(&index_name)
-            );
+            let index_info_query =
+                format!("PRAGMA index_info({})", Self::quote_identifier(&index_name));
             let index_info_rows = sqlx::query(&index_info_query)
                 .fetch_all(pool)
                 .await

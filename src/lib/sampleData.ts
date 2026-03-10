@@ -1,4 +1,5 @@
 import type { ColumnInfo } from "@/store/useAppStore";
+import { quoteTableName } from "./sql-helpers";
 
 const ROWS_PER_BATCH = 200;
 
@@ -112,7 +113,7 @@ export function buildSampleDataTransaction(
     throw new Error("No insertable columns found for the selected table.");
   }
 
-  const quotedTableName = quoteIdentifier(tableName);
+  const quotedTableName = quoteTableName(tableName);
   const quotedColumns = insertableColumns.map((column) => quoteIdentifier(column.name)).join(", ");
   const queries: string[] = [];
 

@@ -1,7 +1,7 @@
 // Integration tests for SQLite engine
 use vibe_db_lib::engines::sqlite::SqliteEngine;
 use vibe_db_lib::engines::{
-    ColumnInfo, ConnectionConfig, DatabaseEngine, EngineResult, QueryResult, TableInfo,
+    ConnectionConfig, DatabaseEngine, EngineResult, QueryResult, TableInfo,
 };
 
 fn create_test_config(path: &str) -> ConnectionConfig {
@@ -142,6 +142,7 @@ async fn test_sqlite_engine_get_table_structure() {
     assert_eq!(structure.columns.len(), 5);
 
     // Check id column
+    assert_eq!(structure.columns[0].cid, 0);
     assert_eq!(structure.columns[0].name, "id");
     assert_eq!(structure.columns[0].col_type, "INTEGER");
     assert!(structure.columns[0].pk);
@@ -149,7 +150,10 @@ async fn test_sqlite_engine_get_table_structure() {
     // Check name column
     assert_eq!(structure.columns[1].name, "name");
     assert!(structure.columns[1].notnull);
-    assert_eq!(structure.columns[1].dflt_value, Some("'unknown'".to_string()));
+    assert_eq!(
+        structure.columns[1].dflt_value,
+        Some("'unknown'".to_string())
+    );
 
     engine.disconnect().await;
     let _ = std::fs::remove_file(&temp_path);

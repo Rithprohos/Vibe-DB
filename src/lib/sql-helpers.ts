@@ -3,6 +3,12 @@ import type { ColumnInfo } from "@/store/useAppStore";
 export const quoteIdentifier = (identifier: string): string =>
   `"${identifier.replace(/"/g, '""')}"`;
 
+export const quoteTableName = (tableName: string): string =>
+  tableName
+    .split(".")
+    .map((part) => quoteIdentifier(part.trim()))
+    .join(".");
+
 export const escapeSqlString = (value: string): string =>
   value.replace(/'/g, "''");
 
