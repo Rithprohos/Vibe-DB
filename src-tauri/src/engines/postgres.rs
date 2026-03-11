@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::{Column, Row, TypeInfo};
 use tokio::sync::RwLock;
@@ -144,9 +145,10 @@ impl PostgresEngine {
         let col_name = col.name();
         let type_info = col.type_info();
         let type_name = type_info.name();
+        let type_name_upper = type_name.to_ascii_uppercase();
 
         // Handle PostgreSQL-specific types
-        match type_name {
+        match type_name_upper.as_str() {
             // JSON and JSONB types
             "JSON" | "JSONB" => {
                 if let Ok(val) = row.try_get::<Option<serde_json::Value>, _>(col_name) {
@@ -156,7 +158,7 @@ impl PostgresEngine {
                 }
             }
             // Array types - convert to JSON array
-            _ if type_name.ends_with("[]") => {
+            _ if type_name_upper.ends_with("[]") => {
                 if let Ok(val) = row.try_get::<Option<Vec<String>>, _>(col_name) {
                     match val {
                         Some(arr) => serde_json::json!(arr),
@@ -185,10 +187,48 @@ impl PostgresEngine {
                     serde_json::Value::Null
                 }
             }
-            // Timestamp types
-            "TIMESTAMP" | "TIMESTAMPTZ" | "DATE" | "TIME" | "TIMETZ" => {
+            // Timestamp/date/time types
+            "TIMESTAMP" | "TIMESTAMP WITHOUT TIME ZONE" => {
+                if let Ok(val) = row.try_get::<Option<NaiveDateTime>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.format("%Y-%m-%d %H:%M:%S%.f").to_string()))
+                        .unwrap_or(serde_json::Value::Null)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
+            "TIMESTAMPTZ" | "TIMESTAMP WITH TIME ZONE" => {
+                if let Ok(val) = row.try_get::<Option<DateTime<Utc>>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.to_rfc3339()))
+                        .unwrap_or(serde_json::Value::Null)
+                } else if let Ok(val) = row.try_get::<Option<DateTime<FixedOffset>>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.to_rfc3339()))
+                        .unwrap_or(serde_json::Value::Null)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
+            "DATE" => {
+                if let Ok(val) = row.try_get::<Option<NaiveDate>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.to_string()))
+                        .unwrap_or(serde_json::Value::Null)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
+            "TIME" | "TIME WITHOUT TIME ZONE" => {
+                if let Ok(val) = row.try_get::<Option<NaiveTime>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.format("%H:%M:%S%.f").to_string()))
+                        .unwrap_or(serde_json::Value::Null)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
+            "TIMETZ" | "TIME WITH TIME ZONE" => {
                 if let Ok(val) = row.try_get::<Option<String>, _>(col_name) {
                     val.map(|v| serde_json::json!(v))
+                        .unwrap_or(serde_json::Value::Null)
+                } else if let Ok(val) = row.try_get::<Option<NaiveTime>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.format("%H:%M:%S%.f").to_string()))
                         .unwrap_or(serde_json::Value::Null)
                 } else {
                     serde_json::Value::Null
