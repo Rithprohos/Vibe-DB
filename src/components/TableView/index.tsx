@@ -1,7 +1,15 @@
 import { useMemo, useEffect, useCallback, useRef, useState, startTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Hash, Key, PanelRightOpen, PanelRightClose } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Loader2, RefreshCw, Plus, Check, X as XIcon, ChevronLeft, ChevronRight, AlertCircle, Filter, Database, Hash, Key, PanelRightOpen, PanelRightClose, Trash2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/useAppStore';
 import {
@@ -17,6 +25,7 @@ import { useTableData } from './hooks/useTableData';
 import { useFilters } from './hooks/useFilters';
 import { useNewRow } from './hooks/useNewRow';
 import { useCellEditing } from './hooks/useCellEditing';
+import { useDeleteRows } from './hooks/useDeleteRows';
 import type { TableViewProps } from './types';
 import { useDevRenderCounter } from '@/lib/dev-performance';
 import { VirtualizedTableBody } from './TableRows';
@@ -89,6 +98,30 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   const refreshVisibleData = useCallback(
     () => fetchData(appliedFilters),
     [fetchData, appliedFilters],
+  );
+
+  const refreshAfterDelete = useCallback(
+    async (deletedRows: number) => {
+      if (deletedRows <= 0) {
+        await fetchData(appliedFilters);
+        return;
+      }
+
+      const nextTotalRows = await fetchRowCount(appliedFilters);
+      if (nextTotalRows === null) {
+        await fetchData(appliedFilters);
+        return;
+      }
+
+      const maxPage = Math.max(0, Math.ceil(nextTotalRows / pageSize) - 1);
+      if (page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
+
+      await fetchData(appliedFilters);
+    },
+    [appliedFilters, fetchData, fetchRowCount, page, pageSize, setPage],
   );
 
   // Trigger data fetching for rows (page/sort/filter)
@@ -337,6 +370,37 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     setEditingCell(null);
   }, [setEditingCell]);
 
+  const handleClearCheckedRows = useCallback(() => {
+    setCheckedRowIndices(new Set());
+  }, []);
+
+  const {
+    isDeleting,
+    showConfirmDialog,
+    selectedCount,
+    hasSelection,
+    error: deleteError,
+    handleDeleteClick,
+    handleConfirmDelete,
+    handleCancelDelete,
+    setError: setDeleteError,
+  } = useDeleteRows({
+    tableName,
+    tableData,
+    activeConnection,
+    checkedRowIndices,
+    onClearChecked: handleClearCheckedRows,
+    onRefresh: refreshAfterDelete,
+  });
+
+  // Combine errors from cell editing and delete
+  useEffect(() => {
+    if (deleteError) {
+      setCellError(deleteError);
+      setDeleteError('');
+    }
+  }, [deleteError, setCellError, setDeleteError]);
+
   // Build columns for TanStack Table
   const columns = useMemo<ColumnDef<any>[]>(() => {
     const cols: ColumnDef<any>[] = [];
@@ -544,11 +608,24 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
             </div>
           )}
 
+          {hasSelection && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDeleteClick}
+              disabled={isDeleting}
+              className="h-8 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              {isDeleting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Trash2 size={14} className="mr-1.5" />}
+              Delete {selectedCount > 0 && `(${selectedCount})`}
+            </Button>
+          )}
+
           <div className="h-4 w-px bg-border/50 mx-1" />
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleRefreshAll}
             disabled={loading}
             className="h-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors font-medium px-2.5"
@@ -839,6 +916,41 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
           <div className="h-2 w-px bg-border/50" />
         </div>
       </div>
+
+      {/* Production Delete Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={handleCancelDelete}>
+        <DialogContent className="max-w-md border-destructive/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-destructive">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription>
+              You are about to delete <strong>{selectedCount}</strong> row{selectedCount !== 1 ? 's' : ''} from
+              the <strong>{tableName}</strong> table.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3 px-3 bg-destructive/10 rounded border border-destructive/20">
+            <p className="text-xs text-destructive/90 font-medium">
+              This connection is tagged as <strong>PRODUCTION</strong>. Deleted data cannot be recovered.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelDelete} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete {selectedCount} Row{selectedCount !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

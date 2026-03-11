@@ -34,6 +34,18 @@ Multi-database engine support for VibeDB.
 - `get_database_version` — Retrieve SQLite version
 - `build_create_table_sql` — Generate validated `CREATE TABLE` SQL from structured input
 - `build_create_view_sql` — Generate validated `CREATE VIEW` SQL from structured input
+- `delete_rows` — Delete rows by identifiers (SQL built in Rust, executed in transaction)
+
+### Table View Features
+
+- **Cell Editing** — Double-click to edit, Cmd/Ctrl+Enter to commit
+- **New Row Insert** — Add record button with inline row input
+- **Row Selection** — Checkbox multi-select with "select all" header
+- **Row Deletion** — Delete selected rows with production confirmation, toast feedback, and pagination-safe refresh
+- **Row Inspector** — Side panel for detailed row viewing/editing
+- **Column Sorting** — Click headers to sort ASC/DESC
+- **Column Resizing** — Drag column borders to resize
+- **Filtering** — Multi-condition filter panel with operators
 
 ### Query Safety (Implemented)
 
@@ -78,6 +90,7 @@ See [`changelog/`](./changelog/) for completed features.
 
 | Feature        | Priority | Description                                  |
 | -------------- | -------- | -------------------------------------------- |
+| Delete Rows    | ✅ Done  | Multi-select delete with backend SQL generation, production confirm, toast feedback, and page/count sync |
 | Import Data    | Medium   | CSV, JSON, SQL file import                   |
 | Export Data    | Medium   | Export table/query results as CSV, JSON, SQL |
 | Backup/Restore | Low      | One-click database backup and restore        |
@@ -91,6 +104,16 @@ See [`changelog/`](./changelog/) for completed features.
 | Query Templates | Low      | Pre-built queries for common operations (create table, insert, etc.)     |
 
 ### Upcoming Tasks
+
+**Backend SQL Generation (High Priority)**
+
+Move SQL query building from frontend to backend for security and cleaner architecture:
+
+- [x] Add `delete_rows` command - Accept table name + row identifiers, build DELETE queries in Rust
+- [ ] Add `update_rows` command - Accept table name + column changes, build UPDATE queries in Rust
+- [ ] Add `insert_rows` command - Accept table name + row data, build INSERT queries in Rust
+- [ ] Deprecate frontend SQL builders (`buildWhereClause`, `buildDeleteQueries`, etc.)
+- [ ] Frontend becomes "UI only" - sends structured data, receives results
 
 **AI Panel Improvements**
 

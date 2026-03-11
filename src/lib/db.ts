@@ -57,6 +57,20 @@ export interface GenerateSqlResponse {
   explanation?: string;
 }
 
+export interface RowIdentifierInput {
+  rowData: Record<string, unknown>;
+}
+
+export async function deleteRows(
+  tableName: string,
+  rows: RowIdentifierInput[],
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("delete_rows", () =>
+    invoke<QueryResult>("delete_rows", { tableName, rows, connId }),
+  );
+}
+
 export async function connectDatabase(conn: Connection): Promise<string> {
   const engineType =
     conn.type === "turso" ? "Turso" : conn.type === "postgres" ? "Postgres" : "Sqlite";

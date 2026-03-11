@@ -1,6 +1,105 @@
 use crate::engines::{ColumnInfo, QueryResult};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+
+/// Input for identifying a row to delete.
+/// The row_data map contains column names and their values.
+/// For tables with primary keys, only PK columns are needed.
+/// For tables without PKs, all column values are used to identify the row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RowIdentifierInput {
+    /// Column name to value mapping for row identification
+    pub row_data: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Builds a WHERE clause for a single row using primary keys if available,
+/// otherwise falls back to matching all columns.
+pub fn build_where_clause_for_row(
+    row: &serde_json::Map<String, serde_json::Value>,
+    columns: &[ColumnInfo],
+) -> Result<String, String> {
+    let pk_columns: Vec<&ColumnInfo> = columns.iter().filter(|column| column.pk).collect();
+    let columns_to_use: Vec<&ColumnInfo> = if pk_columns.is_empty() {
+        columns.iter().collect()
+    } else {
+        pk_columns
+    };
+    if columns_to_use.is_empty() {
+        return Err("No columns available to identify row".to_string());
+    }
+
+    let mut conditions = Vec::new();
+    for column in &columns_to_use {
+        let column_name = column.name.as_str();
+        let value = row
+            .get(column_name)
+            .ok_or_else(|| format!("Missing required column '{column_name}' in row identifier"))?;
+
+        let condition = match value {
+            serde_json::Value::Null => {
+                format!("{} IS NULL", quote_identifier(column_name))
+            }
+            serde_json::Value::Number(number) => {
+                format!("{} = {}", quote_identifier(column_name), number)
+            }
+            serde_json::Value::Bool(boolean) => {
+                format!("{} = {}", quote_identifier(column_name), boolean)
+            }
+            serde_json::Value::String(text) => {
+                format!(
+                    "{} = '{}'",
+                    quote_identifier(column_name),
+                    escape_sql_string(text)
+                )
+            }
+            _ => {
+                return Err(format!(
+                    "Unsupported value type for column '{}' in row identifier",
+                    column_name
+                ));
+            }
+        };
+        conditions.push(condition);
+    }
+
+    Ok(conditions.join(" AND "))
+}
+
+/// Builds DELETE queries for selected rows.
+/// Returns a vector of DELETE SQL statements.
+pub fn build_delete_queries(
+    table_name: &str,
+    rows: &[RowIdentifierInput],
+    columns: &[ColumnInfo],
+) -> Result<Vec<String>, String> {
+    if rows.is_empty() {
+        return Err("No rows provided for deletion".to_string());
+    }
+
+    let trimmed_table_name = table_name.trim();
+    if trimmed_table_name.is_empty() {
+        return Err("Table name is required".to_string());
+    }
+    if trimmed_table_name
+        .split('.')
+        .any(|part| part.trim().is_empty())
+    {
+        return Err("Table name contains an empty identifier segment".to_string());
+    }
+
+    let quoted_table = quote_qualified_identifier(trimmed_table_name);
+
+    rows.iter()
+        .map(|row| {
+            let where_clause = build_where_clause_for_row(&row.row_data, columns)?;
+            Ok(format!(
+                "DELETE FROM {} WHERE {};",
+                quoted_table, where_clause
+            ))
+        })
+        .collect()
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -403,252 +502,4 @@ fn format_sql_literal(value: &str, is_numeric: bool) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        build_create_table_sql, build_create_view_sql, quote_qualified_identifier,
-        CreateTableColumnInput,
-    };
-
-    #[test]
-    fn build_create_view_sql_basic() {
-        let sql = build_create_view_sql(
-            "active_users".to_string(),
-            "SELECT * FROM users".to_string(),
-            false,
-            false,
-        )
-        .expect("expected SQL");
-
-        assert_eq!(sql, "CREATE VIEW \"active_users\" AS\nSELECT * FROM users;");
-    }
-
-    #[test]
-    fn build_create_view_sql_temp_if_not_exists() {
-        let sql = build_create_view_sql(
-            "recent_orders".to_string(),
-            "WITH latest AS (SELECT * FROM orders) SELECT * FROM latest".to_string(),
-            true,
-            true,
-        )
-        .expect("expected SQL");
-
-        assert_eq!(
-            sql,
-            "CREATE TEMP VIEW IF NOT EXISTS \"recent_orders\" AS\nWITH latest AS (SELECT * FROM orders) SELECT * FROM latest;"
-        );
-    }
-
-    #[test]
-    fn build_create_view_sql_rejects_bad_identifier() {
-        let error = build_create_view_sql(
-            "123_invalid".to_string(),
-            "SELECT 1".to_string(),
-            false,
-            false,
-        )
-        .expect_err("expected validation error");
-
-        assert!(error.contains("View name must start with a letter or underscore"));
-    }
-
-    #[test]
-    fn build_create_view_sql_rejects_sqlite_prefix() {
-        let error = build_create_view_sql(
-            "sqlite_my_view".to_string(),
-            "SELECT 1".to_string(),
-            false,
-            false,
-        )
-        .expect_err("expected sqlite_ prefix error");
-
-        assert_eq!(error, "View name cannot start with 'sqlite_'");
-    }
-
-    #[test]
-    fn build_create_view_sql_rejects_empty_query() {
-        let error = build_create_view_sql("my_view".to_string(), "   ".to_string(), false, false)
-            .expect_err("expected empty query error");
-
-        assert_eq!(error, "View query is required");
-    }
-
-    #[test]
-    fn build_create_view_sql_rejects_non_select_query() {
-        let error = build_create_view_sql(
-            "my_view".to_string(),
-            "UPDATE users SET name = 'x'".to_string(),
-            false,
-            false,
-        )
-        .expect_err("expected non-select error");
-
-        assert_eq!(error, "View query must start with SELECT or WITH");
-    }
-
-    #[test]
-    fn build_create_view_sql_rejects_multi_statement_query() {
-        let error = build_create_view_sql(
-            "my_view".to_string(),
-            "SELECT * FROM users; SELECT * FROM orders".to_string(),
-            false,
-            false,
-        )
-        .expect_err("expected single statement error");
-
-        assert_eq!(error, "View query must contain a single SELECT statement");
-    }
-
-    #[test]
-    fn quote_qualified_identifier_quotes_each_segment() {
-        assert_eq!(
-            quote_qualified_identifier("public.users"),
-            "\"public\".\"users\""
-        );
-    }
-
-    #[test]
-    fn build_create_table_sql_sqlite_with_autoincrement() {
-        let columns = vec![CreateTableColumnInput {
-            name: "id".to_string(),
-            col_type: "INTEGER".to_string(),
-            primary_key: true,
-            auto_increment: true,
-            not_null: false,
-            unique: false,
-            default_option: "none".to_string(),
-            default_value: "".to_string(),
-        }];
-
-        let sql = build_create_table_sql(
-            "users".to_string(),
-            columns,
-            false,
-            Some("sqlite".to_string()),
-        )
-        .expect("expected SQL");
-
-        assert!(
-            sql.contains("INTEGER PRIMARY KEY AUTOINCREMENT"),
-            "SQLite should use INTEGER PRIMARY KEY AUTOINCREMENT. Got: {}",
-            sql
-        );
-    }
-
-    #[test]
-    fn build_create_table_sql_postgres_with_serial() {
-        let columns = vec![CreateTableColumnInput {
-            name: "id".to_string(),
-            col_type: "INTEGER".to_string(),
-            primary_key: true,
-            auto_increment: true,
-            not_null: false,
-            unique: false,
-            default_option: "none".to_string(),
-            default_value: "".to_string(),
-        }];
-
-        let sql = build_create_table_sql(
-            "users".to_string(),
-            columns,
-            false,
-            Some("postgres".to_string()),
-        )
-        .expect("expected SQL");
-
-        assert!(
-            sql.contains("SERIAL PRIMARY KEY"),
-            "PostgreSQL should use SERIAL PRIMARY KEY. Got: {}",
-            sql
-        );
-        assert!(
-            !sql.contains("AUTOINCREMENT"),
-            "PostgreSQL should NOT contain AUTOINCREMENT. Got: {}",
-            sql
-        );
-    }
-
-    #[test]
-    fn build_create_table_sql_postgres_with_bigserial() {
-        let columns = vec![CreateTableColumnInput {
-            name: "id".to_string(),
-            col_type: "BIGINT".to_string(),
-            primary_key: true,
-            auto_increment: true,
-            not_null: false,
-            unique: false,
-            default_option: "none".to_string(),
-            default_value: "".to_string(),
-        }];
-
-        let sql = build_create_table_sql(
-            "events".to_string(),
-            columns,
-            false,
-            Some("postgres".to_string()),
-        )
-        .expect("expected SQL");
-
-        assert!(
-            sql.contains("BIGSERIAL PRIMARY KEY"),
-            "PostgreSQL BIGINT auto-increment should use BIGSERIAL. Got: {}",
-            sql
-        );
-        assert!(
-            !sql.contains("AUTOINCREMENT"),
-            "PostgreSQL should NOT contain AUTOINCREMENT. Got: {}",
-            sql
-        );
-    }
-
-    #[test]
-    fn build_create_table_sql_postgres_supports_if_not_exists() {
-        let columns = vec![CreateTableColumnInput {
-            name: "id".to_string(),
-            col_type: "INTEGER".to_string(),
-            primary_key: true,
-            auto_increment: false,
-            not_null: false,
-            unique: false,
-            default_option: "none".to_string(),
-            default_value: "".to_string(),
-        }];
-
-        let sql = build_create_table_sql(
-            "users".to_string(),
-            columns,
-            true,
-            Some("postgres".to_string()),
-        )
-        .expect("expected SQL");
-
-        assert!(
-            sql.starts_with("CREATE TABLE IF NOT EXISTS"),
-            "PostgreSQL should retain IF NOT EXISTS. Got: {}",
-            sql
-        );
-    }
-
-    #[test]
-    fn build_create_table_sql_rejects_unknown_engine() {
-        let columns = vec![CreateTableColumnInput {
-            name: "id".to_string(),
-            col_type: "INTEGER".to_string(),
-            primary_key: true,
-            auto_increment: false,
-            not_null: false,
-            unique: false,
-            default_option: "none".to_string(),
-            default_value: "".to_string(),
-        }];
-
-        let error = build_create_table_sql(
-            "users".to_string(),
-            columns,
-            false,
-            Some("mysql".to_string()),
-        )
-        .expect_err("expected unsupported engine error");
-
-        assert_eq!(error, "Unsupported database engine for CREATE TABLE: mysql");
-    }
-}
+mod tests;

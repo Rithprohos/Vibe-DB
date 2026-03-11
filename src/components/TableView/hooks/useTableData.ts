@@ -60,15 +60,17 @@ export const useTableData = (tableName: string, tabId: string) => {
 
   const fetchRowCount = useCallback(
     async (filters?: QueryFilter[]) => {
-      if (!activeConnection?.connId) return;
+      if (!activeConnection?.connId) return null;
       const requestId = ++countRequestIdRef.current;
       try {
         const count = await getTableRowCount(tableName, activeConnection.connId, filters);
-        if (requestId !== countRequestIdRef.current) return;
+        if (requestId !== countRequestIdRef.current) return null;
         setTotalRows(count);
         setHasLoadedRowCount(true);
+        return count;
       } catch (e: any) {
         console.error(e);
+        return null;
       }
     },
     [tableName, activeConnection?.connId],
