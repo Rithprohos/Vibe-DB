@@ -12,7 +12,7 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.4.0)
+## Current State (v0.4.2)
 
 | Database | Status    | Notes                     |
 | -------- | --------- | ------------------------- |
@@ -90,7 +90,6 @@ See [`changelog/`](./changelog/) for completed features.
 
 | Feature        | Priority | Description                                  |
 | -------------- | -------- | -------------------------------------------- |
-| Delete Rows    | ✅ Done  | Multi-select delete with backend SQL generation, production confirm, toast feedback, and page/count sync |
 | Import Data    | Medium   | CSV, JSON, SQL file import                   |
 | Export Data    | Medium   | Export table/query results as CSV, JSON, SQL |
 | Backup/Restore | Low      | One-click database backup and restore        |
@@ -109,7 +108,6 @@ See [`changelog/`](./changelog/) for completed features.
 
 Move SQL query building from frontend to backend for security and cleaner architecture:
 
-- [x] Add `delete_rows` command - Accept table name + row identifiers, build DELETE queries in Rust
 - [ ] Add `update_rows` command - Accept table name + column changes, build UPDATE queries in Rust
 - [ ] Add `insert_rows` command - Accept table name + row data, build INSERT queries in Rust
 - [ ] Deprecate frontend SQL builders (`buildWhereClause`, `buildDeleteQueries`, etc.)
@@ -402,6 +400,7 @@ Stronghold vault plumbing is installed and working for AI keys and Turso auth to
 | v0.3.0  | Q1 2026 | Turso & UI Revitalization | ✅ Complete |
 | v0.3.1  | Q2 2026 | Embedded replicas, UI     | 📋 Planned  |
 | v0.4.0  | Q3 2026 | PostgreSQL                | ✅ Complete |
+| v0.4.2  | March 2026 | PG Type UX & Json Edit    | ✅ Complete |
 | v0.5    | Q4 2026 | MySQL                     | 📋 Planned  |
 
 ---
