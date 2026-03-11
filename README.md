@@ -13,9 +13,9 @@
 
 ---
 
-A modern, high-performance database manager built with Tauri v2 and React. Supports SQLite and Turso (libSQL). Engineered for speed, security, and a premium developer experience.
+A modern, high-performance database manager built with Tauri v2 and React. Supports SQLite, Turso (libSQL), and PostgreSQL. Engineered for speed, security, and a premium developer experience.
 
-![VibeDB](https://img.shields.io/badge/version-0.2.7-blue)
+![VibeDB](https://img.shields.io/badge/version-0.4.0-blue)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 [![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet)](./ROADMAP.md)
@@ -32,7 +32,7 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
 
 - **🚀 High Performance** — TanStack virtualization across table browsing, query results, logs, and sidebar lists, plus aggressive code-splitting for heavy UI paths.
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction.
-- **🌍 Multi-Engine Ready** — SQLite and Turso (libSQL) supported. PostgreSQL and MySQL coming soon.
+- **🌍 Multi-Engine Ready** — SQLite, Turso (libSQL), and PostgreSQL supported. MySQL coming soon.
 - **🏗️ Visual Table Builder** — Create tables with a polished GUI including real-time, syntax-highlighted SQL preview.
 - **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions.
 - **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
@@ -65,7 +65,7 @@ bun run tauri build
 
 ## 🔐 Security Posture
 
-As of **March 10, 2026**, VibeDB includes important baseline protections, but security hardening is still in progress.
+As of **March 11, 2026**, VibeDB includes important baseline protections, but security hardening is still in progress.
 
 ### Implemented
 

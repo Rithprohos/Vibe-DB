@@ -12,13 +12,13 @@
 
 Multi-database engine support for VibeDB.
 
-## Current State (v0.3.0)
+## Current State (v0.4.0)
 
 | Database | Status    | Notes                     |
 | -------- | --------- | ------------------------- |
 | SQLite   | ✅ Stable | Full support via `sqlx`   |
 | Turso    | ✅ Stable | Full support via `libsql` |
-| Postgres | 🚧 Active | Core engine + UI landed   |
+| Postgres | ✅ Stable | Full support via `sqlx`   |
 
 ### SQLite Commands
 
@@ -207,14 +207,14 @@ let config = ConnectionConfig::turso_local(
 
 ---
 
-## Phase 3: PostgreSQL Support (v0.4) 🚧 In Progress
+## Phase 3: PostgreSQL Support (v0.4) ✅ Complete
 
 Full PostgreSQL database support.
 
 | Feature                          | Priority | Status         |
 | -------------------------------- | -------- | -------------- |
 | Connection via connection string | High     | ✅ Implemented |
-| Schema browser                   | High     | 🚧 In Progress |
+| Schema browser                   | High     | ✅ Implemented |
 | SSL/TLS support                  | High     | ✅ Implemented |
 | Custom port/host                 | Medium   | ✅ Implemented |
 | PostgreSQL type handling         | High     | ✅ Implemented |
@@ -223,14 +223,6 @@ Full PostgreSQL database support.
 
 ### Tasks
 
-- [x] Add `sqlx` postgres feature
-- [x] Implement `PostgresEngine` struct
-- [x] Handle PostgreSQL-specific types (JSON, arrays, etc.)
-- [x] Add connection pooling
-- [x] Normalize PostgreSQL table metadata to VibeDB table/view model
-- [x] Add schema-aware sidebar browsing with schema selector
-- [x] Quote schema-qualified table names correctly in Rust commands and frontend table-edit flows
-- [x] Show PostgreSQL database name in connected UI
 - [ ] Fix schema-qualified object follow-up (P2):
   Create/open flows still use bare names in some paths, so new Postgres tables/views can open under unqualified names and create duplicate tabs; rename no-op detection in `EditTable` also still compares leaf names against qualified names.
 - [ ] Add PostgreSQL integration coverage for schema-qualified create/open/edit flows
@@ -346,7 +338,7 @@ Stronghold vault plumbing is installed and working for AI keys and Turso auth to
 | ------- | ------- | ------------------------- | ----------- |
 | v0.3.0  | Q1 2026 | Turso & UI Revitalization | ✅ Complete |
 | v0.3.1  | Q2 2026 | Embedded replicas, UI     | 📋 Planned  |
-| v0.4    | Q3 2026 | PostgreSQL                | 📋 Planned  |
+| v0.4.0  | Q3 2026 | PostgreSQL                | ✅ Complete |
 | v0.5    | Q4 2026 | MySQL                     | 📋 Planned  |
 
 ---

@@ -113,7 +113,7 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] bg-card border-border shadow-xl shadow-black/5 dark:shadow-2xl dark:shadow-black/40 p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[440px] bg-card border-border shadow-2xl shadow-black/20 p-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent-secondary via-primary to-accent-secondary" />
 
         <div className="p-6">
@@ -159,7 +159,7 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
                       setTag(t);
                       setError('');
                     }}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                    className={`px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all border ${
                       tag === t
                         ? t === 'production'
                           ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(248,113,113,0.15)]'
@@ -339,20 +339,20 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
           </div>
         </div>
 
-        <DialogFooter className="bg-secondary/50 p-4 border-t border-border flex sm:justify-between items-center">
+        <DialogFooter className="bg-secondary/30 p-4 border-t border-border/60 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center">
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            className="hover:bg-secondary text-muted-foreground"
+            className="hover:bg-secondary text-muted-foreground h-9 text-xs font-bold uppercase tracking-wider rounded-sm w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={() => void handleSave()}
             disabled={!name.trim() || !tag || isSaving}
-            className="shadow-glow px-8 rounded-full font-semibold tracking-wide"
+            className="px-8 h-9 text-xs font-bold uppercase tracking-wider rounded-sm glow-shadow w-full sm:w-auto"
           >
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogFooter>
       </DialogContent>
