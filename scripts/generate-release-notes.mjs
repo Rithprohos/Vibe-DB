@@ -9,6 +9,10 @@ const MAX_CHANGELOG_BYTES = Number.parseInt(
   process.env.RELEASE_NOTES_CHANGELOG_MAX_BYTES ?? "24000",
   10,
 );
+const MAX_PROMPT_CHARS = Number.parseInt(
+  process.env.RELEASE_NOTES_PROMPT_MAX_CHARS ?? "12000",
+  10,
+);
 const RELEASE_NOTES_SYSTEM_PROMPT = [
   "You are a senior release engineer writing GitHub release notes in Markdown.",
   "Write concise, factual notes for developers and power users.",
@@ -46,13 +50,147 @@ function buildChatCompletionsUrl(baseUrl) {
   return `${trimmed}/v1/chat/completions`;
 }
 
+function prepareChangelogForPrompt(changelogContent) {
+  const lines = changelogContent.split("\n");
+  const selected = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (
+      trimmed.startsWith("#") ||
+      /^(\*\*Release Date:\*\*|Release Date:)/i.test(trimmed) ||
+      /^-\s+\[[xX ]\]\s+/.test(trimmed) ||
+      /^-\s+/.test(trimmed)
+    ) {
+      selected.push(trimmed);
+    }
+  }
+
+  const compact = selected.join("\n").trim();
+  const promptSource =
+    compact.length >= 200
+      ? compact
+      : changelogContent.trim();
+
+  return promptSource.slice(0, Math.max(400, MAX_PROMPT_CHARS));
+}
+
+function dedupePush(target, seen, value) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return;
+  }
+  const key = normalized.toLowerCase();
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  target.push(normalized);
+}
+
+function classifyBullet(context, bullet) {
+  const text = `${context} ${bullet}`.toLowerCase();
+  if (/(breaking|deprecat|remove|removed|migration|incompatible)/.test(text)) {
+    return "breaking";
+  }
+  if (/(fix|bug|error|issue|null|crash|rollback|syntax|correct)/.test(text)) {
+    return "fixes";
+  }
+  if (
+    /(improv|optimi|performance|support|add|new|enhance|refactor|ui|ux|editor|workflow|coverage|type)/.test(
+      text,
+    )
+  ) {
+    return "improvements";
+  }
+  return "highlights";
+}
+
+function buildLocalSummaryMarkdown(changelogContent) {
+  const lines = changelogContent.split("\n");
+  let headingContext = "";
+  const seen = new Set();
+  const categories = {
+    highlights: [],
+    improvements: [],
+    fixes: [],
+    breaking: [],
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    const headingMatch = line.match(/^#{1,6}\s+(.+)$/);
+    if (headingMatch) {
+      headingContext = headingMatch[1].trim();
+      continue;
+    }
+
+    const taskMatch = line.match(/^-\s+\[[xX ]\]\s+(.+)$/);
+    const bulletMatch = line.match(/^-\s+(.+)$/);
+    const bullet = (taskMatch?.[1] ?? bulletMatch?.[1] ?? "").trim();
+    if (!bullet) {
+      continue;
+    }
+
+    const bucket = classifyBullet(headingContext, bullet);
+    dedupePush(categories[bucket], seen, bullet);
+  }
+
+  const sectionDefs = [
+    { key: "highlights", title: "## ✨ Highlights" },
+    { key: "improvements", title: "## 🔧 Improvements" },
+    { key: "fixes", title: "## 🐛 Fixes" },
+    { key: "breaking", title: "## 💥 Breaking Changes" },
+  ];
+
+  const output = [];
+  let totalBullets = 0;
+
+  for (const section of sectionDefs) {
+    const items = categories[section.key].slice(0, 4);
+    if (items.length === 0) {
+      continue;
+    }
+    output.push(section.title);
+    for (const item of items) {
+      output.push(`- ${item}`);
+      totalBullets += 1;
+      if (totalBullets >= 12) {
+        break;
+      }
+    }
+    if (totalBullets >= 12) {
+      break;
+    }
+    output.push("");
+  }
+
+  if (totalBullets === 0) {
+    return [
+      "## ✨ Highlights",
+      "- Internal updates were prepared for this release.",
+      "",
+    ].join("\n");
+  }
+
+  return output.join("\n").trim();
+}
+
 function buildFallbackBody(tag, changelogPath, changelogContent) {
   return [
     `# VibeDB ${tag}`,
     "",
     `_Source: \`${changelogPath}\`_`,
     "",
-    changelogContent.trim(),
+    buildLocalSummaryMarkdown(changelogContent),
     "",
   ].join("\n");
 }
@@ -117,6 +255,9 @@ async function summarizeWithPollinations({ tag, changelogContent }) {
 
     const data = await response.json();
     const summary = extractSummaryFromCompletion(data);
+    if (isLikelyNonReleaseSummary(summary)) {
+      return "";
+    }
     return summary;
   }
 
@@ -163,7 +304,25 @@ function extractSummaryFromCompletion(data) {
 
   // OpenAI-compatible: choices[0].message.content is a string.
   if (typeof choice?.message?.content === "string") {
-    return choice.message.content.trim();
+    const text = choice.message.content.trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  if (Array.isArray(choice?.message?.content_blocks)) {
+    const text = choice.message.content_blocks
+      .map((block) => {
+        if (typeof block?.text === "string") {
+          return block.text;
+        }
+        return "";
+      })
+      .join("\n")
+      .trim();
+    if (text) {
+      return text;
+    }
   }
 
   // Some providers return content parts.
@@ -175,6 +334,9 @@ function extractSummaryFromCompletion(data) {
         }
         if (part && typeof part.text === "string") {
           return part.text;
+        }
+        if (part && typeof part.content === "string") {
+          return part.content;
         }
         return "";
       })
@@ -198,7 +360,55 @@ function extractSummaryFromCompletion(data) {
     }
   }
 
+  if (Array.isArray(data?.output)) {
+    const text = data.output
+      .flatMap((item) => {
+        if (typeof item?.content === "string") {
+          return [item.content];
+        }
+        if (!Array.isArray(item?.content)) {
+          return [];
+        }
+        return item.content
+          .map((part) => {
+            if (typeof part?.text === "string") {
+              return part.text;
+            }
+            if (typeof part?.content === "string") {
+              return part.content;
+            }
+            return "";
+          })
+          .filter(Boolean);
+      })
+      .join("\n")
+      .trim();
+    if (text) {
+      return text;
+    }
+  }
+
   return "";
+}
+
+function isLikelyNonReleaseSummary(text) {
+  const normalized = text.toLowerCase().trim();
+  if (!normalized) {
+    return true;
+  }
+
+  const greetingPatterns = [
+    /^#?\s*hello\b/,
+    /\bhow can i help\b/,
+    /\bi[' ]?m .*ai assistant\b/,
+    /\bmade by anthropic\b/,
+  ];
+  if (greetingPatterns.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  const hasStructure = normalized.includes("## ") || normalized.includes("- ");
+  return !hasStructure;
 }
 
 async function main() {
@@ -221,10 +431,14 @@ async function main() {
 
   const truncated = changelogBuffer.subarray(0, Math.max(1, MAX_CHANGELOG_BYTES));
   const changelogContent = truncated.toString("utf8");
+  const aiPromptChangelog = prepareChangelogForPrompt(changelogContent);
 
   let body;
   try {
-    const summary = await summarizeWithPollinations({ tag, changelogContent });
+    const summary = await summarizeWithPollinations({
+      tag,
+      changelogContent: aiPromptChangelog,
+    });
     body = [
       `# VibeDB ${tag}`,
       "",
@@ -236,7 +450,7 @@ async function main() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(
-      `::warning::Pollinations summary failed for ${tag}. Falling back to raw changelog.`,
+      `::warning::Pollinations summary failed for ${tag}. Falling back to local summary.`,
     );
     console.error(message);
     body = buildFallbackBody(tag, changelogPath, changelogContent);
