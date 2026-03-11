@@ -42,35 +42,37 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Get Release Notes
+      - name: Generate Release Notes
         id: notes
+        env:
+          POLLINATIONS_BASE_URL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_URL != '' && vars.VIBEDB_RELEASE_NOTES_AI_URL || vars.VIBEDB_DEFAULT_AI_URL != '' && vars.VIBEDB_DEFAULT_AI_URL || 'https://gen.pollinations.ai' }}
+          POLLINATIONS_MODEL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_MODEL != '' && vars.VIBEDB_RELEASE_NOTES_AI_MODEL || vars.VIBEDB_DEFAULT_AI_MODEL != '' && vars.VIBEDB_DEFAULT_AI_MODEL || 'openai' }}
+          POLLINATIONS_API_KEY: ${{ secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY != '' && secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY || secrets.VIBEDB_DEFAULT_AI_API_KEY }}
         run: |
-          delimiter="$(openssl rand -hex 8)"
-          echo "body<<$delimiter" >> $GITHUB_OUTPUT
+          set -euo pipefail
 
-          # 1. Main Release Notes from File
-          if [ -f ".github/release-notes/${{ github.ref_name }}.md" ]; then
-            cat ".github/release-notes/${{ github.ref_name }}.md" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-          else
-            echo "## Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "See the assets to download and install this version." >> $GITHUB_OUTPUT
-          fi
+          delimiter="$(openssl rand -hex 8)"
+          echo "body<<$delimiter" >> "$GITHUB_OUTPUT"
+
+          TAG="${{ github.ref_name }}"
+
+          # 1. Generate summary from changelog/<tag>.md with Pollinations AI
+          bun scripts/generate-release-notes.mjs "$TAG" >> "$GITHUB_OUTPUT"
 
           # 2. Automatically Generate Changelog
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || echo "")
+          PREVIOUS_TAG="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
 
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "---" >> $GITHUB_OUTPUT
-            echo "## Changelog" >> $GITHUB_OUTPUT
-            echo "**Full Changelog**: [${PREVIOUS_TAG}...${{ github.ref_name }}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ github.ref_name }})" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            git log ${PREVIOUS_TAG}..${{ github.ref_name }} --pretty=format:"- \`%h\` %s @%an" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
+            echo "---" >> "$GITHUB_OUTPUT"
+            echo "## Changelog" >> "$GITHUB_OUTPUT"
+            echo "**Full Changelog**: [${PREVIOUS_TAG}...${TAG}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG})" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_OUTPUT"
+            git log "${PREVIOUS_TAG}..${TAG}" --pretty=format:"- \`%h\` %s @%an" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_OUTPUT"
           fi
 
           # 3. macOS Fix Instruction
-          cat << 'EOF' >> $GITHUB_OUTPUT
+          cat << 'EOF' >> "$GITHUB_OUTPUT"
 
           ---
           ### ⚠️ macOS "App is damaged" fix
@@ -81,7 +83,7 @@ jobs:
           Then open the app again.
           EOF
 
-          echo "$delimiter" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> "$GITHUB_OUTPUT"
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
