@@ -221,6 +221,47 @@ Full PostgreSQL database support.
 | Database name in connected UI    | Medium   | ✅ Implemented |
 | SSH tunnel                       | Low      | 📋 Planned     |
 
+### PostgreSQL Datatype Support Matrix
+
+| Data Type | Create/Edit UI | Read Decode (Rust) | Grid Display (React) | Status | Need To Do | Priority |
+| --------- | -------------- | ------------------ | -------------------- | ------ | ---------- | -------- |
+| INTEGER | ✅ Picker | ✅ `INT4 -> i64` | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| SMALLINT | ✅ Picker | ✅ Default scalar decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| BIGINT | ✅ Picker | ✅ `INT8 -> i64` | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| SERIAL | ✅ Picker | ✅ Reads back as integer | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| BIGSERIAL | ✅ Picker | ✅ Reads back as bigint | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| NUMERIC | ✅ Picker | ✅ String decode for precision safety | ✅ Scalar text render | ⚠️ Partial | Parameterized types: support `NUMERIC(p,s)` in Create/Edit UI | High |
+| DOUBLE PRECISION | ✅ Picker | ✅ `FLOAT8` decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| MONEY | ✅ Picker | ✅ Default scalar decode (string path) | ✅ Scalar text render | ⚠️ Partial | Add PG integration test coverage for locale/format variations | Medium |
+| BOOLEAN | ✅ Picker | ✅ `BOOL` decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| TEXT | ✅ Picker | ✅ String decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| VARCHAR | ✅ Picker | ✅ String decode | ✅ Scalar text render | ⚠️ Partial | Parameterized types: support `VARCHAR(n)` in Create/Edit UI | High |
+| CHAR | ✅ Picker | ✅ String decode | ✅ Scalar text render | ⚠️ Partial | Parameterized types: support `CHAR(n)` in Create/Edit UI | Medium |
+| BPCHAR | ✅ Picker | ✅ String decode | ✅ Scalar text render | ⚠️ Partial | Parameterized types: map/edit as fixed-length char alias in UI | Medium |
+| XML | ✅ Picker | ✅ Default scalar decode (string path) | ✅ Scalar text render | ⚠️ Partial | Add integration coverage for large XML values | Low |
+| UUID | ✅ Picker | ✅ Native `Uuid` decode + string fallback | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| DATE | ✅ Picker | ✅ Native date decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| TIME | ✅ Picker | ✅ Native time decode | ✅ Scalar text render | ⚠️ Partial | Parameterized types: support temporal precision in Create/Edit UI | High |
+| TIMETZ | ✅ Picker | ✅ Decode (string fallback path) | ✅ Scalar text render | ⚠️ Partial | Verify/standardize timezone-preserving format + add tests | Medium |
+| TIMESTAMP | ✅ Picker | ✅ Native timestamp decode | ✅ Scalar text render | ⚠️ Partial | Parameterized types: support temporal precision in Create/Edit UI | High |
+| TIMESTAMPTZ | ✅ Picker | ✅ Native timestamptz decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| INTERVAL | ✅ Picker | ✅ Default scalar decode (string path) | ✅ Scalar text render | ⚠️ Partial | INTERVAL: verify/standardize decode + display formatting and add coverage | High |
+| JSON | ✅ Picker | ✅ JSON decode to object/array | ✅ Pretty JSON display + JSON-aware edit | ✅ Supported | None (keep regression coverage) | Low |
+| JSONB | ✅ Picker | ✅ JSONB decode to object/array | ✅ Pretty JSON display + JSON-aware edit | ✅ Supported | None (keep regression coverage) | Low |
+| BYTEA | ✅ Picker | ✅ Decodes to placeholder text (`<BLOB n bytes>`) | ⚠️ Placeholder-only display | ⚠️ Partial | BYTEA: improve binary preview/inspection beyond placeholder text | High |
+| INET | ✅ Picker | ✅ String decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| CIDR | ✅ Picker | ✅ String decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| MACADDR | ✅ Picker | ✅ String decode | ✅ Scalar text render | ✅ Supported | None (keep regression coverage) | Low |
+| ARRAY (`type[]`) | ❌ Not in picker | ⚠️ Limited decode (`Vec<String|i64|f64>` only) | ⚠️ Unhandled array types can fall back to `NULL` | ⚠️ Partial | ARRAY: broaden decode beyond only `Vec<String|i64|f64>` and avoid null fallback for other array element types | High |
+
+#### High-Priority Follow-Ups
+
+- [x] JSON/JSONB: render objects/arrays as pretty JSON in grid/inspector instead of `[object Object]`
+- [ ] ARRAY: broaden PostgreSQL array decode and avoid null fallback for unsupported array element types
+- [ ] Parameterized types: support `VARCHAR(n)`, `NUMERIC(p,s)`, and temporal precision in Create/Edit UI
+- [ ] BYTEA: add binary preview/inspection UX (size + hex/text preview)
+- [ ] INTERVAL: standardize decode/display formatting and add integration coverage
+
 ### Tasks
 
 - [ ] Fix schema-qualified object follow-up (P2):

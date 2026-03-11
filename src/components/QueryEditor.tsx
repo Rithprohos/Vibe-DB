@@ -381,7 +381,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     if (!columnName || !row) return null;
 
     const rawValue = row[selectedCell.columnIndex];
-    const { text, className } = formatCellValue(rawValue);
+    const { text, className } = formatCellValue(rawValue, { prettyJson: true });
 
     return {
       columnName,

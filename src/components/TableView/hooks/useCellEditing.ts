@@ -4,9 +4,12 @@ import type { ColumnInfo } from "@/store/useAppStore";
 import {
   escapeSqlString,
   formatSqlValue,
+  isJsonColumn,
+  normalizeJsonInput,
   quoteIdentifier,
   quoteTableName,
 } from "@/lib/sql-helpers";
+import { stringifyCellValue } from "@/lib/formatters";
 
 interface EditingCell {
   rowIndex: number;
@@ -31,7 +34,27 @@ type PendingCellEdits = Record<string, PendingCellEdit>;
 const getCellKey = (rowIndex: number, colName: string): string =>
   `${rowIndex}:${colName}`;
 
-const normalizeValue = (value: unknown): string => String(value ?? "");
+const normalizeValue = (value: unknown): string =>
+  value == null ? "" : stringifyCellValue(value);
+
+const normalizeEditedValueForColumn = (
+  value: string,
+  columnInfo?: ColumnInfo,
+): string => {
+  if (!columnInfo || !isJsonColumn(columnInfo.col_type)) {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+  if (trimmed === "NULL") return "NULL";
+
+  try {
+    return JSON.stringify(JSON.parse(normalizeJsonInput(value)));
+  } catch {
+    return value;
+  }
+};
 
 const buildWhereClause = (row: Record<string, unknown>, pks: ColumnInfo[]): string =>
   pks
@@ -111,10 +134,11 @@ export const useCellEditing = (
     valueToSave: string,
   ) => {
     const columnInfo = structure.find((c) => c.name === colName);
+    const normalizedValue = normalizeEditedValueForColumn(valueToSave, columnInfo);
 
     try {
-      formatSqlValue(valueToSave, columnInfo);
-      stageCellEdit(rowIndex, colName, valueToSave);
+      formatSqlValue(normalizedValue, columnInfo);
+      stageCellEdit(rowIndex, colName, normalizedValue);
       setError("");
       setEditingCell(null);
     } catch (e: any) {
@@ -149,10 +173,15 @@ export const useCellEditing = (
     }
 
     const key = getCellKey(activeEdit.rowIndex, activeEdit.colName);
+    const columnInfo = structure.find((c) => c.name === activeEdit.colName);
     const originalValue = row[activeEdit.colName];
     const normalizedOriginal = normalizeValue(originalValue);
+    const normalizedActiveValue = normalizeEditedValueForColumn(
+      activeEdit.value,
+      columnInfo,
+    );
 
-    if (normalizedOriginal === activeEdit.value) {
+    if (normalizedOriginal === normalizedActiveValue) {
       if (!pendingEdits[key]) return pendingEdits;
       const { [key]: _, ...rest } = pendingEdits;
       return rest;
@@ -164,7 +193,7 @@ export const useCellEditing = (
         rowIndex: activeEdit.rowIndex,
         colName: activeEdit.colName,
         oldValue: originalValue,
-        newValue: activeEdit.value,
+        newValue: normalizedActiveValue,
       },
     };
   };

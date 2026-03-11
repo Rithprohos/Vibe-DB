@@ -24,6 +24,7 @@ import { FilterPanel } from './FilterPanel';
 import { RowInspector } from './RowInspector';
 import { copyToClipboard } from '@/lib/copy';
 import { Checkbox } from '@/components/ui/checkbox';
+import { stringifyCellValue } from '@/lib/formatters';
 
 const PAGE_SIZE_OPTIONS = ['50', '100', '200', '500'] as const;
 
@@ -231,7 +232,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   }, [tableData.length]);
 
   const handleCopyField = useCallback(async (columnName: string, value: unknown) => {
-    await copyToClipboard(value == null ? '' : String(value), {
+    await copyToClipboard(stringifyCellValue(value, { prettyJson: true }), {
       successMessage: `Copied ${columnName}`,
     });
   }, []);
@@ -312,7 +313,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       }
 
       setEditingCell({ rowIndex, colName });
-      setEditValue(String(value ?? ''));
+      setEditValue(value == null ? '' : stringifyCellValue(value));
     },
     [editingCell, editValue, handleSaveCell, newRowData, saving, setEditingCell, setEditValue],
   );
@@ -324,6 +325,13 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   const handleSaveCellForRow = useCallback((rowIndex: number, colName: string, value: string) => {
     void handleSaveCell(rowIndex, colName, value);
   }, [handleSaveCell]);
+
+  const handleSaveFieldFromInspector = useCallback(
+    async (rowIndex: number, colName: string, value: string) => {
+      await handleSaveCell(rowIndex, colName, value);
+    },
+    [handleSaveCell],
+  );
 
   const handleCancelCellEdit = useCallback(() => {
     setEditingCell(null);
@@ -790,8 +798,13 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
         <RowInspector
           isOpen={isInspectorOpen}
           gridCols={gridCols}
+          selectedRowIndex={selectedRowIndex}
           selectedRowData={selectedRowData}
           columnInfoByName={columnInfoByName}
+          getPendingCellValue={getPendingCellValue}
+          isCellPending={isCellPending}
+          saving={saving}
+          onSaveField={handleSaveFieldFromInspector}
           onToggle={toggleInspector}
           onCopyField={handleCopyField}
         />
