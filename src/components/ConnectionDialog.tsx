@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Database, FolderOpen, Plus, ArrowRight, X, Clock, Pencil, Globe, Key, Cloud, Server } from 'lucide-react';
+import { Database, FolderOpen, Plus, X, Clock, Pencil, Globe, Key, Cloud, Server } from 'lucide-react';
 import EditConnectionDialog from './EditConnectionDialog';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -84,6 +84,19 @@ function parsePostgresConnectionUrl(raw: string): { value?: ParsedPostgresUrl; e
   };
 }
 
+function getConnectionLocation(conn: Connection): string {
+  if (conn.type === 'turso') return conn.host || conn.path || '';
+  if (conn.type === 'postgres') return `${conn.host || ''}:${conn.port || 5432}`;
+  return conn.path || '';
+}
+
+function truncateMiddle(value: string, maxLength = 52): string {
+  if (value.length <= maxLength) return value;
+  const leftLength = Math.ceil((maxLength - 1) * 0.6);
+  const rightLength = Math.floor((maxLength - 1) * 0.4);
+  return `${value.slice(0, leftLength)}…${value.slice(-rightLength)}`;
+}
+
 export default function ConnectionDialog() {
   const showConnectionDialog = useAppStore(s => s.showConnectionDialog);
   const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
@@ -94,6 +107,7 @@ export default function ConnectionDialog() {
   const activeConnectionsCount = connections.filter(c => c.connId).length;
 
   const [type, setType] = useState<'sqlite' | 'turso' | 'postgres'>('sqlite');
+  const [activeTab, setActiveTab] = useState<'recent' | 'new'>('new');
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
   const [host, setHost] = useState('');
@@ -289,141 +303,190 @@ export default function ConnectionDialog() {
       <DialogContent className="w-[calc(100vw-2rem)] max-w-[1000px] max-h-[85vh] bg-card border-border/80 shadow-2xl shadow-black/20 p-0 overflow-hidden flex flex-col">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent-secondary to-primary" />
         
-        <div className="p-6 pb-2 flex-shrink-0">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="flex items-center space-x-2 text-xl font-bold tracking-tight">
-              <Database className="text-primary" />
-              <span>{type === 'sqlite' ? 'SQLite' : type === 'turso' ? 'Turso' : 'PostgreSQL'} Connection</span>
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground mt-1 text-xs">
-              {type === 'sqlite'
-                ? 'Open an existing database or create a new one to connect.'
-                : type === 'turso'
-                ? 'Connect to your Turso database or use a local libSQL file.'
-                : 'Connect to your PostgreSQL server.'}
-            </DialogDescription>
+        <div className="p-6 pb-2 flex-shrink-0 border-b border-border/40 bg-secondary/20">
+          <DialogHeader className="mb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <DialogTitle className="flex items-center space-x-3 text-2xl font-black tracking-tight uppercase">
+                  <div className="w-10 h-10 rounded-sm bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_15px_rgba(0,229,153,0.1)]">
+                    {type === 'sqlite' ? <Database className="text-primary h-6 w-6" /> : type === 'turso' ? <Cloud className="text-primary h-6 w-6" /> : <Server className="text-primary h-6 w-6" />}
+                  </div>
+                  <span>{type === 'sqlite' ? 'Local SQLite' : type === 'turso' ? 'Turso Cloud' : 'PostgreSQL Server'}</span>
+                </DialogTitle>
+                <DialogDescription className="text-muted-foreground mt-1 text-[11px] font-bold opacity-60 uppercase tracking-[0.2em]">
+                  {type === 'sqlite'
+                    ? 'Connect to a persistent local database file'
+                    : type === 'turso'
+                    ? 'Managed libSQL via edge cloud infrastructure'
+                    : 'External relational database instance'}
+                </DialogDescription>
+              </div>
+
+              {/* Mobile View Toggle */}
+              <div className="lg:hidden flex p-1 bg-background/50 rounded-sm border border-border/60 self-start sm:self-center backdrop-blur-sm">
+                <button
+                  onClick={() => setActiveTab('recent')}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 text-[10px] font-bold uppercase transition-all rounded-[2px]",
+                    activeTab === 'recent' ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Clock size={12} />
+                  Saved
+                </button>
+                <button
+                  onClick={() => setActiveTab('new')}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 text-[10px] font-bold uppercase transition-all rounded-[2px]",
+                    activeTab === 'new' ? "bg-primary text-primary-foreground shadow-lg" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Plus size={12} />
+                  New
+                </button>
+              </div>
+            </div>
           </DialogHeader>
         </div>
 
-        <ScrollArea className="flex-1 overflow-y-auto">
-          <div className="p-6 pt-0">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-            <section className="rounded-md border border-border/70 bg-background/50 p-4">
-              <div className="flex items-center gap-1.5 mb-3">
-                <Clock size={12} className="text-muted-foreground" />
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Recent & Saved
+        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+          {/* Sidebar / Saved Connections */}
+          <aside className={cn(
+            "w-full lg:w-[248px] lg:flex-none lg:shrink-0 lg:border-r border-border/40 bg-secondary/10 flex flex-col min-w-0 transition-all",
+            activeTab !== 'recent' && "hidden lg:flex"
+          )}>
+            <div className="px-4 py-2.5 border-b border-border/40 flex items-center justify-between bg-background/20 backdrop-blur-md">
+              <div className="flex items-center gap-2.5">
+                <div className="w-1 h-3 bg-primary rounded-full" />
+                <span className="text-[11px] font-black text-foreground uppercase tracking-[0.15em]">
+                  Saved Library
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Browse previous connections and reopen instantly.
-              </p>
-              {recentConnections.length > 0 ? (
-                <div className="grid gap-2">
-                  {recentConnections.map((conn) => (
-                    <div
-                      key={conn.id}
-                      className="flex items-center gap-3 p-2.5 rounded-sm bg-background border border-border/60 cursor-pointer hover:border-primary/40 hover:bg-secondary/50 transition-all group"
-                      onClick={() => handleSwitchTo(conn)}
-                    >
-                      <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                        {conn.type === 'turso' ? (
-                          <Cloud size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                        ) : conn.type === 'postgres' ? (
-                          <Server size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                        ) : (
-                          <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm font-medium text-foreground truncate">{conn.name}</div>
+              <span className="text-[10px] font-mono font-bold text-muted-foreground bg-background/80 px-2 py-0.5 rounded-sm border border-border/40 min-w-[20px] text-center">
+                {recentConnections.length}
+              </span>
+            </div>
+            
+            <ScrollArea className="flex-1 overflow-x-hidden">
+              <div className="w-full min-w-0 p-2 flex flex-col items-center gap-1.5">
+                {recentConnections.length > 0 ? (
+                  recentConnections.map((conn) => {
+                    const fullLocation = getConnectionLocation(conn);
+                    const displayLocation = truncateMiddle(fullLocation);
+
+                    return (
+                      <div
+                        key={conn.id}
+                        className="group relative w-full lg:w-[216px] lg:max-w-[216px] min-w-0 flex flex-col gap-1 p-2 rounded-sm bg-background/40 border border-border/40 cursor-pointer hover:border-primary/50 hover:bg-secondary/40 transition-all overflow-hidden"
+                        onClick={() => handleSwitchTo(conn)}
+                      >
+                      {/* Accent Strip */}
+                      <div className={cn(
+                        "absolute left-0 top-0 bottom-0 w-0.5 transition-all opacity-0 group-hover:opacity-100",
+                        conn.tag === 'production' ? "bg-red-500" : "bg-primary"
+                      )} />
+                      
+                      <div className="flex items-center min-w-0 pr-12">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="text-[12px] font-bold text-foreground truncate pr-1">{conn.name}</div>
                           <span className={cn(
-                            "px-1 py-0 rounded-[3px] text-[7px] font-bold uppercase tracking-tight",
-                            conn.type === 'turso'
-                              ? "bg-cyan-500/10 text-cyan-400"
-                              : conn.type === 'postgres'
-                              ? "bg-blue-500/10 text-blue-400"
-                              : "bg-muted text-muted-foreground"
+                            "px-1 py-0.5 rounded-[2px] text-[7px] font-black uppercase tracking-widest flex-shrink-0",
+                            conn.type === 'turso' ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" : 
+                            conn.type === 'postgres' ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : 
+                            "bg-muted/50 text-muted-foreground border border-border/40"
                           )}>
                             {conn.type}
                           </span>
-                          {conn.tag && (
-                            <span className={cn(
-                              "px-1.5 py-0 rounded-[4px] text-[8px] font-bold uppercase tracking-widest border",
-                              conn.tag === 'production'
-                                ? "bg-red-500/10 text-red-400 border-red-500/20"
-                                : "bg-primary/10 text-primary/80 border-primary/20"
-                            )}>
-                              {conn.tag}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5 opacity-70">
-                          {conn.type === 'turso'
-                            ? (conn.host || conn.path)
-                            : conn.type === 'postgres'
-                            ? `${conn.host}:${conn.port || 5432}/${conn.database || 'postgres'}`
-                            : conn.path}
                         </div>
                       </div>
-                      <ArrowRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-primary transition-all flex-shrink-0" />
-                      <button
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-primary/10 hover:text-primary flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingConnection(conn);
-                        }}
-                        title="Edit"
+
+                      <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-0.5 bg-background/60 backdrop-blur-sm pl-0.5 rounded-sm sm:opacity-20 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          className="p-1 rounded-[2px] hover:bg-primary/20 hover:text-primary transition-colors"
+                          onClick={(e) => { e.stopPropagation(); setEditingConnection(conn); }}
+                        >
+                          <Pencil size={10} />
+                        </button>
+                        <button
+                          className="p-1 rounded-[2px] hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          onClick={(e) => { e.stopPropagation(); void handleRemoveConnection(conn); }}
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                      
+                      <div
+                        className="w-full min-w-0 overflow-hidden whitespace-nowrap text-[9px] text-muted-foreground font-mono opacity-60 leading-tight pr-12"
+                        title={fullLocation}
                       >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleRemoveConnection(conn);
-                        }}
-                        title="Remove"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-sm border border-dashed border-border/70 bg-background/60 p-6 text-center">
-                  <Database size={22} className="mx-auto mb-2 text-muted-foreground/80" />
-                  <p className="text-sm text-foreground">No saved connections yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Create one on the right to start building your list.
+                        {displayLocation}
+                      </div>
+
+                      <div className="flex items-center mt-0.5">
+                        {conn.tag && (
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded-[2px] text-[7px] font-bold uppercase tracking-widest border transition-colors",
+                            conn.tag === 'production'
+                              ? "bg-red-500/10 text-red-400 border-red-500/20"
+                              : "bg-primary/5 text-primary/60 border-primary/20"
+                          )}>
+                            {conn.tag}
+                          </span>
+                        )}
+                      </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-12 px-4 text-center">
+                    <Database size={24} className="mx-auto mb-3 text-muted-foreground/20" />
+                    <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">No connections</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </aside>
+
+          {/* Main Content Area */}
+          <main className={cn(
+            "flex-1 flex flex-col min-h-0 bg-background/50",
+            activeTab !== 'new' && "hidden lg:flex"
+          )}>
+            <ScrollArea className="flex-1">
+              <div className="p-6 lg:p-10 max-w-[600px] mx-auto w-full">
+                <div className="mb-8">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Plus size={14} className="text-primary" />
+                    <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-foreground">
+                      New Entry
+                    </h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Configure your database engine and credentials below. All fields are validated in real-time.
                   </p>
                 </div>
-              )}
-            </section>
-
-            <section className="rounded-md border border-border/70 bg-background/50 p-4">
-              <div className="mb-4">
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  New Connection
-                </span>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Choose a database engine and provide details.
-                </p>
-              </div>
 
               <div className="mb-6">
                 <Tabs value={type} onValueChange={(v) => setType(v as 'sqlite' | 'turso' | 'postgres')}>
-                  <TabsList className="grid w-full grid-cols-3 bg-background/80 border border-border/60">
-                    <TabsTrigger value="sqlite" className="text-[10px] uppercase tracking-wider font-bold h-8">
+                  <TabsList className="grid w-full grid-cols-3 h-9 p-0.5 bg-secondary/20 border border-border/60">
+                    <TabsTrigger
+                      value="sqlite"
+                      className="h-8 rounded-[2px] border border-transparent text-[10px] uppercase tracking-wider font-bold text-muted-foreground data-[state=active]:border-primary/40 data-[state=active]:bg-primary/12 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                    >
                       <Database size={12} className="mr-2" />
                       SQLite
                     </TabsTrigger>
-                    <TabsTrigger value="turso" className="text-[10px] uppercase tracking-wider font-bold h-8">
+                    <TabsTrigger
+                      value="turso"
+                      className="h-8 rounded-[2px] border border-transparent text-[10px] uppercase tracking-wider font-bold text-muted-foreground data-[state=active]:border-primary/40 data-[state=active]:bg-primary/12 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                    >
                       <Cloud size={12} className="mr-2" />
                       Turso
                     </TabsTrigger>
-                    <TabsTrigger value="postgres" className="text-[10px] uppercase tracking-wider font-bold h-8">
+                    <TabsTrigger
+                      value="postgres"
+                      className="h-8 rounded-[2px] border border-transparent text-[10px] uppercase tracking-wider font-bold text-muted-foreground data-[state=active]:border-primary/40 data-[state=active]:bg-primary/12 data-[state=active]:text-primary data-[state=active]:shadow-none"
+                    >
                       <Server size={12} className="mr-2" />
                       PostgreSQL
                     </TabsTrigger>
@@ -713,61 +776,71 @@ export default function ConnectionDialog() {
                 </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Environment Label <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {(['local', 'testing', 'development', 'production'] as const).map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => {
-                          setTag(t);
-                          setError('');
-                        }}
-                        className={`px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all border ${
-                          tag === t
-                            ? t === 'production'
-                              ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(248,113,113,0.15)]'
-                              : 'bg-primary/20 border-primary text-primary glow-shadow'
-                            : 'bg-background hover:bg-secondary border-border text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Environment Label <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {(['local', 'testing', 'development', 'production'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => {
+                            setTag(t);
+                            setError('');
+                          }}
+                          className={`px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                            tag === t
+                              ? t === 'production'
+                                ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_10px_rgba(248,113,113,0.15)]'
+                                : 'bg-primary/20 border-primary text-primary glow-shadow'
+                              : 'bg-background hover:bg-secondary border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                    {!tag && (
+                      <p className="text-[11px] text-destructive">
+                        Environment label is required.
+                      </p>
+                    )}
                   </div>
-                  {!tag && (
-                    <p className="text-[11px] text-destructive">
-                      Environment label is required.
-                    </p>
-                  )}
                 </div>
               </div>
-            </section>
-            </div>
-          </div>
-        </ScrollArea>
+            </ScrollArea>
+          </main>
+        </div>
 
-        <DialogFooter className="bg-secondary/50 p-4 border-t border-border flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:items-center flex-shrink-0">
-          <Button
-            variant="ghost"
-            onClick={() => setShowConnectionDialog(false)}
-            className="hover:bg-secondary text-muted-foreground w-full sm:w-auto"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConnect}
-            disabled={
-              (type === 'postgres'
-                ? (postgresInputMode === 'url' ? !postgresUrl.trim() : !host.trim() || !username.trim())
-                : !path.trim() && !host.trim()) || !tag
-            }
-            className="px-8 font-semibold tracking-wide w-full sm:w-auto"
-          >
-            Connect
-          </Button>
+        <DialogFooter className="bg-secondary/30 p-4 border-t border-border/60 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:items-center flex-shrink-0">
+          <div className="hidden sm:block">
+            {error && (
+              <p className="text-[10px] text-destructive font-bold uppercase tracking-tight flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+                {error}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row gap-3 w-full sm:w-auto">
+            <Button
+              variant="ghost"
+              onClick={() => setShowConnectionDialog(false)}
+              className="hover:bg-secondary text-muted-foreground h-9 text-xs font-bold uppercase tracking-wider rounded-sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConnect}
+              disabled={
+                (type === 'postgres'
+                  ? (postgresInputMode === 'url' ? !postgresUrl.trim() : !host.trim() || !username.trim())
+                  : !path.trim() && !host.trim()) || !tag
+              }
+              className="px-8 h-9 text-xs font-bold uppercase tracking-wider rounded-sm glow-shadow"
+            >
+              Connect to Database
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
       </Dialog>
