@@ -4,7 +4,6 @@ import { listTables } from '../lib/db';
 import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -134,7 +133,11 @@ export default function Sidebar() {
     });
 
     return Array.from(counts.entries())
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => {
+        if (left === 'public') return -1;
+        if (right === 'public') return 1;
+        return left.localeCompare(right);
+      })
       .map(([value, count]) => ({
         value,
         count,
@@ -143,7 +146,12 @@ export default function Sidebar() {
   const showSchemaFilter = isPostgresConnection && schemaOptions.length > 0;
   const showSchemaBadge = isPostgresConnection && schemaOptions.length > 1;
   const defaultSchemaValue = useMemo(
-    () => (schemaOptions.length === 1 ? schemaOptions[0].value : ALL_SCHEMAS_VALUE),
+    () => {
+      if (schemaOptions.some((schema) => schema.value === 'public')) {
+        return 'public';
+      }
+      return schemaOptions.length === 1 ? schemaOptions[0].value : ALL_SCHEMAS_VALUE;
+    },
     [schemaOptions],
   );
 
@@ -475,115 +483,8 @@ export default function Sidebar() {
             />
           </div>
 
-          <ScrollArea className="flex-1 px-3">
-            <div className="space-y-4 pb-4">
-              {/* Tables */}
-              <div className="space-y-1">
-                <div
-                  className="flex items-center space-x-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors group px-2 py-1"
-                  onClick={() => setTablesOpen(!tablesOpen)}
-                >
-                  <span className="text-[10px] transform transition-transform text-muted-foreground group-hover:text-primary">
-                    {tablesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  </span>
-                  <span className="flex-1">Tables</span>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
-                      {filteredTables.length}
-                    </span>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-emerald-500/20 hover:text-emerald-400 transition-all"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateTable();
-                      }}
-                      title="Create Table"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
-                
-                {tablesOpen && (
-                  <div ref={tablesListRef} className="max-h-80 overflow-auto pr-1">
-                    <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-                      {tableVirtualizer.getVirtualItems().map((virtualItem) => {
-                        const t = filteredTables[virtualItem.index];
-                        const qualifiedName = getQualifiedTableName(t);
-                        const schemaName = getSchemaName(t);
-                        const menuKey = `table:${qualifiedName}`;
-                        return (
-                          <div
-                            key={qualifiedName}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualItem.start}px)`,
-                              paddingBottom: '2px',
-                            }}
-                          >
-                            <ContextMenu
-                              key={`${menuKey}:${contextMenuEpoch}`}
-                              onOpenChange={setIsContextMenuOpen}
-                            >
-                              <ContextMenuTrigger asChild>
-                                <div
-                                  className={cn(
-                                    "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                    selectedTable === qualifiedName
-                                      ? "bg-primary/10 text-primary border border-primary/20"
-                                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                                  )}
-                                  onClick={() => openTableTab(activeConnection!.id, qualifiedName, 'data')}
-                                  onDoubleClick={() => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
-                                >
-                                  <LayoutTemplate size={14} className={selectedTable === qualifiedName ? "text-primary" : "text-muted-foreground"} />
-                                  <span className="truncate">{t.name}</span>
-                                  {showSchemaBadge && schemaName && (
-                                    <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
-                                      {schemaName}
-                                    </span>
-                                  )}
-                                </div>
-                              </ContextMenuTrigger>
-                              <ContextMenuContent className="w-48">
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, qualifiedName, 'data');
-                                  }}
-                                >
-                                  Open Data
-                                </ContextMenuItem>
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, qualifiedName, 'structure');
-                                  }}
-                                >
-                                  Open Structure
-                                </ContextMenuItem>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    handleEditTable(qualifiedName);
-                                  }}
-                                >
-                                  Edit Table
-                                </ContextMenuItem>
-                              </ContextMenuContent>
-                            </ContextMenu>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
+          <div className="flex-1 min-h-0 px-3 pb-4">
+            <div className="flex h-full min-h-0 flex-col space-y-4">
               {/* Views */}
               <div className="space-y-1">
                 <div
@@ -682,6 +583,113 @@ export default function Sidebar() {
                 )}
               </div>
 
+              {/* Tables */}
+              <div className="flex min-h-0 flex-1 flex-col space-y-1">
+                <div
+                  className="flex items-center space-x-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors group px-2 py-1"
+                  onClick={() => setTablesOpen(!tablesOpen)}
+                >
+                  <span className="text-[10px] transform transition-transform text-muted-foreground group-hover:text-primary">
+                    {tablesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </span>
+                  <span className="flex-1">Tables</span>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
+                      {filteredTables.length}
+                    </span>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-emerald-500/20 hover:text-emerald-400 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateTable();
+                      }}
+                      title="Create Table"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+                
+                {tablesOpen && (
+                  <div ref={tablesListRef} className="flex-1 min-h-0 overflow-auto pr-1">
+                    <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {tableVirtualizer.getVirtualItems().map((virtualItem) => {
+                        const t = filteredTables[virtualItem.index];
+                        const qualifiedName = getQualifiedTableName(t);
+                        const schemaName = getSchemaName(t);
+                        const menuKey = `table:${qualifiedName}`;
+                        return (
+                          <div
+                            key={qualifiedName}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualItem.start}px)`,
+                              paddingBottom: '2px',
+                            }}
+                          >
+                            <ContextMenu
+                              key={`${menuKey}:${contextMenuEpoch}`}
+                              onOpenChange={setIsContextMenuOpen}
+                            >
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  className={cn(
+                                    "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
+                                    selectedTable === qualifiedName
+                                      ? "bg-primary/10 text-primary border border-primary/20"
+                                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  )}
+                                  onClick={() => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                                  onDoubleClick={() => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
+                                >
+                                  <LayoutTemplate size={14} className={selectedTable === qualifiedName ? "text-primary" : "text-muted-foreground"} />
+                                  <span className="truncate">{t.name}</span>
+                                  {showSchemaBadge && schemaName && (
+                                    <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
+                                      {schemaName}
+                                    </span>
+                                  )}
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent className="w-48">
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    openTableTab(activeConnection!.id, qualifiedName, 'data');
+                                  }}
+                                >
+                                  Open Data
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    openTableTab(activeConnection!.id, qualifiedName, 'structure');
+                                  }}
+                                >
+                                  Open Structure
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                  onClick={() => {
+                                    setIsContextMenuOpen(false);
+                                    handleEditTable(qualifiedName);
+                                  }}
+                                >
+                                  Edit Table
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Empty state */}
               {filteredTables.length === 0 && filteredViews.length === 0 && !search && (
                 <div className="text-center py-8 px-4 border border-dashed border-border rounded-lg bg-background/30 mt-4">
@@ -699,7 +707,7 @@ export default function Sidebar() {
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
 
