@@ -3,6 +3,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::{Column, Row, TypeInfo};
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use super::row_decode;
 use super::safety;
@@ -180,7 +181,10 @@ impl PostgresEngine {
             }
             // UUID type
             "UUID" => {
-                if let Ok(val) = row.try_get::<Option<String>, _>(col_name) {
+                if let Ok(val) = row.try_get::<Option<Uuid>, _>(col_name) {
+                    val.map(|v| serde_json::json!(v.to_string()))
+                        .unwrap_or(serde_json::Value::Null)
+                } else if let Ok(val) = row.try_get::<Option<String>, _>(col_name) {
                     val.map(|v| serde_json::json!(v))
                         .unwrap_or(serde_json::Value::Null)
                 } else {
