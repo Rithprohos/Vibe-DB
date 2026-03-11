@@ -256,7 +256,6 @@ Full PostgreSQL database support.
 
 #### High-Priority Follow-Ups
 
-- [x] JSON/JSONB: render objects/arrays as pretty JSON in grid/inspector instead of `[object Object]`
 - [ ] ARRAY: broaden PostgreSQL array decode and avoid null fallback for unsupported array element types
 - [ ] Parameterized types: support `VARCHAR(n)`, `NUMERIC(p,s)`, and temporal precision in Create/Edit UI
 - [ ] BYTEA: add binary preview/inspection UX (size + hex/text preview)
