@@ -103,24 +103,102 @@ async function summarizeWithPollinations({ tag, changelogContent }) {
     headers.Authorization = `Bearer ${apiKey}`;
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
+  async function callAndExtract(requestPayload) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestPayload),
+    });
 
-  if (!response.ok) {
-    const details = (await response.text()).slice(0, 300);
-    throw new Error(`Pollinations call failed ${response.status}: ${details}`);
+    if (!response.ok) {
+      const details = (await response.text()).slice(0, 300);
+      throw new Error(`Pollinations call failed ${response.status}: ${details}`);
+    }
+
+    const data = await response.json();
+    const summary = extractSummaryFromCompletion(data);
+    return summary;
   }
 
-  const data = await response.json();
-  const summary = data?.choices?.[0]?.message?.content?.trim();
-  if (!summary) {
-    throw new Error("Pollinations returned an empty summary.");
+  const firstAttempt = await callAndExtract(payload);
+  if (firstAttempt) {
+    return firstAttempt;
   }
 
-  return summary;
+  // Retry once with simpler constraints if provider returns a structurally valid but empty answer.
+  const retryPayload = {
+    ...payload,
+    messages: [
+      payload.messages[0],
+      {
+        role: "user",
+        content: [
+          `Version tag: ${tag}`,
+          "Write short GitHub release notes in Markdown for this changelog.",
+          "Use: ## ✨ Highlights, ## 🔧 Improvements, ## 🐛 Fixes.",
+          "If a section is empty, omit it.",
+          "Keep under 180 words.",
+          "",
+          "Changelog content:",
+          changelogContent,
+        ].join("\n"),
+      },
+    ],
+    temperature: 0.1,
+  };
+
+  const retryAttempt = await callAndExtract(retryPayload);
+  if (retryAttempt) {
+    return retryAttempt;
+  }
+
+  throw new Error("Pollinations returned an empty summary.");
+}
+
+function extractSummaryFromCompletion(data) {
+  const choice = data?.choices?.[0];
+  if (!choice) {
+    return "";
+  }
+
+  // OpenAI-compatible: choices[0].message.content is a string.
+  if (typeof choice?.message?.content === "string") {
+    return choice.message.content.trim();
+  }
+
+  // Some providers return content parts.
+  if (Array.isArray(choice?.message?.content)) {
+    const text = choice.message.content
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+        if (part && typeof part.text === "string") {
+          return part.text;
+        }
+        return "";
+      })
+      .join("\n")
+      .trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  // Legacy completion-style response.
+  if (typeof choice?.text === "string") {
+    return choice.text.trim();
+  }
+
+  // Rare providers may emit top-level output text arrays.
+  if (Array.isArray(data?.output_text)) {
+    const text = data.output_text.join("\n").trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  return "";
 }
 
 async function main() {

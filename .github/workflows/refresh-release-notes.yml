@@ -1,0 +1,93 @@
+name: Refresh Release Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to refresh (e.g. v0.4.1)"
+        required: true
+        type: string
+      create_if_missing:
+        description: "Create release if it does not exist"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  refresh-release-notes:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Generate release body
+        env:
+          POLLINATIONS_BASE_URL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_URL != '' && vars.VIBEDB_RELEASE_NOTES_AI_URL || vars.VIBEDB_DEFAULT_AI_URL != '' && vars.VIBEDB_DEFAULT_AI_URL || 'https://gen.pollinations.ai' }}
+          POLLINATIONS_MODEL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_MODEL != '' && vars.VIBEDB_RELEASE_NOTES_AI_MODEL || vars.VIBEDB_DEFAULT_AI_MODEL != '' && vars.VIBEDB_DEFAULT_AI_MODEL || 'openai' }}
+          POLLINATIONS_API_KEY: ${{ secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY != '' && secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY || secrets.VIBEDB_DEFAULT_AI_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ inputs.tag }}"
+          BODY_FILE="release_body.md"
+
+          bun scripts/generate-release-notes.mjs "$TAG" > "$BODY_FILE"
+
+          PREVIOUS_TAG="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
+          if [ -n "$PREVIOUS_TAG" ]; then
+            {
+              echo ""
+              echo "---"
+              echo "## Changelog"
+              echo "**Full Changelog**: [${PREVIOUS_TAG}...${TAG}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG})"
+              echo ""
+              git log "${PREVIOUS_TAG}..${TAG}" --pretty=format:"- \`%h\` %s @%an"
+              echo ""
+            } >> "$BODY_FILE"
+          fi
+
+          cat << 'EOF' >> "$BODY_FILE"
+
+          ---
+          ### ⚠️ macOS "App is damaged" fix
+          This app is not code-signed. After installing, if macOS says "App is damaged", run this in Terminal:
+          ```bash
+          xattr -cr "/Applications/Vibe DB.app"
+          ```
+          Then open the app again.
+          EOF
+
+      - name: Update GitHub release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ inputs.tag }}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "VibeDB ${TAG}" --notes-file release_body.md
+            exit 0
+          fi
+
+          if [ "${{ inputs.create_if_missing }}" = "true" ]; then
+            gh release create "$TAG" --title "VibeDB ${TAG}" --notes-file release_body.md --verify-tag
+            exit 0
+          fi
+
+          echo "::error::Release ${TAG} not found. Re-run with create_if_missing=true to create it."
+          exit 1
+
+      - name: Upload generated release body
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-body-${{ inputs.tag }}
+          path: release_body.md
