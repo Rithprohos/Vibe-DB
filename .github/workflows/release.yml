@@ -42,49 +42,6 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Generate Release Notes
-        id: notes
-        env:
-          POLLINATIONS_BASE_URL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_URL != '' && vars.VIBEDB_RELEASE_NOTES_AI_URL || vars.VIBEDB_DEFAULT_AI_URL != '' && vars.VIBEDB_DEFAULT_AI_URL || 'https://gen.pollinations.ai' }}
-          POLLINATIONS_MODEL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_MODEL != '' && vars.VIBEDB_RELEASE_NOTES_AI_MODEL || vars.VIBEDB_DEFAULT_AI_MODEL != '' && vars.VIBEDB_DEFAULT_AI_MODEL || 'openai' }}
-          POLLINATIONS_API_KEY: ${{ secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY != '' && secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY || secrets.VIBEDB_DEFAULT_AI_API_KEY }}
-        run: |
-          set -euo pipefail
-
-          delimiter="$(openssl rand -hex 8)"
-          echo "body<<$delimiter" >> "$GITHUB_OUTPUT"
-
-          TAG="${{ github.ref_name }}"
-
-          # 1. Generate summary from changelog/<tag>.md with Pollinations AI
-          bun scripts/generate-release-notes.mjs "$TAG" >> "$GITHUB_OUTPUT"
-
-          # 2. Automatically Generate Changelog
-          PREVIOUS_TAG="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            echo "---" >> "$GITHUB_OUTPUT"
-            echo "## Changelog" >> "$GITHUB_OUTPUT"
-            echo "**Full Changelog**: [${PREVIOUS_TAG}...${TAG}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG})" >> "$GITHUB_OUTPUT"
-            echo "" >> "$GITHUB_OUTPUT"
-            git log "${PREVIOUS_TAG}..${TAG}" --pretty=format:"- \`%h\` %s @%an" >> "$GITHUB_OUTPUT"
-            echo "" >> "$GITHUB_OUTPUT"
-          fi
-
-          # 3. macOS Fix Instruction
-          cat << 'EOF' >> "$GITHUB_OUTPUT"
-
-          ---
-          ### ⚠️ macOS "App is damaged" fix
-          This app is not code-signed. After installing, if macOS says "App is damaged", run this in Terminal:
-          ```bash
-          xattr -cr "/Applications/Vibe DB.app"
-          ```
-          Then open the app again.
-          EOF
-
-          echo "$delimiter" >> "$GITHUB_OUTPUT"
-
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -97,7 +54,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "VibeDB ${{ github.ref_name }}"
-          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -130,3 +86,62 @@ jobs:
         run: gh release upload ${{ github.ref_name }} latest.json --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  refresh-release-notes:
+    needs: release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Generate release body
+        env:
+          POLLINATIONS_BASE_URL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_URL != '' && vars.VIBEDB_RELEASE_NOTES_AI_URL || vars.VIBEDB_DEFAULT_AI_URL != '' && vars.VIBEDB_DEFAULT_AI_URL || 'https://gen.pollinations.ai' }}
+          POLLINATIONS_MODEL: ${{ vars.VIBEDB_RELEASE_NOTES_AI_MODEL != '' && vars.VIBEDB_RELEASE_NOTES_AI_MODEL || vars.VIBEDB_DEFAULT_AI_MODEL != '' && vars.VIBEDB_DEFAULT_AI_MODEL || 'openai' }}
+          POLLINATIONS_API_KEY: ${{ secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY != '' && secrets.VIBEDB_RELEASE_NOTES_AI_API_KEY || secrets.VIBEDB_DEFAULT_AI_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ github.ref_name }}"
+          BODY_FILE="release_body.md"
+
+          bun scripts/generate-release-notes.mjs "$TAG" > "$BODY_FILE"
+
+          PREVIOUS_TAG="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
+          if [ -n "$PREVIOUS_TAG" ]; then
+            {
+              echo ""
+              echo "---"
+              echo "## Changelog"
+              echo "**Full Changelog**: [${PREVIOUS_TAG}...${TAG}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG})"
+              echo ""
+              git log "${PREVIOUS_TAG}..${TAG}" --pretty=format:"- \`%h\` %s @%an"
+              echo ""
+            } >> "$BODY_FILE"
+          fi
+
+          cat << 'EOF' >> "$BODY_FILE"
+
+          ---
+          ### ⚠️ macOS "App is damaged" fix
+          This app is not code-signed. After installing, if macOS says "App is damaged", run this in Terminal:
+          ```bash
+          xattr -cr "/Applications/Vibe DB.app"
+          ```
+          Then open the app again.
+          EOF
+
+      - name: Update GitHub release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          gh release edit "$TAG" --title "VibeDB ${TAG}" --notes-file release_body.md
