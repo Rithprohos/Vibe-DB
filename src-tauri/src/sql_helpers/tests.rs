@@ -1,7 +1,7 @@
 use super::{
-    build_create_table_sql, build_create_view_sql, build_delete_queries,
-    build_where_clause_for_row, quote_qualified_identifier, CreateTableColumnInput,
-    RowIdentifierInput,
+    build_create_table_sql, build_create_view_sql, build_delete_queries, build_insert_queries,
+    build_insert_query, build_where_clause_for_row, quote_qualified_identifier,
+    CreateTableColumnInput, RowDataInput, RowIdentifierInput,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -24,6 +24,15 @@ fn test_row_identifier(value: serde_json::Value) -> RowIdentifierInput {
         .expect("test row identifier should be a JSON object");
 
     RowIdentifierInput { row_data }
+}
+
+fn test_row_data(value: serde_json::Value) -> RowDataInput {
+    let row_data = value
+        .as_object()
+        .cloned()
+        .expect("test row data should be a JSON object");
+
+    RowDataInput { row_data }
 }
 
 #[test]
@@ -354,4 +363,166 @@ fn build_create_table_sql_rejects_unknown_engine() {
     .expect_err("expected unsupported engine error");
 
     assert_eq!(error, "Unsupported database engine for CREATE TABLE: mysql");
+}
+
+#[test]
+fn build_insert_query_rejects_empty_table_name() {
+    let row = test_row_data(json!({ "name": "Alice" }));
+
+    let error = build_insert_query("", &row).expect_err("expected empty table name error");
+
+    assert_eq!(error, "Table name is required");
+}
+
+#[test]
+fn build_insert_query_rejects_invalid_table_name() {
+    let row = test_row_data(json!({ "name": "Alice" }));
+
+    let error =
+        build_insert_query("main..users", &row).expect_err("expected invalid table name error");
+
+    assert_eq!(error, "Table name contains an empty identifier segment");
+}
+
+#[test]
+fn build_insert_query_rejects_empty_row_data() {
+    let row = test_row_data(json!({}));
+
+    let error = build_insert_query("users", &row).expect_err("expected empty row data error");
+
+    assert_eq!(error, "Row data cannot be empty");
+}
+
+#[test]
+fn build_insert_query_generates_basic_insert() {
+    let row = test_row_data(json!({
+        "name": "Alice",
+        "age": 30,
+    }));
+
+    let sql = build_insert_query("users", &row).expect("expected insert query");
+
+    assert_eq!(
+        sql,
+        "INSERT INTO \"users\" (\"age\", \"name\") VALUES (30, 'Alice');"
+    );
+}
+
+#[test]
+fn build_insert_query_handles_qualified_table_name() {
+    let row = test_row_data(json!({ "id": 1 }));
+
+    let sql = build_insert_query("public.users", &row).expect("expected insert query");
+
+    assert!(sql.contains("INSERT INTO \"public\".\"users\""));
+}
+
+#[test]
+fn build_insert_query_handles_null_values() {
+    let row = test_row_data(json!({
+        "name": "Bob",
+        "email": null,
+    }));
+
+    let sql = build_insert_query("users", &row).expect("expected insert query");
+
+    assert!(sql.contains("(NULL, 'Bob')") || sql.contains("('Bob', NULL)"));
+    assert!(sql.contains("'Bob'"));
+    assert!(sql.contains("NULL"));
+}
+
+#[test]
+fn build_insert_query_escapes_string_values() {
+    let row = test_row_data(json!({
+        "name": "O'Reilly",
+        "description": "It's \"great\"!",
+    }));
+
+    let sql = build_insert_query("users", &row).expect("expected insert query");
+
+    assert!(sql.contains("'O''Reilly'"));
+    assert!(sql.contains("'It''s \"great\"!'"));
+}
+
+#[test]
+fn build_insert_query_handles_boolean_values() {
+    let row = test_row_data(json!({
+        "name": "Charlie",
+        "active": true,
+        "deleted": false,
+    }));
+
+    let sql = build_insert_query("users", &row).expect("expected insert query");
+
+    assert!(sql.contains("true"));
+    assert!(sql.contains("false"));
+}
+
+#[test]
+fn build_insert_query_handles_json_values() {
+    let row = test_row_data(json!({
+        "name": "Diana",
+        "metadata": { "role": "admin" },
+        "tags": ["a", "b", "c"],
+    }));
+
+    let sql = build_insert_query("users", &row).expect("expected insert query");
+
+    // JSON values are serialized as strings
+    assert!(sql.contains("'{"));
+    assert!(sql.contains("}'"));
+}
+
+#[test]
+fn build_insert_queries_rejects_empty_rows() {
+    let rows: Vec<RowDataInput> = vec![];
+
+    let error = build_insert_queries("users", &rows).expect_err("expected empty rows error");
+
+    assert_eq!(error, "No rows provided for insertion");
+}
+
+#[test]
+fn build_insert_queries_generates_multiple_inserts() {
+    let rows = vec![
+        test_row_data(json!({ "id": 1, "name": "Alice" })),
+        test_row_data(json!({ "id": 2, "name": "Bob" })),
+    ];
+
+    let queries = build_insert_queries("users", &rows).expect("expected insert queries");
+
+    assert_eq!(queries.len(), 1);
+    assert_eq!(
+        queries[0],
+        "INSERT INTO \"users\" (\"id\", \"name\") VALUES (1, 'Alice'), (2, 'Bob');"
+    );
+}
+
+#[test]
+fn build_insert_queries_splits_when_column_sets_change() {
+    let rows = vec![
+        test_row_data(json!({ "id": 1, "name": "Alice" })),
+        test_row_data(json!({ "id": 2, "email": "bob@example.com" })),
+    ];
+
+    let queries = build_insert_queries("users", &rows).expect("expected insert queries");
+
+    assert_eq!(queries.len(), 2);
+    assert_eq!(
+        queries[0],
+        "INSERT INTO \"users\" (\"id\", \"name\") VALUES (1, 'Alice');"
+    );
+    assert_eq!(
+        queries[1],
+        "INSERT INTO \"users\" (\"email\", \"id\") VALUES ('bob@example.com', 2);"
+    );
+}
+
+#[test]
+fn build_insert_query_rejects_empty_column_name() {
+    let row = test_row_data(json!({ "": "Alice" }));
+
+    let error = build_insert_query("users", &row).expect_err("expected empty column name error");
+
+    assert_eq!(error, "Column name is required");
 }

@@ -61,6 +61,20 @@ export interface RowIdentifierInput {
   rowData: Record<string, unknown>;
 }
 
+export interface RowDataInput {
+  rowData: Record<string, unknown>;
+}
+
+export async function insertRows(
+  tableName: string,
+  rows: RowDataInput[],
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("insert_rows", () =>
+    invoke<QueryResult>("insert_rows", { tableName, rows, connId }),
+  );
+}
+
 export async function deleteRows(
   tableName: string,
   rows: RowIdentifierInput[],

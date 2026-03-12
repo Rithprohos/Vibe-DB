@@ -1,5 +1,6 @@
 use crate::engines::{ColumnInfo, QueryResult};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::collections::HashSet;
 
 /// Input for identifying a row to delete.
@@ -11,6 +12,158 @@ use std::collections::HashSet;
 pub struct RowIdentifierInput {
     /// Column name to value mapping for row identification
     pub row_data: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Input for inserting a new row.
+/// The row_data map contains column names and their values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RowDataInput {
+    /// Column name to value mapping for the new row
+    pub row_data: serde_json::Map<String, serde_json::Value>,
+}
+
+fn validate_table_name(table_name: &str) -> Result<&str, String> {
+    let trimmed_table_name = table_name.trim();
+    if trimmed_table_name.is_empty() {
+        return Err("Table name is required".to_string());
+    }
+    if trimmed_table_name
+        .split('.')
+        .any(|part| part.trim().is_empty())
+    {
+        return Err("Table name contains an empty identifier segment".to_string());
+    }
+
+    Ok(trimmed_table_name)
+}
+
+fn format_insert_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "NULL".to_string(),
+        serde_json::Value::Number(number) => number.to_string(),
+        serde_json::Value::Bool(boolean) => boolean.to_string(),
+        serde_json::Value::String(text) => {
+            format!("'{}'", escape_sql_string(text))
+        }
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            format!("'{}'", escape_sql_string(&value.to_string()))
+        }
+    }
+}
+
+fn normalize_insert_row(row: &RowDataInput) -> Result<(Vec<String>, Vec<String>), String> {
+    if row.row_data.is_empty() {
+        return Err("Row data cannot be empty".to_string());
+    }
+
+    let mut seen_columns = BTreeSet::new();
+    let mut entries = Vec::with_capacity(row.row_data.len());
+
+    for (column_name, value) in &row.row_data {
+        let trimmed_column_name = column_name.trim();
+        if trimmed_column_name.is_empty() {
+            return Err("Column name is required".to_string());
+        }
+        if !seen_columns.insert(trimmed_column_name.to_string()) {
+            return Err(format!("Duplicate column name: \"{trimmed_column_name}\""));
+        }
+        entries.push((trimmed_column_name.to_string(), format_insert_value(value)));
+    }
+
+    entries.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+
+    let columns = entries
+        .iter()
+        .map(|(column_name, _)| quote_identifier(column_name))
+        .collect();
+    let values = entries.into_iter().map(|(_, value)| value).collect();
+
+    Ok((columns, values))
+}
+
+fn build_insert_statement(
+    quoted_table: &str,
+    columns: &[String],
+    row_values: &[Vec<String>],
+) -> String {
+    let values_sql = row_values
+        .iter()
+        .map(|values| format!("({})", values.join(", ")))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!(
+        "INSERT INTO {} ({}) VALUES {};",
+        quoted_table,
+        columns.join(", "),
+        values_sql
+    )
+}
+
+/// Builds an INSERT query for a single row.
+/// Returns the INSERT SQL statement.
+pub fn build_insert_query(table_name: &str, row: &RowDataInput) -> Result<String, String> {
+    let trimmed_table_name = validate_table_name(table_name)?;
+    let quoted_table = quote_qualified_identifier(trimmed_table_name);
+    let (columns, values) = normalize_insert_row(row)?;
+
+    Ok(format!(
+        "INSERT INTO {} ({}) VALUES ({});",
+        quoted_table,
+        columns.join(", "),
+        values.join(", ")
+    ))
+}
+
+/// Builds INSERT queries for multiple rows.
+/// Returns a vector of INSERT SQL statements.
+pub fn build_insert_queries(
+    table_name: &str,
+    rows: &[RowDataInput],
+) -> Result<Vec<String>, String> {
+    if rows.is_empty() {
+        return Err("No rows provided for insertion".to_string());
+    }
+
+    let trimmed_table_name = validate_table_name(table_name)?;
+    let quoted_table = quote_qualified_identifier(trimmed_table_name);
+    let mut queries = Vec::new();
+    let mut current_columns: Option<Vec<String>> = None;
+    let mut current_values: Vec<Vec<String>> = Vec::new();
+
+    for row in rows {
+        let (columns, values) = normalize_insert_row(row)?;
+
+        match &current_columns {
+            Some(existing_columns) if *existing_columns == columns => {
+                current_values.push(values);
+            }
+            Some(existing_columns) => {
+                queries.push(build_insert_statement(
+                    &quoted_table,
+                    existing_columns,
+                    &current_values,
+                ));
+                current_columns = Some(columns);
+                current_values = vec![values];
+            }
+            None => {
+                current_columns = Some(columns);
+                current_values.push(values);
+            }
+        }
+    }
+
+    if let Some(columns) = current_columns {
+        queries.push(build_insert_statement(
+            &quoted_table,
+            &columns,
+            &current_values,
+        ));
+    }
+
+    Ok(queries)
 }
 
 /// Builds a WHERE clause for a single row using primary keys if available,
