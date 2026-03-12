@@ -31,7 +31,8 @@ bun run cargo:test
 - [`src/store/helpers.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/helpers.ts): shared store helper logic
 - [`src/store/storage.ts`](/Users/a1234/Documents/Project/vibe-db/src/store/storage.ts): Tauri Store-backed Zustand storage adapter
 - [`src/lib/db.ts`](/Users/a1234/Documents/Project/vibe-db/src/lib/db.ts): frontend wrappers around Tauri commands
-- [`src-tauri/src/commands.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/commands.rs): backend command implementations
+- [`src-tauri/src/commands.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/commands.rs): backend command module root and re-exports
+- [`src-tauri/src/commands/*`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/commands): backend command implementations split by domain (`connection`, `query`, `schema`, `rows`)
 - [`src-tauri/src/lib.rs`](/Users/a1234/Documents/Project/vibe-db/src-tauri/src/lib.rs): Tauri setup, plugins, command registration
 - [`src/index.css`](/Users/a1234/Documents/Project/vibe-db/src/index.css): theme variables and shared styling tokens
 - [`STYLE_GUIDE.md`](/Users/a1234/Documents/Project/vibe-db/STYLE_GUIDE.md): UI rules
@@ -41,13 +42,13 @@ bun run cargo:test
 
 - Frontend state lives in Zustand with a root store in `src/store/useAppStore.ts` composed from slice modules in `src/store/slices`.
 - Persisted state uses Tauri Store via `app_settings.json`, not browser localStorage.
-- Backend DB operations are implemented in `src-tauri/src/commands.rs`.
+- Backend DB operations are implemented under `src-tauri/src/commands/`, with `src-tauri/src/commands.rs` as the module root.
 - `src-tauri/src/lib.rs` wires plugins and exposes commands.
 - Current custom event: `vibedb:connect`.
 
 ## Current Backend Commands
 
-Defined in `src-tauri/src/commands.rs`:
+Re-exported from `src-tauri/src/commands.rs` and implemented under `src-tauri/src/commands/`:
 
 | Category | Commands |
 |----------|----------|

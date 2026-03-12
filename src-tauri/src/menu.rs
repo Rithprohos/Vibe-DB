@@ -19,8 +19,12 @@ pub fn setup_menu(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let paste = PredefinedMenuItem::paste(app, None)?;
     let select_all = PredefinedMenuItem::select_all(app, None)?;
 
-    let app_submenu =
-        Submenu::with_items(app, "Vibe DB", true, &[&about, &separator, &check_updates, &separator, &quit])?;
+    let app_submenu = Submenu::with_items(
+        app,
+        "Vibe DB",
+        true,
+        &[&about, &separator, &check_updates, &separator, &quit],
+    )?;
     let edit_submenu = Submenu::with_items(
         app,
         "Edit",

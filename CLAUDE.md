@@ -30,7 +30,7 @@ bun run cargo:test   # Run Rust backend tests
 
 ### Frontend-Backend Communication
 
-Tauri commands are defined in `src-tauri/src/lib.rs` and wrapped in `src/lib/db.ts`:
+Tauri commands are registered in `src-tauri/src/lib.rs`, implemented under `src-tauri/src/commands/`, and wrapped in `src/lib/db.ts`:
 
 | Category | Commands |
 |----------|----------|
@@ -145,7 +145,8 @@ Key variables: `--bg-primary`, `--bg-secondary`, `--accent-primary` (#00e599 neo
 | `src/store/types.ts` | Shared store/domain types |
 | `src/store/constants.ts` | Store limits/defaults |
 | `src/lib/db.ts` | Tauri invoke wrappers |
-| `src-tauri/src/commands.rs` | Tauri command implementations |
+| `src-tauri/src/commands.rs` | Tauri command module root and re-exports |
+| `src-tauri/src/commands/*` | Tauri command implementations split by domain |
 | `src-tauri/src/lib.rs` | Tauri setup, plugins, command registration |
 | `src-tauri/src/engines/` | Database engine implementations |
 | `src/index.css` | CSS variables, themes (~1100 lines) |
