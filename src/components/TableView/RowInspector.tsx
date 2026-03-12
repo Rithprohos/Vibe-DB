@@ -4,7 +4,11 @@ import { formatCellValue } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { ColumnInfo } from '@/store/useAppStore';
-import { formatSqlValue, isJsonColumn, normalizeJsonInput } from '@/lib/sql-helpers';
+import {
+  isJsonColumn,
+  normalizeJsonInput,
+  parseStructuredColumnValue,
+} from '@/lib/sql-helpers';
 
 interface RowInspectorProps {
   isOpen: boolean;
@@ -118,10 +122,10 @@ export function RowInspector({
     }
 
     try {
-      formatSqlValue(valueToSave, columnInfo);
+      parseStructuredColumnValue(valueToSave, columnInfo);
       setEditorError('');
-    } catch (error: any) {
-      setEditorError(error.toString());
+    } catch (error: unknown) {
+      setEditorError(error instanceof Error ? error.message : String(error));
       return;
     }
 

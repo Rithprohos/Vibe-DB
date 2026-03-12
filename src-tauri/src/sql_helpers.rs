@@ -114,6 +114,7 @@ fn build_insert_statement(
 
 /// Builds an INSERT query for a single row.
 /// Returns the INSERT SQL statement.
+#[cfg(test)]
 pub fn build_insert_query(table_name: &str, row: &RowDataInput) -> Result<String, String> {
     let trimmed_table_name = validate_table_name(table_name)?;
     let quoted_table = quote_qualified_identifier(trimmed_table_name);

@@ -152,7 +152,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     error: newRowError,
     handleAddRow,
     handleDiscardNewRow,
-    getPendingInsertQuery,
+    handleSaveNewRow,
     setError: setNewRowError
   } = useNewRow(
     tableName,
@@ -309,30 +309,25 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       editingCell && !newRowData
         ? { rowIndex: editingCell.rowIndex, colName: editingCell.colName, value: editValue }
         : undefined;
-    let insertQueries: string[] = [];
-    if (newRowData) {
-      try {
-        const insertSql = getPendingInsertQuery();
-        if (insertSql) {
-          insertQueries = [insertSql];
-        }
-      } catch (e: any) {
-        setNewRowError(e.toString());
-        return;
-      }
+    let didCommit = false;
+
+    if (activeEdit || pendingEditCount > 0) {
+      didCommit = await handleCommitPendingEdits(activeEdit);
     }
 
-    const didCommit = await handleCommitPendingEdits(activeEdit, insertQueries);
-    if (!didCommit) return;
     if (newRowData) {
-      handleDiscardNewRow();
+      const didInsert = await handleSaveNewRow();
+      didCommit = didCommit || didInsert;
     }
+
+    if (!didCommit) return;
+
     if (commitFlashTimerRef.current) {
       window.clearTimeout(commitFlashTimerRef.current);
     }
     setCommitFlash(true);
     commitFlashTimerRef.current = window.setTimeout(() => setCommitFlash(false), 700);
-  }, [editingCell, newRowData, editValue, getPendingInsertQuery, handleCommitPendingEdits, handleDiscardNewRow, setNewRowError]);
+  }, [editValue, editingCell, handleCommitPendingEdits, handleSaveNewRow, newRowData, pendingEditCount]);
 
   const beginCellEdit = useCallback(
     async (rowIndex: number, colName: string, value: unknown) => {
@@ -551,7 +546,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       {/* Toolbar */}
       <div className="flex items-center justify-between p-2 border-b border-border bg-secondary/30 backdrop-blur-sm sticky top-0 z-30 min-h-[52px]">
         <div className="flex items-center space-x-2">
-          {!newRowData && !editingCell && (
+          {!newRowData && !editingCell && pendingEditCount === 0 && (
             <Button 
               variant="default" 
               size="sm" 

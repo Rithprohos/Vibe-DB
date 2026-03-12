@@ -1,6 +1,6 @@
 use crate::app_state::AppState;
 use crate::commands::get_connection_id;
-use crate::engines::{DatabaseEngine, QueryResult};
+use crate::engines::QueryResult;
 use crate::sql_helpers::{
     build_delete_queries, build_insert_queries, build_update_queries, RowDataInput,
     RowIdentifierInput, RowUpdateInput,

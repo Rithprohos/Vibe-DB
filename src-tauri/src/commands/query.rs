@@ -1,6 +1,6 @@
 use crate::app_state::AppState;
 use crate::commands::get_connection_id;
-use crate::engines::{DatabaseEngine, QueryResult};
+use crate::engines::QueryResult;
 use crate::sql_logging::emit_sql_log;
 use std::sync::Arc;
 use std::time::Instant;
