@@ -1,38 +1,44 @@
 #!/usr/bin/env bun
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const DEFAULT_BASE_URL = "https://gen.pollinations.ai";
 const DEFAULT_MODEL = "openai";
-const MAX_CHANGELOG_BYTES = Number.parseInt(
-  process.env.RELEASE_NOTES_CHANGELOG_MAX_BYTES ?? "24000",
-  10,
-);
 const MAX_PROMPT_CHARS = Number.parseInt(
   process.env.RELEASE_NOTES_PROMPT_MAX_CHARS ?? "12000",
   10,
 );
+
 const RELEASE_NOTES_SYSTEM_PROMPT = [
-  "You are a senior release engineer writing GitHub release notes in Markdown.",
-  "Write concise, factual notes for developers and power users.",
-  "Use only information from the provided changelog; do not invent features, fixes, or breaking changes.",
+  "You are a solo indie developer writing GitHub release notes in Markdown.",
+  "Use only the provided commit messages.",
+  "Summarize changes from feat, fix, and refactor commits only.",
+  "Ignore chore, docs, style, test, ci, build, perf, and merge commits unless a provided commit is explicitly typed as feat, fix, or refactor.",
+  "Do not invent features, fixes, or breaking changes.",
+  "Write like one person shipping fast, slightly unserious, but still clear.",
+  "Sound human, casual, and a little scrappy, not corporate.",
+  "Keep the wording concise and factual enough that users can still understand what changed.",
   "Style requirements:",
   "- Use clear section headings with emojis.",
   "- Use short bullet points with concrete outcomes.",
-  "- No code fences, no tables, no marketing fluff.",
+  "- A little personality is good; fluff is not.",
+  "- No code fences, no tables, no corporate marketing tone.",
 ].join("\n");
+
 const RELEASE_NOTES_USER_PROMPT_PREFIX = [
-  "Summarize this changelog into polished release notes.",
+  "Summarize these commit messages into polished GitHub release notes.",
   "Return Markdown only.",
   "Use these sections in order and omit empty ones:",
-  "## ✨ Highlights",
-  "## 🔧 Improvements",
+  "## ✨ Features",
   "## 🐛 Fixes",
-  "## 💥 Breaking Changes (only if explicitly present)",
-  "Keep it under 240 words.",
-  "Prefer 4-12 bullets total.",
-  "Include tasteful emojis in section titles and, when natural, in 1-2 bullets.",
+  "## ♻️ Refactors",
+  "## 💥 Breaking Changes (only if explicitly present with ! or BREAKING CHANGE)",
+  "Use only feat, fix, and refactor commits from the provided list.",
+  "Keep it under 220 words.",
+  "Prefer 3-10 bullets total.",
 ].join("\n");
 
 function trimTrailingSlashes(value) {
@@ -50,162 +56,184 @@ function buildChatCompletionsUrl(baseUrl) {
   return `${trimmed}/v1/chat/completions`;
 }
 
-function prepareChangelogForPrompt(changelogContent) {
-  const lines = changelogContent.split("\n");
-  const selected = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-
-    if (
-      trimmed.startsWith("#") ||
-      /^(\*\*Release Date:\*\*|Release Date:)/i.test(trimmed) ||
-      /^-\s+\[[xX ]\]\s+/.test(trimmed) ||
-      /^-\s+/.test(trimmed)
-    ) {
-      selected.push(trimmed);
-    }
-  }
-
-  const compact = selected.join("\n").trim();
-  const promptSource =
-    compact.length >= 200
-      ? compact
-      : changelogContent.trim();
-
-  return promptSource.slice(0, Math.max(400, MAX_PROMPT_CHARS));
+async function runGit(args) {
+  const { stdout } = await execFileAsync("git", args, {
+    cwd: process.cwd(),
+    maxBuffer: 1024 * 1024 * 4,
+  });
+  return stdout.trim();
 }
 
-function dedupePush(target, seen, value) {
-  const normalized = value.trim().replace(/\s+/g, " ");
-  if (!normalized) {
-    return;
+async function tagExists(tag) {
+  try {
+    await runGit(["rev-parse", "--verify", `refs/tags/${tag}`]);
+    return true;
+  } catch {
+    return false;
   }
-  const key = normalized.toLowerCase();
-  if (seen.has(key)) {
-    return;
-  }
-  seen.add(key);
-  target.push(normalized);
 }
 
-function classifyBullet(context, bullet) {
-  const text = `${context} ${bullet}`.toLowerCase();
-  if (/(breaking|deprecat|remove|removed|migration|incompatible)/.test(text)) {
-    return "breaking";
+async function getPreviousTag(tag) {
+  try {
+    const output = await runGit(["describe", "--tags", "--abbrev=0", `${tag}^`]);
+    return output || "";
+  } catch {
+    return "";
   }
-  if (/(fix|bug|error|issue|null|crash|rollback|syntax|correct)/.test(text)) {
-    return "fixes";
-  }
-  if (
-    /(improv|optimi|performance|support|add|new|enhance|refactor|ui|ux|editor|workflow|coverage|type)/.test(
-      text,
-    )
-  ) {
-    return "improvements";
-  }
-  return "highlights";
 }
 
-function buildLocalSummaryMarkdown(changelogContent) {
-  const lines = changelogContent.split("\n");
-  let headingContext = "";
-  const seen = new Set();
-  const categories = {
-    highlights: [],
-    improvements: [],
-    fixes: [],
-    breaking: [],
+function parseCommitSubject(subject) {
+  const trimmed = subject.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const conventionalMatch = trimmed.match(
+    /^(feat|fix|refactor)(\([^)]+\))?(!)?:\s+(.+)$/i,
+  );
+
+  if (!conventionalMatch) {
+    return null;
+  }
+
+  const [, rawType, scope = "", bang = "", description] = conventionalMatch;
+  const type = rawType.toLowerCase();
+  const normalizedDescription = description.trim().replace(/\s+/g, " ");
+  if (!normalizedDescription) {
+    return null;
+  }
+
+  return {
+    type,
+    scope,
+    description: normalizedDescription,
+    breaking: bang === "" ? /breaking change/i.test(trimmed) : true,
   };
+}
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-
-    const headingMatch = line.match(/^#{1,6}\s+(.+)$/);
-    if (headingMatch) {
-      headingContext = headingMatch[1].trim();
-      continue;
-    }
-
-    const taskMatch = line.match(/^-\s+\[[xX ]\]\s+(.+)$/);
-    const bulletMatch = line.match(/^-\s+(.+)$/);
-    const bullet = (taskMatch?.[1] ?? bulletMatch?.[1] ?? "").trim();
-    if (!bullet) {
-      continue;
-    }
-
-    const bucket = classifyBullet(headingContext, bullet);
-    dedupePush(categories[bucket], seen, bullet);
+async function getReleaseCommits(tag) {
+  const hasTag = await tagExists(tag);
+  if (!hasTag) {
+    throw new Error(`Tag ${tag} does not exist locally.`);
   }
 
-  const sectionDefs = [
-    { key: "highlights", title: "## ✨ Highlights" },
-    { key: "improvements", title: "## 🔧 Improvements" },
-    { key: "fixes", title: "## 🐛 Fixes" },
-    { key: "breaking", title: "## 💥 Breaking Changes" },
+  const previousTag = await getPreviousTag(tag);
+  const revisionRange = previousTag ? `${previousTag}..${tag}` : tag;
+  const logOutput = await runGit([
+    "log",
+    revisionRange,
+    "--no-merges",
+    "--pretty=format:%H%x09%s",
+  ]);
+
+  const seen = new Set();
+  const commits = logOutput
+    .split("\n")
+    .map((line) => {
+      const [hash = "", subject = ""] = line.split("\t");
+      const parsed = parseCommitSubject(subject);
+      if (!parsed) {
+        return null;
+      }
+
+      const dedupeKey = `${parsed.type}:${parsed.description.toLowerCase()}`;
+      if (seen.has(dedupeKey)) {
+        return null;
+      }
+      seen.add(dedupeKey);
+
+      return {
+        hash,
+        subject,
+        ...parsed,
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    previousTag,
+    revisionRange,
+    commits,
+  };
+}
+
+function stringifyCommitsForPrompt(commits) {
+  return commits
+    .map((commit) => {
+      const scope = commit.scope || "";
+      const breaking = commit.breaking ? " [breaking]" : "";
+      return `- ${commit.type}${scope}: ${commit.description}${breaking}`;
+    })
+    .join("\n")
+    .slice(0, Math.max(400, MAX_PROMPT_CHARS));
+}
+
+function toBulletText(commit) {
+  const scopeLabel = commit.scope
+    ? `${commit.scope.slice(1, -1)}: `
+    : "";
+  const text = `${scopeLabel}${commit.description}`;
+  return commit.breaking ? `${text} (breaking)` : text;
+}
+
+function buildLocalSummaryMarkdown(commits) {
+  const sections = [
+    { key: "feat", title: "## ✨ Features" },
+    { key: "fix", title: "## 🐛 Fixes" },
+    { key: "refactor", title: "## ♻️ Refactors" },
   ];
 
-  const output = [];
+  const lines = [];
   let totalBullets = 0;
 
-  for (const section of sectionDefs) {
-    const items = categories[section.key].slice(0, 4);
+  for (const section of sections) {
+    const items = commits.filter((commit) => commit.type === section.key).slice(0, 4);
     if (items.length === 0) {
       continue;
     }
-    output.push(section.title);
+
+    lines.push(section.title);
     for (const item of items) {
-      output.push(`- ${item}`);
+      lines.push(`- ${toBulletText(item)}`);
       totalBullets += 1;
-      if (totalBullets >= 12) {
-        break;
-      }
     }
-    if (totalBullets >= 12) {
-      break;
+    lines.push("");
+  }
+
+  const breakingCommits = commits.filter((commit) => commit.breaking).slice(0, 3);
+  if (breakingCommits.length > 0) {
+    lines.push("## 💥 Breaking Changes");
+    for (const item of breakingCommits) {
+      lines.push(`- ${toBulletText(item)}`);
+      totalBullets += 1;
     }
-    output.push("");
+    lines.push("");
   }
 
   if (totalBullets === 0) {
     return [
-      "## ✨ Highlights",
-      "- Internal updates were prepared for this release.",
+      "## ✨ Features",
+      "- No user-facing feat, fix, or refactor commits were found in this release range.",
       "",
     ].join("\n");
   }
 
-  return output.join("\n").trim();
+  return lines.join("\n").trim();
 }
 
-function buildFallbackBody(tag, changelogPath, changelogContent) {
+function buildFallbackBody(tag, previousTag, commits) {
+  const rangeLabel = previousTag ? `${previousTag}..${tag}` : tag;
   return [
     `# VibeDB ${tag}`,
     "",
-    `_Source: \`${changelogPath}\`_`,
+    `_Source: git log ${rangeLabel}_`,
     "",
-    buildLocalSummaryMarkdown(changelogContent),
+    buildLocalSummaryMarkdown(commits),
     "",
   ].join("\n");
 }
 
-function buildNoChangelogBody(tag, changelogPath) {
-  return [
-    `# VibeDB ${tag}`,
-    "",
-    `No changelog file found at \`${changelogPath}\`.`,
-    "See the assets to download and install this version.",
-    "",
-  ].join("\n");
-}
-
-async function summarizeWithPollinations({ tag, changelogContent }) {
+async function summarizeWithPollinations({ tag, previousTag, commits }) {
   const baseUrl = process.env.POLLINATIONS_BASE_URL ?? DEFAULT_BASE_URL;
   const model = process.env.POLLINATIONS_MODEL ?? DEFAULT_MODEL;
   const apiKey = (process.env.POLLINATIONS_API_KEY ?? "").trim();
@@ -222,10 +250,11 @@ async function summarizeWithPollinations({ tag, changelogContent }) {
         role: "user",
         content: [
           `Version tag: ${tag}`,
+          `Previous tag: ${previousTag || "none"}`,
           RELEASE_NOTES_USER_PROMPT_PREFIX,
           "",
-          "Changelog content:",
-          changelogContent,
+          "Commit messages:",
+          stringifyCommitsForPrompt(commits),
         ].join("\n"),
       },
     ],
@@ -266,7 +295,6 @@ async function summarizeWithPollinations({ tag, changelogContent }) {
     return firstAttempt;
   }
 
-  // Retry once with simpler constraints if provider returns a structurally valid but empty answer.
   const retryPayload = {
     ...payload,
     messages: [
@@ -275,13 +303,14 @@ async function summarizeWithPollinations({ tag, changelogContent }) {
         role: "user",
         content: [
           `Version tag: ${tag}`,
-          "Write short GitHub release notes in Markdown for this changelog.",
-          "Use: ## ✨ Highlights, ## 🔧 Improvements, ## 🐛 Fixes.",
+          "Write short GitHub release notes in Markdown from these commit messages.",
+          "Use only feat, fix, and refactor entries.",
+          "Use: ## ✨ Features, ## 🐛 Fixes, ## ♻️ Refactors.",
           "If a section is empty, omit it.",
           "Keep under 180 words.",
           "",
-          "Changelog content:",
-          changelogContent,
+          "Commit messages:",
+          stringifyCommitsForPrompt(commits),
         ].join("\n"),
       },
     ],
@@ -302,7 +331,6 @@ function extractSummaryFromCompletion(data) {
     return "";
   }
 
-  // OpenAI-compatible: choices[0].message.content is a string.
   if (typeof choice?.message?.content === "string") {
     const text = choice.message.content.trim();
     if (text) {
@@ -325,7 +353,6 @@ function extractSummaryFromCompletion(data) {
     }
   }
 
-  // Some providers return content parts.
   if (Array.isArray(choice?.message?.content)) {
     const text = choice.message.content
       .map((part) => {
@@ -347,12 +374,10 @@ function extractSummaryFromCompletion(data) {
     }
   }
 
-  // Legacy completion-style response.
   if (typeof choice?.text === "string") {
     return choice.text.trim();
   }
 
-  // Rare providers may emit top-level output text arrays.
   if (Array.isArray(data?.output_text)) {
     const text = data.output_text.join("\n").trim();
     if (text) {
@@ -418,31 +443,24 @@ async function main() {
     process.exit(1);
   }
 
-  const changelogPath = `changelog/${tag}.md`;
-  const absolutePath = resolve(process.cwd(), changelogPath);
+  const { previousTag, commits } = await getReleaseCommits(tag);
 
-  let changelogBuffer;
-  try {
-    changelogBuffer = await readFile(absolutePath);
-  } catch {
-    process.stdout.write(buildNoChangelogBody(tag, changelogPath));
+  if (commits.length === 0) {
+    process.stdout.write(buildFallbackBody(tag, previousTag, commits));
     return;
   }
-
-  const truncated = changelogBuffer.subarray(0, Math.max(1, MAX_CHANGELOG_BYTES));
-  const changelogContent = truncated.toString("utf8");
-  const aiPromptChangelog = prepareChangelogForPrompt(changelogContent);
 
   let body;
   try {
     const summary = await summarizeWithPollinations({
       tag,
-      changelogContent: aiPromptChangelog,
+      previousTag,
+      commits,
     });
     body = [
       `# VibeDB ${tag}`,
       "",
-      `_Source: \`${changelogPath}\`_`,
+      `_Source: git log ${previousTag ? `${previousTag}..${tag}` : tag}_`,
       "",
       summary,
       "",
@@ -453,7 +471,7 @@ async function main() {
       `::warning::Pollinations summary failed for ${tag}. Falling back to local summary.`,
     );
     console.error(message);
-    body = buildFallbackBody(tag, changelogPath, changelogContent);
+    body = buildFallbackBody(tag, previousTag, commits);
   }
 
   process.stdout.write(body);
