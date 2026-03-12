@@ -1,13 +1,10 @@
 import { useMemo, useState } from "react";
-import { executeTransaction } from "@/lib/db";
+import { updateRows, type RowUpdateInput } from "@/lib/db";
 import type { ColumnInfo } from "@/store/useAppStore";
 import {
-  escapeSqlString,
-  formatSqlValue,
   isJsonColumn,
   normalizeJsonInput,
-  quoteIdentifier,
-  quoteTableName,
+  parseStructuredColumnValue,
 } from "@/lib/sql-helpers";
 import { stringifyCellValue } from "@/lib/formatters";
 
@@ -56,15 +53,6 @@ const normalizeEditedValueForColumn = (
   }
 };
 
-const buildWhereClause = (row: Record<string, unknown>, pks: ColumnInfo[]): string =>
-  pks
-    .map((pk) => {
-      const val = row[pk.name];
-      if (val === null || val === undefined) return `${quoteIdentifier(pk.name)} IS NULL`;
-      if (typeof val === "number") return `${quoteIdentifier(pk.name)} = ${val}`;
-      return `${quoteIdentifier(pk.name)} = '${escapeSqlString(String(val))}'`;
-    })
-    .join(" AND ");
 
 export const useCellEditing = (
   tableName: string,
@@ -78,6 +66,13 @@ export const useCellEditing = (
   const [pendingEdits, setPendingEdits] = useState<PendingCellEdits>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const columnInfoByName = useMemo(() => {
+    const map: Record<string, ColumnInfo> = {};
+    structure.forEach((column) => {
+      map[column.name] = column;
+    });
+    return map;
+  }, [structure]);
 
   const pendingEditCount = useMemo(
     () => Object.keys(pendingEdits).length,
@@ -133,17 +128,21 @@ export const useCellEditing = (
     colName: string,
     valueToSave: string,
   ) => {
-    const columnInfo = structure.find((c) => c.name === colName);
+    const columnInfo = columnInfoByName[colName];
     const normalizedValue = normalizeEditedValueForColumn(valueToSave, columnInfo);
 
     try {
-      formatSqlValue(normalizedValue, columnInfo);
-      stageCellEdit(rowIndex, colName, normalizedValue);
-      setError("");
-      setEditingCell(null);
-    } catch (e: any) {
-      setError(e.toString());
+      parseStructuredColumnValue(normalizedValue, columnInfo);
+    } catch (errorValue: unknown) {
+      setError(
+        errorValue instanceof Error ? errorValue.message : String(errorValue),
+      );
+      return;
     }
+
+    stageCellEdit(rowIndex, colName, normalizedValue);
+    setError("");
+    setEditingCell(null);
   };
 
   const discardPendingCellEdit = (rowIndex: number, colName: string) => {
@@ -173,7 +172,7 @@ export const useCellEditing = (
     }
 
     const key = getCellKey(activeEdit.rowIndex, activeEdit.colName);
-    const columnInfo = structure.find((c) => c.name === activeEdit.colName);
+    const columnInfo = columnInfoByName[activeEdit.colName];
     const originalValue = row[activeEdit.colName];
     const normalizedOriginal = normalizeValue(originalValue);
     const normalizedActiveValue = normalizeEditedValueForColumn(
@@ -200,12 +199,11 @@ export const useCellEditing = (
 
   const handleCommitPendingEdits = async (
     activeEdit?: ActiveEditPayload,
-    additionalQueries: string[] = [],
   ): Promise<boolean> => {
     if (!activeConnection?.connId) return false;
 
     const workingEdits = buildWorkingEdits(activeEdit);
-    if (Object.keys(workingEdits).length === 0 && additionalQueries.length === 0) {
+    if (Object.keys(workingEdits).length === 0) {
       return false;
     }
 
@@ -220,7 +218,6 @@ export const useCellEditing = (
         groupedByRow.set(edit.rowIndex, rowEdits);
       });
 
-      const updateQueries: string[] = [];
       const pks = structure.filter((c) => c.pk);
       if (groupedByRow.size > 0 && pks.length === 0) {
         throw new Error(
@@ -228,35 +225,43 @@ export const useCellEditing = (
         );
       }
 
+      // Build RowUpdateInput for backend SQL generation
+      const rowUpdates: RowUpdateInput[] = [];
       for (const [rowIndex, edits] of groupedByRow.entries()) {
         const row = tableData[rowIndex];
         if (!row) {
           throw new Error("Unable to resolve row for pending edit");
         }
 
-        const setClause = edits
-          .map((edit) => {
-            const columnInfo = structure.find((c) => c.name === edit.colName);
-            const formattedValue = formatSqlValue(edit.newValue, columnInfo);
-            return `${quoteIdentifier(edit.colName)} = ${formattedValue}`;
-          })
-          .join(", ");
+        // Build row_data (changes to apply)
+        const rowData: Record<string, unknown> = {};
+        for (const edit of edits) {
+          const columnInfo = columnInfoByName[edit.colName];
+          rowData[edit.colName] = parseStructuredColumnValue(
+            edit.newValue,
+            columnInfo,
+          );
+        }
 
-        const whereClause = buildWhereClause(row, pks);
-        updateQueries.push(
-          `UPDATE ${quoteTableName(tableName)} SET ${setClause} WHERE ${whereClause};`,
-        );
+        // Build identifier (primary key values from original row)
+        const identifier: Record<string, unknown> = {};
+        for (const pk of pks) {
+          identifier[pk.name] = row[pk.name];
+        }
+
+        rowUpdates.push({ rowData, identifier });
       }
 
-      const allQueries = [...additionalQueries, ...updateQueries];
-      await executeTransaction(allQueries, activeConnection.connId);
+      await updateRows(tableName, rowUpdates, activeConnection.connId);
       setPendingEdits({});
       setEditingCell(null);
       setEditValue("");
       await fetchData();
       return true;
-    } catch (e: any) {
-      setError(e.toString());
+    } catch (errorValue: unknown) {
+      setError(
+        errorValue instanceof Error ? errorValue.message : String(errorValue),
+      );
       return false;
     } finally {
       setSaving(false);

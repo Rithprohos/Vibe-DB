@@ -110,8 +110,8 @@ Move SQL query building from frontend to backend for security and cleaner archit
 
 - [x] Add `update_rows` command - Accept table name + column changes, build UPDATE queries in Rust
 - [x] Add `insert_rows` command - Accept table name + row data, build INSERT queries in Rust
-- [ ] Deprecate frontend SQL builders (`buildWhereClause`, `buildDeleteQueries`, etc.)
-- [ ] Frontend becomes "UI only" - sends structured data, receives results
+- [x] Deprecate frontend SQL builders (`buildWhereClause`, `buildDeleteQueries`, etc.)
+- [x] Frontend becomes "UI only" - sends structured data, receives results
 
 **AI Panel Improvements**
 
