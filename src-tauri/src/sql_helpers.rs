@@ -23,6 +23,17 @@ pub struct RowDataInput {
     pub row_data: serde_json::Map<String, serde_json::Value>,
 }
 
+/// Input for updating a row.
+/// Contains the new column values and the identifier to locate the row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RowUpdateInput {
+    /// Column name to value mapping for the updated values
+    pub row_data: serde_json::Map<String, serde_json::Value>,
+    /// Column name to value mapping to identify the row (primary key or all columns)
+    pub identifier: serde_json::Map<String, serde_json::Value>,
+}
+
 fn validate_table_name(table_name: &str) -> Result<&str, String> {
     let trimmed_table_name = table_name.trim();
     if trimmed_table_name.is_empty() {
@@ -38,7 +49,7 @@ fn validate_table_name(table_name: &str) -> Result<&str, String> {
     Ok(trimmed_table_name)
 }
 
-fn format_insert_value(value: &serde_json::Value) -> String {
+fn format_sql_value(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::Null => "NULL".to_string(),
         serde_json::Value::Number(number) => number.to_string(),
@@ -68,7 +79,7 @@ fn normalize_insert_row(row: &RowDataInput) -> Result<(Vec<String>, Vec<String>)
         if !seen_columns.insert(trimmed_column_name.to_string()) {
             return Err(format!("Duplicate column name: \"{trimmed_column_name}\""));
         }
-        entries.push((trimmed_column_name.to_string(), format_insert_value(value)));
+        entries.push((trimmed_column_name.to_string(), format_sql_value(value)));
     }
 
     entries.sort_unstable_by(|left, right| left.0.cmp(&right.0));
@@ -249,6 +260,70 @@ pub fn build_delete_queries(
             Ok(format!(
                 "DELETE FROM {} WHERE {};",
                 quoted_table, where_clause
+            ))
+        })
+        .collect()
+}
+
+fn normalize_update_row(
+    row: &RowUpdateInput,
+    columns: &[ColumnInfo],
+) -> Result<Vec<String>, String> {
+    if row.row_data.is_empty() {
+        return Err("No columns to update".to_string());
+    }
+
+    let valid_columns: HashSet<&str> = columns.iter().map(|column| column.name.as_str()).collect();
+    let mut seen_columns = BTreeSet::new();
+    let mut assignments = Vec::with_capacity(row.row_data.len());
+
+    for (column_name, value) in &row.row_data {
+        let trimmed_column_name = column_name.trim();
+        if trimmed_column_name.is_empty() {
+            return Err("Column name is required".to_string());
+        }
+        if !valid_columns.contains(trimmed_column_name) {
+            return Err(format!("Unknown column '{trimmed_column_name}'"));
+        }
+        if !seen_columns.insert(trimmed_column_name.to_string()) {
+            return Err(format!("Duplicate column name: \"{trimmed_column_name}\""));
+        }
+
+        assignments.push(format!(
+            "{} = {}",
+            quote_identifier(trimmed_column_name),
+            format_sql_value(value)
+        ));
+    }
+
+    assignments.sort_unstable();
+    Ok(assignments)
+}
+
+/// Builds UPDATE queries for selected rows.
+/// Returns a vector of UPDATE SQL statements.
+pub fn build_update_queries(
+    table_name: &str,
+    rows: &[RowUpdateInput],
+    columns: &[ColumnInfo],
+) -> Result<Vec<String>, String> {
+    if rows.is_empty() {
+        return Err("No rows provided for update".to_string());
+    }
+
+    let trimmed_table_name = validate_table_name(table_name)?;
+    let quoted_table = quote_qualified_identifier(trimmed_table_name);
+
+    rows.iter()
+        .map(|row| {
+            let set_clauses = normalize_update_row(row, columns)?;
+            let where_clause = build_where_clause_for_row(&row.identifier, columns)?;
+
+            Ok(format!(
+                "UPDATE {} SET {} WHERE {};",
+                quoted_table,
+                set_clauses.join(", "),
+                where_clause
             ))
         })
         .collect()

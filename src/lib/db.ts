@@ -65,6 +65,11 @@ export interface RowDataInput {
   rowData: Record<string, unknown>;
 }
 
+export interface RowUpdateInput {
+  rowData: Record<string, unknown>;
+  identifier: Record<string, unknown>;
+}
+
 export async function insertRows(
   tableName: string,
   rows: RowDataInput[],
@@ -82,6 +87,16 @@ export async function deleteRows(
 ): Promise<QueryResult> {
   return measureDevFetch("delete_rows", () =>
     invoke<QueryResult>("delete_rows", { tableName, rows, connId }),
+  );
+}
+
+export async function updateRows(
+  tableName: string,
+  rows: RowUpdateInput[],
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("update_rows", () =>
+    invoke<QueryResult>("update_rows", { tableName, rows, connId }),
   );
 }
 

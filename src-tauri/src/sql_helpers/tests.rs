@@ -1,7 +1,8 @@
 use super::{
     build_create_table_sql, build_create_view_sql, build_delete_queries, build_insert_queries,
-    build_insert_query, build_where_clause_for_row, quote_qualified_identifier,
-    CreateTableColumnInput, RowDataInput, RowIdentifierInput,
+    build_insert_query, build_update_queries, build_where_clause_for_row,
+    quote_qualified_identifier, CreateTableColumnInput, RowDataInput, RowIdentifierInput,
+    RowUpdateInput,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -33,6 +34,22 @@ fn test_row_data(value: serde_json::Value) -> RowDataInput {
         .expect("test row data should be a JSON object");
 
     RowDataInput { row_data }
+}
+
+fn test_row_update(row_data: serde_json::Value, identifier: serde_json::Value) -> RowUpdateInput {
+    let row_data = row_data
+        .as_object()
+        .cloned()
+        .expect("test row update data should be a JSON object");
+    let identifier = identifier
+        .as_object()
+        .cloned()
+        .expect("test row update identifier should be a JSON object");
+
+    RowUpdateInput {
+        row_data,
+        identifier,
+    }
 }
 
 #[test]
@@ -515,6 +532,66 @@ fn build_insert_queries_splits_when_column_sets_change() {
     assert_eq!(
         queries[1],
         "INSERT INTO \"users\" (\"email\", \"id\") VALUES ('bob@example.com', 2);"
+    );
+}
+
+#[test]
+fn build_update_queries_rejects_empty_rows() {
+    let rows: Vec<RowUpdateInput> = vec![];
+    let columns = vec![test_column("id", "INTEGER", true)];
+
+    let error =
+        build_update_queries("users", &rows, &columns).expect_err("expected empty rows error");
+
+    assert_eq!(error, "No rows provided for update");
+}
+
+#[test]
+fn build_update_queries_rejects_unknown_columns() {
+    let rows = vec![test_row_update(
+        json!({ "missing": "Alice" }),
+        json!({ "id": 1 }),
+    )];
+    let columns = vec![
+        test_column("id", "INTEGER", true),
+        test_column("name", "TEXT", false),
+    ];
+
+    let error =
+        build_update_queries("users", &rows, &columns).expect_err("expected unknown column error");
+
+    assert_eq!(error, "Unknown column 'missing'");
+}
+
+#[test]
+fn build_update_queries_generates_quoted_update_statements() {
+    let rows = vec![
+        test_row_update(
+            json!({ "name": "Alice", "active": true }),
+            json!({ "id": 1 }),
+        ),
+        test_row_update(
+            json!({ "name": "Bob", "active": false }),
+            json!({ "id": 2 }),
+        ),
+    ];
+    let columns = vec![
+        test_column("id", "INTEGER", true),
+        test_column("name", "TEXT", false),
+        test_column("active", "BOOLEAN", false),
+    ];
+
+    let queries =
+        build_update_queries("main.users", &rows, &columns).expect("expected update queries");
+
+    assert_eq!(
+        queries,
+        vec![
+            "UPDATE \"main\".\"users\" SET \"active\" = true, \"name\" = 'Alice' WHERE \"id\" = 1;"
+                .to_string(),
+            "UPDATE \"main\".\"users\" SET \"active\" = false, \"name\" = 'Bob' WHERE \"id\" = 2;"
+                .to_string(),
+        ]
     );
 }
 
