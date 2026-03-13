@@ -126,6 +126,14 @@ SQL query building has been moved to the Rust backend. See [`changelog/v0.4.6.md
 
 **Performance & UI Polish**
 
+- [x] Global quick search (`Cmd/Ctrl+K`) for active-connection tables
+  - Implemented dense command-palette UI with keyboard-first navigation
+  - Reused loaded sidebar metadata only; no backend fetch on open
+  - Added top-bar quick-search trigger next to settings
+  - Moved ranking/filtering into a pure helper module
+  - Added deferred query filtering and virtualized result rendering for large table lists
+  - Added focused Bun coverage for search normalization, ranking, schema matching, and limits
+
 - [ ] Tune virtualization overscan and estimated row heights per view
 - [ ] Replace TableView spacer-row virtualization with absolutely positioned rows
 - [ ] Add QueryEditor performance pass (syntax highlight + memoized parse path)
@@ -140,6 +148,14 @@ SQL query building has been moved to the Rust backend. See [`changelog/v0.4.6.md
 - [ ] Keep metadata fetches separate from row fetches
 - [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
 - [ ] Expand Rust-side command timing instrumentation
+
+**Keep Watching**
+
+- Quick search is still an in-memory O(n) scan over loaded table metadata; if very large schemas become common, move indexing/search work to a worker before adding more scoring complexity
+- Keep the quick-search result rows virtualized and avoid reintroducing per-row expensive formatting inside render
+- Watch combobox/listbox accessibility behavior as the palette gains recents, saved queries, or secondary actions
+- Do not add backend metadata fetches on palette open; keep table search instant and derived from existing state
+- If fuzzy ranking is added later, benchmark it first and gate it behind a simple helper instead of embedding it back into the component
 
 **Security & Infrastructure**
 

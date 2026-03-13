@@ -16,6 +16,7 @@ import StatusBar from './components/StatusBar';
 import WelcomeScreen from './components/WelcomeScreen';
 import EmptyTabScreen from './components/EmptyTabScreen';
 import TopBar from './components/TopBar';
+import QuickSearch from './components/QuickSearch';
 import { useDevRenderCounter } from './lib/dev-performance';
 import './index.css';
 
@@ -437,6 +438,7 @@ export default function App() {
   const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
   const showSettingsModal = useAppStore(s => s.showSettingsModal);
   const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
+  const setIsQuickSearchOpen = useAppStore(s => s.setIsQuickSearchOpen);
   const setShowConnectionDialog = useAppStore(s => s.setShowConnectionDialog);
   const closeTab = useAppStore(s => s.closeTab);
   const [hasLoadedLogDrawer, setHasLoadedLogDrawer] = useState(() => useAppStore.getState().showLogDrawer);
@@ -490,16 +492,20 @@ export default function App() {
       }
 
       const isMod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
       
-      if (isMod && e.key === 'n') {
+      if (isMod && key === 'k') {
+        e.preventDefault();
+        setIsQuickSearchOpen(true);
+      } else if (isMod && key === 'n') {
         e.preventDefault();
         setShowConnectionDialog(true);
-      } else if (isMod && e.key === 'w') {
+      } else if (isMod && key === 'w') {
         if (activeTabId) {
           e.preventDefault();
           closeTab(activeTabId);
         }
-      } else if (isMod && e.key === 't') {
+      } else if (isMod && key === 't') {
         e.preventDefault();
         const id = `query-${Date.now()}`;
         addTab({
@@ -509,10 +515,10 @@ export default function App() {
           title: 'New Query',
           query: '-- New Query Tab\n',
         });
-      } else if (isMod && e.key === 'l') {
+      } else if (isMod && key === 'l') {
         e.preventDefault();
         setShowLogDrawer((prev) => !prev);
-      } else if (isMod && e.key === ',') {
+      } else if (isMod && key === ',') {
         e.preventDefault();
         setShowSettingsModal(true);
       }
@@ -520,7 +526,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, activeSidebarConnectionId, setShowConnectionDialog, closeTab, addTab, setShowLogDrawer, setShowSettingsModal]);
+  }, [activeTabId, activeSidebarConnectionId, setShowConnectionDialog, closeTab, addTab, setShowLogDrawer, setShowSettingsModal, setIsQuickSearchOpen]);
 
   useEffect(() => {
     if (showLogDrawer) {
@@ -614,6 +620,7 @@ export default function App() {
         </Suspense>
       </div>
       <StatusBar />
+      <QuickSearch />
       {showConnectionDialog && (
         <Suspense fallback={null}>
           <ConnectionDialog />

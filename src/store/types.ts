@@ -201,6 +201,7 @@ export interface AppState {
 
   // Settings Modal
   showSettingsModal: boolean;
+  isQuickSearchOpen: boolean;
 
   // Alert Modal
   alertOptions: AlertOptions | null;
@@ -272,6 +273,7 @@ export interface AppState {
   clearLogs: () => void;
   setShowLogDrawer: (val: BooleanSetter) => void;
   setShowSettingsModal: (val: boolean) => void;
+  setIsQuickSearchOpen: (val: BooleanSetter) => void;
   saveQuery: (input: {
     id?: string;
     name: string;

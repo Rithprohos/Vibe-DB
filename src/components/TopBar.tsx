@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Settings, Sparkles } from 'lucide-react';
+import { Search, Settings, Sparkles } from 'lucide-react';
 
 function formatDatabaseVersion(version: string): string {
   const trimmed = version.trim();
@@ -31,6 +31,7 @@ export default function TopBar() {
   const isAiPanelOpen = useAppStore(s => s.isAiPanelOpen);
   const setIsAiPanelOpen = useAppStore(s => s.setIsAiPanelOpen);
   const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
+  const setIsQuickSearchOpen = useAppStore(s => s.setIsQuickSearchOpen);
   const tabs = useAppStore(s => s.tabs);
   const activeTabId = useAppStore(s => s.activeTabId);
 
@@ -49,6 +50,10 @@ export default function TopBar() {
   const openSettings = useCallback(
     () => setShowSettingsModal(true),
     [setShowSettingsModal]
+  );
+  const openQuickSearch = useCallback(
+    () => setIsQuickSearchOpen(true),
+    [setIsQuickSearchOpen]
   );
   const versionBadge = useMemo(
     () => (databaseVersion ? formatDatabaseVersion(databaseVersion) : ''),
@@ -95,6 +100,14 @@ export default function TopBar() {
             AI Chat
           </button>
         )}
+        <button
+          onClick={openQuickSearch}
+          className="p-1.5 rounded hover:bg-secondary transition-colors"
+          title="Quick Search"
+          aria-label="Open quick search"
+        >
+          <Search size={15} />
+        </button>
         <button 
           onClick={openSettings}
           className="p-1.5 rounded hover:bg-secondary transition-colors"
