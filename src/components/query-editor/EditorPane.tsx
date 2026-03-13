@@ -2,7 +2,7 @@ import { memo, type PointerEvent as ReactPointerEvent, type RefObject } from 're
 import type { Extension } from '@codemirror/state';
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
-import { Loader2, Play, WrapText } from 'lucide-react';
+import { Copy, Loader2, Play, Save, WrapText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,12 +13,16 @@ interface QueryEditorPaneProps {
   editorHeight: number;
   isResizing: boolean;
   canRun: boolean;
+  canSave: boolean;
   running: boolean;
+  saveButtonLabel: string;
   query: string;
   editorExtensions: Extension[];
   wrapEditor: boolean;
   basicSetup: Record<string, boolean>;
   onRun: () => void;
+  onSave: () => void;
+  onSaveAs: () => void;
   onToggleWrapEditor: () => void;
   onQueryChange: (value: string) => void;
   onPointerDownResizer: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -30,12 +34,16 @@ export const QueryEditorPane = memo(function QueryEditorPane({
   editorHeight,
   isResizing,
   canRun,
+  canSave,
   running,
+  saveButtonLabel,
   query,
   editorExtensions,
   wrapEditor,
   basicSetup,
   onRun,
+  onSave,
+  onSaveAs,
   onToggleWrapEditor,
   onQueryChange,
   onPointerDownResizer,
@@ -47,15 +55,39 @@ export const QueryEditorPane = memo(function QueryEditorPane({
       style={{ height: editorHeight, minHeight: 100 }}
     >
       <div className="relative z-10 flex items-center justify-between px-4 h-12 border-b border-border bg-secondary/30 backdrop-blur-sm">
-        <Button
-          size="sm"
-          onClick={onRun}
-          disabled={!canRun}
-          className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-        >
-          {running ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Play size={14} className="mr-2" />}
-          {running ? 'Running...' : 'Run Query'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={onRun}
+            disabled={!canRun}
+            className="h-8 shadow-glow bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+          >
+            {running ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Play size={14} className="mr-2" />}
+            {running ? 'Running...' : 'Run Query'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onSave}
+            disabled={!canSave}
+            className="h-8 border-border/60 bg-background/70"
+          >
+            <Save size={14} className="mr-2" />
+            {saveButtonLabel}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onSaveAs}
+            disabled={!canSave}
+            className="h-8 text-muted-foreground hover:text-foreground"
+          >
+            <Copy size={14} className="mr-2" />
+            Save As
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -72,6 +104,9 @@ export const QueryEditorPane = memo(function QueryEditorPane({
           </Button>
           <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
             ⌘ + Enter
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+            ⌘ + S
           </span>
         </div>
       </div>

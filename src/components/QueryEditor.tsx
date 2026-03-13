@@ -4,12 +4,14 @@ import { Prec } from '@codemirror/state';
 import { sql } from '@codemirror/lang-sql';
 
 import { executeQuery, listTables } from '../lib/db';
+import { buildSavedQueryDefaultName } from '@/lib/savedQueries';
 import { useDevRenderCounter } from '@/lib/dev-performance';
 import { useAppStore, MAX_RESULT_ROWS } from '../store/useAppStore';
 
 import { QueryEditorPane } from './query-editor/EditorPane';
 import { QueryResultsPane } from './query-editor/ResultsPane';
 import { isEditorViewLike, type EditorViewLike, type SelectedCell } from './query-editor/types';
+import SavedQueryDialog, { type SavedQueryDialogMode } from './SavedQueryDialog';
 
 interface Props {
   tabId: string;
@@ -18,6 +20,12 @@ interface Props {
 const EMPTY_ARRAY: any[] = [];
 const MIN_EDITOR_HEIGHT = 120;
 const MIN_RESULTS_HEIGHT = 180;
+
+interface SaveDialogState {
+  open: boolean;
+  mode: SavedQueryDialogMode;
+  initialName: string;
+}
 
 const BASIC_SETUP = {
   lineNumbers: true,
@@ -44,10 +52,19 @@ const BASIC_SETUP = {
 const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   useDevRenderCounter('QueryEditor', tabId);
   const connectionId = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.connectionId ?? '', [tabId]));
+  const title = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.title ?? '', [tabId]));
   const query = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.query ?? '', [tabId]));
   const result = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.result ?? null, [tabId]));
   const error = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.error ?? '', [tabId]));
+  const savedQueryId = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.savedQueryId ?? null, [tabId]));
   const activeConnection = useAppStore(useCallback(s => s.connections.find(c => c.id === connectionId), [connectionId]));
+  const linkedSavedQuery = useAppStore(
+    useCallback(
+      s => (savedQueryId ? s.savedQueries.find(savedQuery => savedQuery.id === savedQueryId) ?? null : null),
+      [savedQueryId],
+    ),
+  );
+  const showToast = useAppStore(s => s.showToast);
   const tablesOptions = useAppStore(useCallback(s => s.tablesByConnection[connectionId], [connectionId]));
   const tables = tablesOptions || EMPTY_ARRAY;
 
@@ -58,6 +75,11 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [wrapEditor, setWrapEditor] = useState(false);
   const [wrapCells, setWrapCells] = useState(false);
+  const [saveDialogState, setSaveDialogState] = useState<SaveDialogState>({
+    open: false,
+    mode: 'create',
+    initialName: '',
+  });
   const rootRef = useRef<HTMLDivElement>(null);
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
@@ -84,6 +106,95 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
 
   const activeConnectionId = activeConnection?.id;
   const activeConnectionConnId = activeConnection?.connId;
+  const saveButtonLabel = linkedSavedQuery ? 'Update' : 'Save';
+  const canSave = !running;
+
+  const openSaveDialog = useCallback((mode: SavedQueryDialogMode) => {
+    const store = useAppStore.getState();
+    const currentTab = store.tabs.find(tab => tab.id === tabId);
+    setSaveDialogState({
+      open: true,
+      mode,
+      initialName: buildSavedQueryDefaultName(currentTab?.savedQueryName ?? currentTab?.title ?? title),
+    });
+  }, [tabId, title]);
+
+  const handleUpdateSavedQuery = useCallback(() => {
+    const store = useAppStore.getState();
+    const currentTab = store.tabs.find(tab => tab.id === tabId);
+    if (!currentTab) return;
+
+    const currentSavedQuery = currentTab.savedQueryId
+      ? store.savedQueries.find(savedQuery => savedQuery.id === currentTab.savedQueryId)
+      : null;
+
+    if (!currentSavedQuery) {
+      openSaveDialog('create');
+      return;
+    }
+
+    try {
+      const nextSavedQuery = store.saveQuery({
+        id: currentSavedQuery.id,
+        name: currentSavedQuery.name,
+        sql: currentTab.query ?? '',
+        connectionId: currentTab.connectionId,
+      });
+      store.updateTab(tabId, {
+        savedQueryId: nextSavedQuery.id,
+        savedQueryName: nextSavedQuery.name,
+        title: nextSavedQuery.name,
+      });
+      showToast({ type: 'success', message: 'Saved query updated' });
+    } catch (errorValue) {
+      showToast({
+        type: 'error',
+        message: errorValue instanceof Error ? errorValue.message : 'Unable to update saved query',
+      });
+    }
+  }, [openSaveDialog, showToast, tabId]);
+
+  const handleSave = useCallback(() => {
+    if (linkedSavedQuery) {
+      handleUpdateSavedQuery();
+      return;
+    }
+
+    openSaveDialog('create');
+  }, [handleUpdateSavedQuery, linkedSavedQuery, openSaveDialog]);
+
+  const handleSaveAs = useCallback(() => {
+    openSaveDialog('save-as');
+  }, [openSaveDialog]);
+
+  const handleSubmitSaveDialog = useCallback(async ({
+    name,
+  }: {
+    name: string;
+  }) => {
+    const store = useAppStore.getState();
+    const currentTab = store.tabs.find(tab => tab.id === tabId);
+    if (!currentTab) {
+      throw new Error('Query tab no longer exists');
+    }
+
+    const savedQuery = store.saveQuery({
+      name,
+      sql: currentTab.query ?? '',
+      connectionId: currentTab.connectionId,
+    });
+
+    store.updateTab(tabId, {
+      savedQueryId: savedQuery.id,
+      savedQueryName: savedQuery.name,
+      title: savedQuery.name,
+    });
+
+    showToast({
+      type: 'success',
+      message: saveDialogState.mode === 'save-as' ? 'Saved as a new query' : 'Query saved',
+    });
+  }, [saveDialogState.mode, showToast, tabId]);
 
   const scheduleEditorHeight = useCallback((nextHeight: number) => {
     currentHeightRef.current = nextHeight;
@@ -213,6 +324,10 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
 
   const handleRunRef = useRef(handleRun);
   handleRunRef.current = handleRun;
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+  const handleSaveAsRef = useRef(handleSaveAs);
+  handleSaveAsRef.current = handleSaveAs;
 
   const runKeymap = useMemo(
     () =>
@@ -222,6 +337,22 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
             key: 'Mod-Enter',
             run: (view) => {
               handleRunRef.current(view);
+              return true;
+            },
+          },
+          {
+            key: 'Mod-s',
+            preventDefault: true,
+            run: () => {
+              handleSaveRef.current();
+              return true;
+            },
+          },
+          {
+            key: 'Mod-Shift-s',
+            preventDefault: true,
+            run: () => {
+              handleSaveAsRef.current();
               return true;
             },
           },
@@ -245,12 +376,16 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         editorHeight={editorHeight}
         isResizing={isResizing}
         canRun={canRun}
+        canSave={canSave}
         running={running}
+        saveButtonLabel={saveButtonLabel}
         query={query}
         editorExtensions={editorExtensions}
         wrapEditor={wrapEditor}
         basicSetup={BASIC_SETUP}
         onRun={() => void handleRun()}
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
         onToggleWrapEditor={() => setWrapEditor((current) => !current)}
         onQueryChange={setQuery}
         onPointerDownResizer={startResizing}
@@ -266,6 +401,15 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         wrapCells={wrapCells}
         onSelectCell={handleSelectCell}
         onToggleWrapCells={() => setWrapCells((current) => !current)}
+      />
+
+      <SavedQueryDialog
+        open={saveDialogState.open}
+        mode={saveDialogState.mode}
+        initialName={saveDialogState.initialName}
+        connection={activeConnection ?? null}
+        onOpenChange={(open) => setSaveDialogState((current) => ({ ...current, open }))}
+        onSubmit={handleSubmitSaveDialog}
       />
     </div>
   );
