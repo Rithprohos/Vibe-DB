@@ -1,16 +1,9 @@
 import type { ColumnInfo } from "@/store/useAppStore";
+import { quoteIdentifier, quoteTableName } from "@/lib/sql/identifiers";
+import { escapeSqlString } from "@/lib/sql/values";
 import { isSchemaFlagEnabled } from "./schemaFlags";
-import { quoteTableName } from "./sql-helpers";
 
 const ROWS_PER_BATCH = 200;
-
-function escapeSqlString(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
-function quoteIdentifier(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
-}
 
 function toSqlString(value: string): string {
   return `'${escapeSqlString(value)}'`;
