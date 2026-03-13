@@ -115,6 +115,10 @@ impl DatabaseEngine for TursoEngine {
                 .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?
         };
 
+        conn.execute("PRAGMA foreign_keys = ON", ())
+            .await
+            .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
+
         let mut connection = self.connection.write().await;
         *connection = Some(conn);
 

@@ -1,8 +1,8 @@
 use super::{
     build_create_table_sql, build_create_view_sql, build_delete_queries, build_insert_queries,
-    build_insert_query, build_update_queries, build_where_clause_for_row,
-    quote_qualified_identifier, CreateTableColumnInput, RowDataInput, RowIdentifierInput,
-    RowUpdateInput, TypeParams,
+    build_insert_query, build_update_queries, build_where_clause_for_row, quote_qualified_identifier,
+    CheckConstraintInput, CreateTableColumnInput, ForeignKeyConstraintInput, RowDataInput,
+    RowIdentifierInput, RowUpdateInput, TypeParams,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -255,6 +255,8 @@ fn build_create_table_sql_sqlite_with_autoincrement() {
         columns,
         false,
         Some("sqlite".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -284,6 +286,8 @@ fn build_create_table_sql_postgres_with_serial() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -318,6 +322,8 @@ fn build_create_table_sql_postgres_with_bigserial() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -352,6 +358,8 @@ fn build_create_table_sql_postgres_supports_if_not_exists() {
         columns,
         true,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -381,10 +389,168 @@ fn build_create_table_sql_rejects_unknown_engine() {
         columns,
         false,
         Some("mysql".to_string()),
+        None,
+        None,
     )
     .expect_err("expected unsupported engine error");
 
     assert_eq!(error, "Unsupported database engine for CREATE TABLE: mysql");
+}
+
+#[test]
+fn build_create_table_sql_includes_foreign_key_actions() {
+    let columns = vec![
+        CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "INTEGER".to_string(),
+            type_params: None,
+            primary_key: true,
+            auto_increment: true,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        },
+        CreateTableColumnInput {
+            name: "user_id".to_string(),
+            col_type: "INTEGER".to_string(),
+            type_params: None,
+            primary_key: false,
+            auto_increment: false,
+            not_null: true,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        },
+    ];
+    let foreign_keys = vec![ForeignKeyConstraintInput {
+        column_name: "user_id".to_string(),
+        referenced_table: "users".to_string(),
+        referenced_column: "id".to_string(),
+        on_delete: Some("cascade".to_string()),
+        on_update: Some("restrict".to_string()),
+    }];
+
+    let sql = build_create_table_sql(
+        "orders".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        Some(foreign_keys),
+        None,
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains(
+            "FOREIGN KEY (\"user_id\") REFERENCES \"users\" (\"id\") ON DELETE CASCADE ON UPDATE RESTRICT"
+        ),
+        "Expected FK clause with actions. Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_rejects_partial_foreign_key_constraint() {
+    let columns = vec![CreateTableColumnInput {
+        name: "user_id".to_string(),
+        col_type: "INTEGER".to_string(),
+        type_params: None,
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+    let foreign_keys = vec![ForeignKeyConstraintInput {
+        column_name: "user_id".to_string(),
+        referenced_table: "".to_string(),
+        referenced_column: "id".to_string(),
+        on_delete: None,
+        on_update: None,
+    }];
+
+    let error = build_create_table_sql(
+        "orders".to_string(),
+        columns,
+        false,
+        Some("sqlite".to_string()),
+        Some(foreign_keys),
+        None,
+    )
+    .expect_err("expected partial FK validation error");
+
+    assert_eq!(
+        error,
+        "Foreign key constraint #1 requires column, referenced table, and referenced column"
+    );
+}
+
+#[test]
+fn build_create_table_sql_rejects_empty_check_constraint_expression() {
+    let columns = vec![CreateTableColumnInput {
+        name: "amount".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: None,
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+    let checks = vec![CheckConstraintInput {
+        name: "chk_amount_positive".to_string(),
+        expression: "".to_string(),
+    }];
+
+    let error = build_create_table_sql(
+        "payments".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        None,
+        Some(checks),
+    )
+    .expect_err("expected empty check expression validation error");
+
+    assert_eq!(error, "Check constraint #1 expression is required");
+}
+
+#[test]
+fn build_create_table_sql_includes_named_check_constraint() {
+    let columns = vec![CreateTableColumnInput {
+        name: "amount".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: None,
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+    let checks = vec![CheckConstraintInput {
+        name: "chk_amount_positive".to_string(),
+        expression: "amount > 0".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "payments".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        None,
+        Some(checks),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("CONSTRAINT \"chk_amount_positive\" CHECK (amount > 0)"),
+        "Expected named check constraint. Got: {}",
+        sql
+    );
 }
 
 #[test]
@@ -634,6 +800,8 @@ fn build_create_table_sql_postgres_with_varchar_length() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -667,6 +835,8 @@ fn build_create_table_sql_postgres_with_numeric_precision_scale() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -700,6 +870,8 @@ fn build_create_table_sql_postgres_with_timestamp_precision() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -733,6 +905,8 @@ fn build_create_table_sql_sqlite_with_varchar_length() {
         columns,
         false,
         Some("sqlite".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -762,6 +936,8 @@ fn build_create_table_sql_without_params_uses_base_type() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -800,6 +976,8 @@ fn build_create_table_sql_numeric_with_precision_only() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect("expected SQL");
 
@@ -833,6 +1011,8 @@ fn build_create_table_sql_rejects_scale_greater_than_precision() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect_err("expected validation error");
 
@@ -862,6 +1042,8 @@ fn build_create_table_sql_rejects_temporal_precision_above_six() {
         columns,
         false,
         Some("postgres".to_string()),
+        None,
+        None,
     )
     .expect_err("expected validation error");
 

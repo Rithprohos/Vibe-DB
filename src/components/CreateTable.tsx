@@ -1,478 +1,365 @@
-import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Save, Loader2, AlertCircle, TableIcon } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { buildCreateTableSQL, executeQuery, listTables } from '../lib/db';
-import { validateColumnName, validateTableName } from '../lib/tableName';
-import { highlightSQL } from '../lib/highlightSQL';
 import {
+  buildCreateTableSQL,
+  executeQuery,
+  getTableStructure,
+  listTables,
+} from '../lib/db';
+import { validateTableName } from '../lib/tableName';
+import {
+  canUseAutoIncrement,
+  createDefaultIdColumn,
+  createEmptyCheckConstraint,
+  createEmptyColumn,
+  createEmptyForeignKey,
+  DEFAULT_TABLE_NAME,
   getDataTypesForEngine,
   getEngineTypeLabel,
-  DEFAULT_OPTIONS,
-  DEFAULT_TABLE_NAME,
-  createEmptyColumn,
-  createDefaultIdColumn,
   normalizeTypeParams,
-  validateTypeParams,
+  type CheckConstraint,
   type ColumnDef,
+  type ForeignKeyConstraint,
 } from '../lib/createTableConstants';
-import { TypeParameterFields } from './TypeParameterFields';
+import { ColumnsSection } from './create-table/ColumnsSection';
+import {
+  ConstraintsSection,
+  type ExpandedConstraintSections,
+} from './create-table/ConstraintsSection';
+import { useCreateTableSqlPreview } from './create-table/useCreateTableSqlPreview';
+import {
+  getInvalidColumnNameError,
+  getInvalidTypeParamsError,
+  getLiveColumnNameErrors,
+  getLiveConstraintError,
+} from './create-table/validation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectLabel,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Plus,
-  Trash2,
-  Save,
-  Loader2,
-  GripVertical,
-  Sparkles,
-  AlertCircle,
-  TableIcon,
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Props {
   tabId: string;
 }
 
-// ── Memoized Column Row Component ──
-// Isolates re-renders so typing in one column doesn't re-render all others
-
-interface ColumnRowProps {
-  col: ColumnDef;
-  index: number;
-  engineDataTypes: ReturnType<typeof getDataTypesForEngine>;
-  engineTypeLabel: string;
-  hasError: string | undefined;
-  canRemove: boolean;
-  onUpdate: (id: string, updates: Partial<ColumnDef>) => void;
-  onRemove: (id: string) => void;
-  onMovePk: (targetId: string) => void;
-}
-
-const ColumnRow = memo(function ColumnRow({
-  col,
-  index,
-  engineDataTypes,
-  engineTypeLabel,
-  hasError,
-  canRemove,
-  onUpdate,
-  onRemove,
-  onMovePk,
-}: ColumnRowProps) {
-  // Stable callbacks - only recreate if col.id changes
-  const handleNameChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onUpdate(col.id, { name: e.target.value });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handleTypeChange = useCallback(
-    (val: string) => {
-      onUpdate(col.id, { type: val, typeParams: undefined });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handlePkChange = useCallback(
-    (v: boolean | 'indeterminate') => {
-      if (v && !col.primaryKey) {
-        onMovePk(col.id);
-      } else {
-        onUpdate(col.id, { primaryKey: !!v });
-      }
-    },
-    [col.id, col.primaryKey, onUpdate, onMovePk],
-  );
-
-  const handleAutoIncrementChange = useCallback(
-    (v: boolean | 'indeterminate') => {
-      onUpdate(col.id, { autoIncrement: !!v });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handleNotNullChange = useCallback(
-    (v: boolean | 'indeterminate') => {
-      onUpdate(col.id, { notNull: !!v });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handleUniqueChange = useCallback(
-    (v: boolean | 'indeterminate') => {
-      onUpdate(col.id, { unique: !!v });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handleDefaultOptionChange = useCallback(
-    (val: string) => {
-      onUpdate(col.id, {
-        defaultOption: val || 'none',
-        defaultValue: '',
-      });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handleDefaultValueChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onUpdate(col.id, { defaultValue: e.target.value });
-    },
-    [col.id, onUpdate],
-  );
-
-  const handleRemove = useCallback(() => {
-    onRemove(col.id);
-  }, [col.id, onRemove]);
-
-  return (
-    <TableRow
-      className={cn(
-        'border-border/20 transition-colors group',
-        index % 2 === 0 ? 'bg-transparent' : 'bg-secondary/10',
-      )}
-    >
-      {/* Drag handle */}
-      <TableCell className="pl-3 py-2">
-        <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors">
-          <GripVertical size={14} />
-        </div>
-      </TableCell>
-
-      {/* Column Name */}
-      <TableCell className="py-2">
-        <Input
-          type="text"
-          value={col.name}
-          onChange={handleNameChange}
-          placeholder="column_name"
-          className={cn(
-            'bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-sm font-medium h-8 focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary',
-            hasError &&
-              'border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive',
-          )}
-        />
-        {hasError && (
-          <div className="mt-1 text-[10px] text-destructive leading-tight">
-            {hasError}
-          </div>
-        )}
-      </TableCell>
-
-      {/* Data Type */}
-      <TableCell className="py-2">
-        <Select value={col.type} onValueChange={handleTypeChange}>
-          <SelectTrigger className="h-8 bg-transparent border-border/50 text-sm focus:ring-1 focus:ring-primary">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {engineTypeLabel}
-              </SelectLabel>
-              {engineDataTypes.map(t => (
-                <SelectItem key={t.value} value={t.value}>
-                  <span
-                    className={cn('font-mono text-xs font-bold', t.color)}
-                  >
-                    {t.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <TypeParameterFields
-          typeValue={col.type}
-          params={col.typeParams}
-          onChange={(typeParams) => onUpdate(col.id, { typeParams })}
-          size="compact"
-        />
-      </TableCell>
-
-      {/* Primary Key */}
-      <TableCell className="text-center py-2">
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={col.primaryKey}
-            onCheckedChange={handlePkChange}
-            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-          />
-        </div>
-      </TableCell>
-
-      {/* Auto Increment */}
-      <TableCell className="text-center py-2">
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={col.autoIncrement}
-            onCheckedChange={handleAutoIncrementChange}
-            disabled={!col.primaryKey || col.type !== 'INTEGER'}
-            className={cn(
-              'data-[state=checked]:bg-warning data-[state=checked]:border-warning',
-              (!col.primaryKey || col.type !== 'INTEGER') && 'opacity-30',
-            )}
-          />
-        </div>
-      </TableCell>
-
-      {/* Not Null */}
-      <TableCell className="text-center py-2">
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={col.notNull}
-            onCheckedChange={handleNotNullChange}
-            className="data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
-          />
-        </div>
-      </TableCell>
-
-      {/* Unique */}
-      <TableCell className="text-center py-2">
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={col.unique}
-            onCheckedChange={handleUniqueChange}
-            className="data-[state=checked]:bg-info data-[state=checked]:border-info"
-          />
-        </div>
-      </TableCell>
-
-      {/* Default Value */}
-      <TableCell className="py-2">
-        <div className="flex gap-1.5">
-          <Select
-            value={col.defaultOption}
-            onValueChange={handleDefaultOptionChange}
-          >
-            <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs focus:ring-1 focus:ring-primary flex-1">
-              <SelectValue placeholder="None" />
-            </SelectTrigger>
-            <SelectContent>
-              {DEFAULT_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  <span className="text-xs">{opt.label}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {col.defaultOption === 'custom' && (
-            <Input
-              type="text"
-              value={col.defaultValue}
-              onChange={handleDefaultValueChange}
-              placeholder="value"
-              className="bg-transparent border-border/50 placeholder:text-muted-foreground/30 text-xs h-8 w-24 focus-visible:ring-1 focus-visible:ring-primary"
-            />
-          )}
-        </div>
-      </TableCell>
-
-      {/* Remove */}
-      <TableCell className="py-2 pr-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRemove}
-          disabled={!canRemove}
-          className={cn(
-            'w-7 h-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity',
-            'hover:bg-destructive/10 hover:text-destructive',
-            !canRemove && '!opacity-0',
-          )}
-        >
-          <Trash2 size={13} />
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-});
+const DEFAULT_EXPANDED_SECTIONS: ExpandedConstraintSections = {
+  foreignKeys: false,
+  checkConstraints: false,
+};
 
 export default function CreateTable({ tabId }: Props) {
-  // ── Store selectors (granular per Rule #1) ──
-  const tabs = useAppStore(s => s.tabs);
-  const connections = useAppStore(s => s.connections);
-  const setTables = useAppStore(s => s.setTables);
-  const updateTab = useAppStore(s => s.updateTab);
-  const openTableTab = useAppStore(s => s.openTableTab);
-  const closeTab = useAppStore(s => s.closeTab);
+  const tabs = useAppStore((state) => state.tabs);
+  const connections = useAppStore((state) => state.connections);
+  const tablesByConnection = useAppStore((state) => state.tablesByConnection);
+  const setTables = useAppStore((state) => state.setTables);
+  const updateTab = useAppStore((state) => state.updateTab);
+  const openTableTab = useAppStore((state) => state.openTableTab);
+  const closeTab = useAppStore((state) => state.closeTab);
 
-  // ── Derived state (memoized per Rule #3) ──
-  const tab = useMemo(() => tabs.find(t => t.id === tabId), [tabs, tabId]);
+  const tab = useMemo(() => tabs.find((item) => item.id === tabId), [tabs, tabId]);
   const activeConnection = useMemo(
-    () => connections.find(c => c.id === tab?.connectionId),
+    () => connections.find((connection) => connection.id === tab?.connectionId),
     [connections, tab?.connectionId],
   );
-  // Primitive for effect deps (Rule #2)
   const connId = activeConnection?.connId;
   const engineType = activeConnection?.type ?? 'sqlite';
-  const engineDataTypes = useMemo(
-    () => getDataTypesForEngine(engineType),
-    [engineType],
-  );
-  const engineTypeLabel = useMemo(
-    () => getEngineTypeLabel(engineType),
-    [engineType],
-  );
+  const engineDataTypes = useMemo(() => getDataTypesForEngine(engineType), [engineType]);
+  const engineTypeLabel = useMemo(() => getEngineTypeLabel(engineType), [engineType]);
 
-  // ── Local state ──
   const [tableName, setTableName] = useState(DEFAULT_TABLE_NAME);
   const [columns, setColumns] = useState<ColumnDef[]>([createDefaultIdColumn()]);
   const [ifNotExists, setIfNotExists] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-  const [sql, setSql] = useState('');
-  const sqlPreviewRequestIdRef = useRef(0);
+  const [foreignKeys, setForeignKeys] = useState<ForeignKeyConstraint[]>([]);
+  const [checkConstraints, setCheckConstraints] = useState<CheckConstraint[]>([]);
+  const [referenceColumnsByTable, setReferenceColumnsByTable] = useState<
+    Record<string, string[]>
+  >({});
+  const [loadingReferenceColumnsByTable, setLoadingReferenceColumnsByTable] =
+    useState<Record<string, boolean>>({});
+  const [expandedSections, setExpandedSections] = useState(DEFAULT_EXPANDED_SECTIONS);
 
-  // ── Derived values ──
+  const referenceTableOptions = useMemo(() => {
+    if (!activeConnection) {
+      return [];
+    }
+
+    const seenNames = new Set<string>();
+    return (tablesByConnection[activeConnection.id] ?? [])
+      .filter((table) => table.table_type === 'table')
+      .map((table) => table.name.trim())
+      .filter((name) => {
+        if (!name || seenNames.has(name)) {
+          return false;
+        }
+        seenNames.add(name);
+        return true;
+      })
+      .sort((left, right) => left.localeCompare(right));
+  }, [activeConnection, tablesByConnection]);
+
   const validColumnCount = useMemo(
-    () => columns.filter(c => c.name.trim()).length,
+    () => columns.filter((column) => column.name.trim()).length,
+    [columns],
+  );
+  const namedColumnNames = useMemo(
+    () => new Set(columns.map((column) => column.name.trim()).filter(Boolean)),
     [columns],
   );
   const liveTableNameError = useMemo(() => {
-    if (!tableName.trim()) return null;
+    if (!tableName.trim()) {
+      return null;
+    }
     return validateTableName(tableName);
   }, [tableName]);
-  const liveColumnNameErrors = useMemo(() => {
-    const errorMap: Record<string, string> = {};
-    columns.forEach((col) => {
-      if (!col.name.trim()) return;
-      const maybeError = validateColumnName(col.name);
-      if (maybeError) {
-        errorMap[col.id] = maybeError;
-      }
-    });
-    return errorMap;
-  }, [columns]);
-  const hasTypeParamError = useMemo(
-    () => columns.some((column) => Boolean(validateTypeParams(column.type, column.typeParams))),
-    [columns],
+  const liveColumnNameErrors = useMemo(() => getLiveColumnNameErrors(columns), [columns]);
+  const liveTypeParamsError = useMemo(() => getInvalidTypeParamsError(columns), [columns]);
+  const liveConstraintError = useMemo(
+    () =>
+      getLiveConstraintError({
+        foreignKeys,
+        checkConstraints,
+        namedColumnNames,
+      }),
+    [foreignKeys, checkConstraints, namedColumnNames],
   );
 
-  // ── Stabilized callbacks (Rule #4) ──
+  const sql = useCreateTableSqlPreview({
+    showPreview,
+    tableName,
+    columns,
+    ifNotExists,
+    engineType,
+    foreignKeys,
+    checkConstraints,
+    liveConstraintError,
+  });
+
   const updateColumn = useCallback(
     (id: string, updates: Partial<ColumnDef>) => {
-      setColumns(prev =>
-        prev.map(col => {
-          if (col.id !== id) return col;
-          const updated = { ...col, ...updates };
+      setColumns((previous) =>
+        previous.map((column) => {
+          if (column.id !== id) {
+            return column;
+          }
+          const nextColumn = { ...column, ...updates };
           if ('type' in updates) {
-            updated.typeParams = normalizeTypeParams(updated.type, updated.typeParams);
+            nextColumn.typeParams = normalizeTypeParams(nextColumn.type, nextColumn.typeParams);
+            if (nextColumn.autoIncrement && !canUseAutoIncrement(engineType, nextColumn.type)) {
+              nextColumn.autoIncrement = false;
+            }
           }
-          // AUTOINCREMENT requires INTEGER PRIMARY KEY
-          if (updates.autoIncrement && updated.autoIncrement) {
-            updated.primaryKey = true;
-            updated.type = 'INTEGER';
-            updated.typeParams = undefined;
+          if (updates.autoIncrement && nextColumn.autoIncrement) {
+            nextColumn.primaryKey = true;
+            if (!canUseAutoIncrement(engineType, nextColumn.type)) {
+              nextColumn.type = 'INTEGER';
+              nextColumn.typeParams = undefined;
+            }
           }
-          // If unsetting PK, also unset autoincrement
           if ('primaryKey' in updates && !updates.primaryKey) {
-            updated.autoIncrement = false;
+            nextColumn.autoIncrement = false;
           }
-          return updated;
+          return nextColumn;
         }),
       );
       setError('');
     },
-    [],
+    [engineType],
   );
 
   const addColumn = useCallback(() => {
-    setColumns(prev => [...prev, createEmptyColumn()]);
+    setColumns((previous) => [...previous, createEmptyColumn()]);
   }, []);
 
   const removeColumn = useCallback((id: string) => {
-    setColumns(prev => {
-      if (prev.length <= 1) return prev;
-      return prev.filter(col => col.id !== id);
+    setColumns((previous) => {
+      if (previous.length <= 1) {
+        return previous;
+      }
+      return previous.filter((column) => column.id !== id);
     });
   }, []);
 
+  const movePk = useCallback((targetId: string) => {
+    setColumns((previous) =>
+      previous.map((column) => ({
+        ...column,
+        primaryKey: column.id === targetId,
+        autoIncrement: column.id === targetId ? column.autoIncrement : false,
+      })),
+    );
+  }, []);
+
+  const toggleSection = useCallback((section: keyof ExpandedConstraintSections) => {
+    setExpandedSections((previous) => ({ ...previous, [section]: !previous[section] }));
+  }, []);
+
+  const addForeignKey = useCallback(() => {
+    setForeignKeys((previous) => [...previous, createEmptyForeignKey()]);
+    setExpandedSections((previous) => ({ ...previous, foreignKeys: true }));
+  }, []);
+
+  const updateForeignKey = useCallback(
+    (id: string, updates: Partial<ForeignKeyConstraint>) => {
+      setForeignKeys((previous) =>
+        previous.map((foreignKey) => {
+          if (foreignKey.id !== id) {
+            return foreignKey;
+          }
+
+          const nextForeignKey = { ...foreignKey, ...updates };
+          if (
+            typeof updates.referencedTable === 'string' &&
+            updates.referencedTable !== foreignKey.referencedTable
+          ) {
+            nextForeignKey.referencedColumn = '';
+          }
+
+          const trimmedReferencedTable = nextForeignKey.referencedTable.trim();
+          const trimmedReferencedColumn = nextForeignKey.referencedColumn.trim();
+          const tableColumns = referenceColumnsByTable[trimmedReferencedTable];
+          if (
+            trimmedReferencedTable &&
+            trimmedReferencedColumn &&
+            tableColumns &&
+            !tableColumns.includes(trimmedReferencedColumn)
+          ) {
+            nextForeignKey.referencedColumn = '';
+          }
+
+          return nextForeignKey;
+        }),
+      );
+    },
+    [referenceColumnsByTable],
+  );
+
+  const removeForeignKey = useCallback((id: string) => {
+    setForeignKeys((previous) => previous.filter((foreignKey) => foreignKey.id !== id));
+  }, []);
+
+  const addCheckConstraint = useCallback(() => {
+    setCheckConstraints((previous) => [...previous, createEmptyCheckConstraint()]);
+    setExpandedSections((previous) => ({ ...previous, checkConstraints: true }));
+  }, []);
+
+  const updateCheckConstraint = useCallback((id: string, updates: Partial<CheckConstraint>) => {
+    setCheckConstraints((previous) =>
+      previous.map((constraint) => (constraint.id === id ? { ...constraint, ...updates } : constraint)),
+    );
+  }, []);
+
+  const removeCheckConstraint = useCallback((id: string) => {
+    setCheckConstraints((previous) => previous.filter((constraint) => constraint.id !== id));
+  }, []);
+
   const handleTogglePreview = useCallback(() => {
-    setShowPreview(prev => !prev);
+    setShowPreview((previous) => !previous);
   }, []);
 
   const handleCancel = useCallback(() => {
     closeTab(tabId);
   }, [closeTab, tabId]);
 
-  // Move PK to a specific column (when clicking PK on a different column)
-  const movePk = useCallback(
-    (targetId: string) => {
-      setColumns(prev =>
-        prev.map(c => ({
-          ...c,
-          primaryKey: c.id === targetId,
-          autoIncrement: c.id === targetId ? c.autoIncrement : false,
-        })),
-      );
+  const fetchReferenceTableColumns = useCallback(
+    async (referencedTable: string) => {
+      const tableName = referencedTable.trim();
+      if (!connId || !tableName) {
+        return;
+      }
+      if (referenceColumnsByTable[tableName] || loadingReferenceColumnsByTable[tableName]) {
+        return;
+      }
+
+      setLoadingReferenceColumnsByTable((previous) => ({ ...previous, [tableName]: true }));
+      try {
+        const structure = await getTableStructure(tableName, connId);
+        const columnNames = Array.from(
+          new Set(
+            structure.columns
+              .map((column) => column.name.trim())
+              .filter(Boolean),
+          ),
+        );
+        setReferenceColumnsByTable((previous) => ({ ...previous, [tableName]: columnNames }));
+      } catch (unknownError) {
+        console.error(`Failed to load columns for referenced table "${tableName}"`, unknownError);
+        setReferenceColumnsByTable((previous) => ({ ...previous, [tableName]: [] }));
+      } finally {
+        setLoadingReferenceColumnsByTable((previous) => {
+          const next = { ...previous };
+          delete next[tableName];
+          return next;
+        });
+      }
     },
-    [],
+    [connId, loadingReferenceColumnsByTable, referenceColumnsByTable],
   );
 
   useEffect(() => {
-    const hasTableName = tableName.trim().length > 0;
-    const hasNamedColumn = columns.some(col => col.name.trim().length > 0);
-    if (!hasTableName || !hasNamedColumn) {
-      setSql('');
+    setReferenceColumnsByTable({});
+    setLoadingReferenceColumnsByTable({});
+  }, [connId]);
+
+  useEffect(() => {
+    if (!connId || !activeConnection) {
       return;
     }
 
-    const requestId = ++sqlPreviewRequestIdRef.current;
-    void (async () => {
-      try {
-        if (validateTableName(tableName)) {
-          if (requestId !== sqlPreviewRequestIdRef.current) return;
-          setSql('');
+    let cancelled = false;
+    void listTables(connId)
+      .then((tables) => {
+        if (cancelled) {
           return;
         }
-        const invalidColumn = columns.find(
-          (col) => col.name.trim().length > 0 && validateColumnName(col.name),
-        );
-        const invalidTypeColumn = columns.find((col) =>
-          Boolean(validateTypeParams(col.type, col.typeParams)),
-        );
-        if (invalidColumn) {
-          if (requestId !== sqlPreviewRequestIdRef.current) return;
-          setSql('');
-          return;
+        setTables(activeConnection.id, tables);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConnection, connId, setTables]);
+
+  useEffect(() => {
+    const referencedTables = Array.from(
+      new Set(
+        foreignKeys
+          .map((foreignKey) => foreignKey.referencedTable.trim())
+          .filter(Boolean),
+      ),
+    );
+    for (const referencedTable of referencedTables) {
+      void fetchReferenceTableColumns(referencedTable);
+    }
+  }, [fetchReferenceTableColumns, foreignKeys]);
+
+  useEffect(() => {
+    setForeignKeys((previous) => {
+      let didChange = false;
+      const next = previous.map((foreignKey) => {
+        const trimmedReferencedTable = foreignKey.referencedTable.trim();
+        const trimmedReferencedColumn = foreignKey.referencedColumn.trim();
+        if (!trimmedReferencedTable || !trimmedReferencedColumn) {
+          return foreignKey;
         }
-        if (invalidTypeColumn) {
-          if (requestId !== sqlPreviewRequestIdRef.current) return;
-          setSql('');
-          return;
+
+        const availableColumns = referenceColumnsByTable[trimmedReferencedTable];
+        if (!availableColumns || availableColumns.includes(trimmedReferencedColumn)) {
+          return foreignKey;
         }
-        const generatedSql = await buildCreateTableSQL(tableName, columns, ifNotExists, engineType);
-        if (requestId !== sqlPreviewRequestIdRef.current) return;
-        setSql(generatedSql);
-      } catch {
-        if (requestId !== sqlPreviewRequestIdRef.current) return;
-        setSql('');
-      }
-    })();
-  }, [tableName, columns, ifNotExists, engineType]);
+
+        didChange = true;
+        return { ...foreignKey, referencedColumn: '' };
+      });
+
+      return didChange ? next : previous;
+    });
+  }, [referenceColumnsByTable]);
 
   const handleSave = useCallback(async () => {
     if (!connId) {
@@ -485,70 +372,70 @@ export default function CreateTable({ tabId }: Props) {
       setError(tableNameError);
       return;
     }
-    const invalidColumn = columns.find(
-      (col) => col.name.trim().length > 0 && validateColumnName(col.name),
-    );
-    if (invalidColumn) {
-      const colError = validateColumnName(invalidColumn.name);
-      setError(colError ?? "Invalid column name");
+
+    const invalidColumnNameError = getInvalidColumnNameError(columns);
+    if (invalidColumnNameError) {
+      setError(invalidColumnNameError);
       return;
     }
-    const invalidTypeColumn = columns.find((col) =>
-      Boolean(validateTypeParams(col.type, col.typeParams)),
-    );
-    if (invalidTypeColumn) {
-      setError(
-        validateTypeParams(invalidTypeColumn.type, invalidTypeColumn.typeParams) ??
-          'Invalid type parameters',
-      );
+
+    if (liveTypeParamsError) {
+      setError(liveTypeParamsError);
+      return;
+    }
+
+    if (liveConstraintError) {
+      setError(liveConstraintError);
       return;
     }
 
     setSaving(true);
     setError('');
-    let sqlToRun = '';
 
     try {
-      sqlToRun = await buildCreateTableSQL(
+      const sqlToRun = await buildCreateTableSQL(
         tableName,
         columns,
         ifNotExists,
         engineType,
+        foreignKeys,
+        checkConstraints,
       );
       await executeQuery(sqlToRun, connId);
-      // Refresh the tables list
+
       const tables = await listTables(connId);
       if (activeConnection) {
         setTables(activeConnection.id, tables);
       }
 
-      // Update tab title and navigate to the new table
       updateTab(tabId, { title: `✓ ${tableName}` });
       closeTab(tabId);
       if (activeConnection) {
         openTableTab(activeConnection.id, tableName.trim(), 'data');
       }
-    } catch (e: any) {
-      const errMsg = e?.toString() || 'Unknown error';
-      setError(errMsg);
+    } catch (unknownError: any) {
+      setError(unknownError?.toString() || 'Unknown error');
     } finally {
       setSaving(false);
     }
   }, [
-    connId,
-    tableName,
-    columns,
-    ifNotExists,
-    engineType,
-    setTables,
     activeConnection,
-    updateTab,
-    tabId,
+    checkConstraints,
     closeTab,
+    columns,
+    connId,
+    engineType,
+    foreignKeys,
+    ifNotExists,
+    liveConstraintError,
+    liveTypeParamsError,
     openTableTab,
+    setTables,
+    tableName,
+    tabId,
+    updateTab,
   ]);
 
-  // ── Preview empty state message ──
   const previewHint = useMemo(() => {
     if (!tableName.trim() && validColumnCount === 0) {
       return 'Enter a table name and at least one column to see the generated SQL.';
@@ -561,7 +448,6 @@ export default function CreateTable({ tabId }: Props) {
 
   return (
     <div className="flex-1 overflow-hidden bg-background relative w-full h-full flex flex-col">
-      {/* ── Header Section ── */}
       <div className="border-b border-border bg-background/80 backdrop-blur-sm px-6 py-4 flex-shrink-0">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-3 mb-4">
@@ -587,13 +473,14 @@ export default function CreateTable({ tabId }: Props) {
                 type="text"
                 placeholder="e.g. users, products, orders..."
                 value={tableName}
-                onChange={e => {
-                  setTableName(e.target.value);
+                onChange={(event) => {
+                  setTableName(event.target.value);
                   setError('');
                 }}
                 className={cn(
-                  "bg-background border-border placeholder:text-muted-foreground/40 text-sm font-medium focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary h-9",
-                  liveTableNameError && "border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive",
+                  'bg-background border-border placeholder:text-muted-foreground/40 text-sm font-medium focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary h-9',
+                  liveTableNameError &&
+                    'border-destructive/70 focus-visible:ring-destructive focus-visible:border-destructive',
                 )}
                 autoFocus
               />
@@ -605,7 +492,7 @@ export default function CreateTable({ tabId }: Props) {
               <Checkbox
                 id="if-not-exists"
                 checked={ifNotExists}
-                onCheckedChange={v => setIfNotExists(!!v)}
+                onCheckedChange={(value) => setIfNotExists(!!value)}
               />
               <label
                 htmlFor="if-not-exists"
@@ -618,7 +505,6 @@ export default function CreateTable({ tabId }: Props) {
         </div>
       </div>
 
-      {/* ── Error Banner ── */}
       {error && (
         <div className="mx-6 mt-3 flex items-center gap-2 px-4 py-2.5 rounded-sm bg-destructive/10 border border-destructive/20 text-destructive text-sm font-mono max-w-6xl">
           <AlertCircle size={16} className="flex-shrink-0" />
@@ -626,145 +512,44 @@ export default function CreateTable({ tabId }: Props) {
         </div>
       )}
 
-      {/* ── Columns Table ── */}
       <ScrollArea className="flex-1 px-6 py-4">
         <div className="max-w-6xl mx-auto">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Columns
-              </span>
-              <span className="bg-secondary px-1.5 py-0.5 rounded text-[10px] font-mono border border-border text-muted-foreground">
-                {columns.length}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTogglePreview}
-                className="border-border/50 bg-background/50 hover:bg-accent/50 text-xs gap-1.5"
-              >
-                <Sparkles size={13} />
-                {showPreview ? 'Hide' : 'Preview'} SQL
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addColumn}
-                className="border-border/50 bg-background/50 hover:bg-accent/50 text-xs gap-1.5"
-              >
-                <Plus size={13} />
-                Add Column
-              </Button>
-            </div>
-          </div>
+          <ColumnsSection
+            columns={columns}
+            engineType={engineType}
+            engineDataTypes={engineDataTypes}
+            engineTypeLabel={engineTypeLabel}
+            liveColumnNameErrors={liveColumnNameErrors}
+            showPreview={showPreview}
+            sql={sql}
+            previewHint={previewHint}
+            onTogglePreview={handleTogglePreview}
+            onAddColumn={addColumn}
+            onUpdateColumn={updateColumn}
+            onRemoveColumn={removeColumn}
+            onMovePk={movePk}
+          />
 
-          {/* SQL Preview */}
-          {showPreview && (
-            <div className="mb-4 rounded-md border border-border bg-surface/[0.3] overflow-hidden glass-panel animate-in fade-in-0 duration-200">
-              <div className="px-4 py-2 bg-secondary/40 border-b border-border/50">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Generated SQL
-                </span>
-              </div>
-              {sql ? (
-                <pre className="p-4 text-[13px] font-mono leading-relaxed overflow-x-auto custom-scrollbar-hide whitespace-pre select-text">
-                  <code>{highlightSQL(sql)}</code>
-                </pre>
-              ) : (
-                <div className="p-4 text-xs text-muted-foreground/60 italic">
-                  {previewHint}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Columns Grid */}
-          <div className="rounded-md border border-border bg-surface/[0.3] overflow-hidden shadow-xl shadow-black/15 glass-panel">
-            <Table className="w-full text-left">
-              <TableHeader className="bg-secondary/40 sticky top-0 backdrop-blur-md border-b border-border/50">
-                <TableRow className="border-border/50 hover:bg-transparent">
-                  <TableHead className="w-[40px] py-3 pl-3" />
-                  <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-foreground min-w-[180px]">
-                    Column Name
-                  </TableHead>
-                  <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-foreground min-w-[140px]">
-                    Data Type
-                  </TableHead>
-                  <TableHead className="w-[60px] font-semibold uppercase tracking-wider text-[10px] text-foreground text-center">
-                    PK
-                  </TableHead>
-                  <TableHead className="w-[60px] font-semibold uppercase tracking-wider text-[10px] text-foreground text-center">
-                    AI
-                  </TableHead>
-                  <TableHead className="w-[60px] font-semibold uppercase tracking-wider text-[10px] text-foreground text-center">
-                    NN
-                  </TableHead>
-                  <TableHead className="w-[60px] font-semibold uppercase tracking-wider text-[10px] text-foreground text-center">
-                    UQ
-                  </TableHead>
-                  <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-foreground min-w-[160px]">
-                    Default
-                  </TableHead>
-                  <TableHead className="w-[50px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {columns.map((col, idx) => (
-                  <ColumnRow
-                    key={col.id}
-                    col={col}
-                    index={idx}
-                    engineDataTypes={engineDataTypes}
-                    engineTypeLabel={engineTypeLabel}
-                    hasError={liveColumnNameErrors[col.id]}
-                    canRemove={columns.length > 1}
-                    onUpdate={updateColumn}
-                    onRemove={removeColumn}
-                    onMovePk={movePk}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Add Column Row */}
-            <div
-              className="flex items-center justify-center py-3 border-t border-border/30 cursor-pointer hover:bg-secondary/30 transition-colors group"
-              onClick={addColumn}
-            >
-              <Plus
-                size={14}
-                className="text-muted-foreground/50 group-hover:text-primary transition-colors mr-1.5"
-              />
-              <span className="text-xs text-muted-foreground/50 group-hover:text-primary transition-colors font-medium">
-                Add Column
-              </span>
-            </div>
-          </div>
-
-          {/* Column Legend */}
-          <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3 text-[10px] text-muted-foreground/60">
-            <span>
-              <strong className="text-muted-foreground">PK</strong> = Primary
-              Key
-            </span>
-            <span>
-              <strong className="text-muted-foreground">AI</strong> = Auto
-              Increment
-            </span>
-            <span>
-              <strong className="text-muted-foreground">NN</strong> = Not Null
-            </span>
-            <span>
-              <strong className="text-muted-foreground">UQ</strong> = Unique
-            </span>
-          </div>
+          <ConstraintsSection
+            tableName={tableName}
+            columns={columns}
+            foreignKeys={foreignKeys}
+            checkConstraints={checkConstraints}
+            referenceTableOptions={referenceTableOptions}
+            referenceColumnsByTable={referenceColumnsByTable}
+            loadingReferenceColumnsByTable={loadingReferenceColumnsByTable}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onAddForeignKey={addForeignKey}
+            onUpdateForeignKey={updateForeignKey}
+            onRemoveForeignKey={removeForeignKey}
+            onAddCheckConstraint={addCheckConstraint}
+            onUpdateCheckConstraint={updateCheckConstraint}
+            onRemoveCheckConstraint={removeCheckConstraint}
+          />
         </div>
       </ScrollArea>
 
-      {/* ── Footer Actions ── */}
       <div className="border-t border-border bg-background/80 backdrop-blur-sm px-6 py-3 flex-shrink-0">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="text-xs text-muted-foreground">
@@ -772,9 +557,7 @@ export default function CreateTable({ tabId }: Props) {
             {tableName.trim() && (
               <span className="ml-2">
                 · Table:{' '}
-                <span className="text-foreground font-medium">
-                  {tableName.trim()}
-                </span>
+                <span className="text-foreground font-medium">{tableName.trim()}</span>
               </span>
             )}
           </div>
@@ -796,7 +579,8 @@ export default function CreateTable({ tabId }: Props) {
                 validColumnCount === 0 ||
                 Boolean(liveTableNameError) ||
                 Object.keys(liveColumnNameErrors).length > 0 ||
-                hasTypeParamError
+                Boolean(liveTypeParamsError) ||
+                Boolean(liveConstraintError)
               }
               className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shadow-glow"
             >

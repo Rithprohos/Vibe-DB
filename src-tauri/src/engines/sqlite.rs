@@ -123,6 +123,11 @@ impl DatabaseEngine for SqliteEngine {
             .await
             .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
 
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await
+            .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
+
         let mut p = self.pool.write().await;
         *p = Some(pool);
         Ok(())

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ColumnDef } from "./createTableConstants";
+import type { ColumnDef, ForeignKeyConstraint, CheckConstraint } from "./createTableConstants";
 import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
 import {
@@ -223,6 +223,8 @@ export async function buildCreateTableSQL(
   columns: ColumnDef[],
   ifNotExists: boolean,
   engineType: 'sqlite' | 'turso' | 'postgres' = 'sqlite',
+  foreignKeys: ForeignKeyConstraint[] = [],
+  checkConstraints: CheckConstraint[] = [],
 ): Promise<string> {
   return measureDevFetch("build_create_table_sql", () =>
     invoke<string>("build_create_table_sql", {
@@ -230,6 +232,8 @@ export async function buildCreateTableSQL(
       columns,
       ifNotExists,
       engineType,
+      foreignKeys,
+      checkConstraints,
     }),
   );
 }

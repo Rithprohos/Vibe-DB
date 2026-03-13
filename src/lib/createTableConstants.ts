@@ -28,6 +28,29 @@ export interface ColumnDef {
   defaultValue: string;
 }
 
+/** Foreign key constraint definition */
+export interface ForeignKeyConstraint {
+  id: string;
+  columnName: string;
+  referencedTable: string;
+  referencedColumn: string;
+  onDelete?: 'cascade' | 'set_null' | 'set_default' | 'restrict' | 'no_action';
+  onUpdate?: 'cascade' | 'set_null' | 'set_default' | 'restrict' | 'no_action';
+}
+
+/** Check constraint definition */
+export interface CheckConstraint {
+  id: string;
+  name: string;
+  expression: string;
+}
+
+/** Table constraint definitions */
+export interface TableConstraints {
+  foreignKeys: ForeignKeyConstraint[];
+  checks: CheckConstraint[];
+}
+
 export interface SqliteType {
   value: string;
   label: string;
@@ -42,6 +65,18 @@ export interface DefaultOption {
   value: string;
   label: string;
 }
+
+const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SQLITE_AUTOINCREMENT_TYPES = new Set(["INTEGER"]);
+const POSTGRES_AUTOINCREMENT_TYPES = new Set([
+  "SMALLINT",
+  "SMALLSERIAL",
+  "INTEGER",
+  "INT",
+  "SERIAL",
+  "BIGINT",
+  "BIGSERIAL",
+]);
 
 /** SQLite data types – covering the main affinities + common aliases */
 interface DataTypeOption extends SqliteType {
@@ -109,6 +144,31 @@ export function getEngineTypeLabel(engine: SupportedEngine): string {
   if (engine === "turso") return "Turso types";
   if (engine === "postgres") return "PostgreSQL types";
   return "Types";
+}
+
+export function canUseAutoIncrement(
+  engine: SupportedEngine,
+  typeValue: string,
+): boolean {
+  const normalized = typeValue.trim().toUpperCase();
+  if (engine === "postgres") {
+    return POSTGRES_AUTOINCREMENT_TYPES.has(normalized);
+  }
+  return SQLITE_AUTOINCREMENT_TYPES.has(normalized);
+}
+
+export function validateConstraintIdentifier(
+  value: string,
+  label: string,
+): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return `${label} is required`;
+  }
+  if (!IDENTIFIER_PATTERN.test(trimmed)) {
+    return `${label} must start with a letter/underscore and contain only letters, numbers, and underscores`;
+  }
+  return null;
 }
 
 /** Common SQLite default value presets */
@@ -226,6 +286,37 @@ export function formatTypeWithParams(typeValue: string, params?: TypeParams): st
   }
   return typeValue;
 }
+
+/** Create a new empty foreign key constraint */
+export function createEmptyForeignKey(): ForeignKeyConstraint {
+  return {
+    id: `fk-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    columnName: '',
+    referencedTable: '',
+    referencedColumn: '',
+    onDelete: undefined,
+    onUpdate: undefined,
+  };
+}
+
+/** Create a new empty check constraint */
+export function createEmptyCheckConstraint(): CheckConstraint {
+  return {
+    id: `chk-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    name: '',
+    expression: '',
+  };
+}
+
+/** Foreign key action options */
+export const FK_ACTION_OPTIONS: { value: ForeignKeyConstraint['onDelete']; label: string }[] = [
+  { value: undefined, label: 'No Action' },
+  { value: 'cascade', label: 'CASCADE' },
+  { value: 'set_null', label: 'SET NULL' },
+  { value: 'set_default', label: 'SET DEFAULT' },
+  { value: 'restrict', label: 'RESTRICT' },
+  { value: 'no_action', label: 'NO ACTION' },
+];
 
 /** Validate type parameters. */
 export function validateTypeParams(typeValue: string, params?: TypeParams): string | null {
