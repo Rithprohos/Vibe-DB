@@ -141,7 +141,7 @@ Move SQL query building from frontend to backend for security and cleaner archit
 - [ ] Keep pagination/filter/sort execution fully in Rust commands
 - [ ] Add prepared statements for repeated table patterns
 - [ ] Return typed rows with reusable column metadata maps
-- [ ] Debounce UI-triggered query refreshes
+- [x] Debounce UI-triggered query refreshes
 - [ ] Keep metadata fetches separate from row fetches
 - [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
 - [ ] Expand Rust-side command timing instrumentation
