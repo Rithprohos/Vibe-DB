@@ -3,6 +3,7 @@ import { Copy, Eye, Pencil, X as XIcon } from 'lucide-react';
 import { formatCellValue } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatColumnTypeDisplay } from '@/lib/typeDisplay';
 import type { ColumnInfo } from '@/store/useAppStore';
 import {
   isJsonColumn,
@@ -195,7 +196,7 @@ export function RowInspector({
                           {colName}
                         </div>
                         <div className="mt-0.5 text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground/70">
-                          {columnInfo?.col_type ?? 'text'}
+                          {formatColumnTypeDisplay(columnInfo?.col_type ?? 'text')}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">

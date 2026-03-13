@@ -34,6 +34,7 @@ import { RowInspector } from './RowInspector';
 import { copyToClipboard } from '@/lib/copy';
 import { Checkbox } from '@/components/ui/checkbox';
 import { stringifyCellValue } from '@/lib/formatters';
+import { formatColumnTypeDisplay } from '@/lib/typeDisplay';
 
 const PAGE_SIZE_OPTIONS = ['50', '100', '200', '500'] as const;
 const QUERY_REFRESH_DEBOUNCE_MS = 250;
@@ -520,8 +521,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
     gridCols.forEach((colName) => {
       const columnInfo = columnInfoByName[colName];
-      let type = columnInfo?.col_type.toLowerCase() || 'text';
-      if (type === 'integer') type = 'int';
+      const typeLabel = formatColumnTypeDisplay(columnInfo?.col_type ?? 'text');
       const isPk = columnInfo?.pk;
       const indexMeta = indexMetaByColumnName[colName];
       const hasIndex = Boolean(indexMeta);
@@ -555,8 +555,8 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                 "text-[11px] tracking-tight truncate shrink-0",
                 isPk ? "text-amber-500/90 font-black uppercase" : "font-bold text-foreground/90"
               )}>{colName}</span>
-              <span className="text-[9px] font-mono tracking-tight text-primary/40 group-hover:text-primary/70 transition-colors lowercase truncate pt-0.5">
-                {type}
+              <span className="text-[9px] font-mono tracking-tight text-primary/40 group-hover:text-primary/70 transition-colors truncate pt-0.5">
+                {typeLabel}
               </span>
               <div className="flex-1" />
               {sortCol === colName && (

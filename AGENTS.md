@@ -70,6 +70,7 @@ Re-exported from `src-tauri/src/commands.rs` and implemented under `src-tauri/sr
 
 - Keep UI dark-first, compact, and use CSS variables from `src/index.css`.
 - Do not hardcode colors. Existing neon accent `#00e599` is allowed sparingly.
+- Prefer Conventional Commit messages for git commits, e.g. `fix: ...`, `feat: ...`, `refactor: ...`, `docs: ...`, `test: ...`.
 - Follow [`STYLE_GUIDE.md`](/Users/a1234/Documents/Project/vibe-db/STYLE_GUIDE.md) for visual direction.
 - VibeDB should look like a devtool: sharp corners, dense layouts, restrained glow, no soft SaaS cards.
 - Avoid `rounded-full` and large radii on primary UI surfaces. Reserve fully round shapes for tiny indicators only.

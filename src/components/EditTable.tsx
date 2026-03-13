@@ -12,8 +12,12 @@ import {
   splitQualifiedTableName,
 } from '../lib/databaseObjects';
 import {
+  formatTypeWithParams,
   getDataTypesForEngine,
   getEngineTypeLabel,
+  normalizeTypeParams,
+  validateTypeParams,
+  type TypeParams,
 } from '../lib/createTableConstants';
 import {
   EditTableErrorBanner,
@@ -67,6 +71,7 @@ export default function EditTable({ tableName, tabId }: Props) {
   );
   const [newColumnName, setNewColumnName] = useState('');
   const [newColumnType, setNewColumnType] = useState('TEXT');
+  const [newColumnTypeParams, setNewColumnTypeParams] = useState<TypeParams | undefined>(undefined);
   const [newColumnNotNull, setNewColumnNotNull] = useState(false);
   const [newColumnDefault, setNewColumnDefault] = useState('');
 
@@ -104,6 +109,10 @@ export default function EditTable({ tableName, tabId }: Props) {
     if (!nextName) return null;
     return validateColumnName(nextName);
   }, [newColumnName]);
+  const newColumnTypeParamError = useMemo(
+    () => validateTypeParams(newColumnType, newColumnTypeParams),
+    [newColumnType, newColumnTypeParams],
+  );
 
   const renameColumnToError = useMemo(() => {
     const nextName = renameColumnTo.trim();
@@ -349,13 +358,21 @@ export default function EditTable({ tableName, tabId }: Props) {
       showToast({ type: 'error', message: 'Invalid column name' });
       return;
     }
+    if (newColumnTypeParamError) {
+      setError(newColumnTypeParamError);
+      showToast({ type: 'error', message: 'Invalid type parameters' });
+      return;
+    }
+
+    // Build full type with parameters
+    const fullType = formatTypeWithParams(newColumnType, newColumnTypeParams);
 
     const defaultSql = newColumnDefault.trim() ? ` DEFAULT ${newColumnDefault.trim()}` : '';
     const notNullSql = newColumnNotNull ? ' NOT NULL' : '';
     const sql =
       `ALTER TABLE ${quoteTableName(currentTableName)} ` +
       `ADD COLUMN ${quoteIdentifier(trimmedName)} ` +
-      `${newColumnType.trim() || 'TEXT'}${notNullSql}${defaultSql}`;
+      `${fullType}${notNullSql}${defaultSql}`;
 
     const ok = await runAlter('add-column', sql, `Added column ${trimmedName}`);
     if (!ok) return;
@@ -363,6 +380,7 @@ export default function EditTable({ tableName, tabId }: Props) {
     setNewColumnName('');
     setNewColumnDefault('');
     setNewColumnNotNull(false);
+    setNewColumnTypeParams(undefined);
     const refreshed = await refreshStructure(currentTableName, {
       preferredColumnName: trimmedName,
       ensureColumnName: trimmedName,
@@ -382,6 +400,8 @@ export default function EditTable({ tableName, tabId }: Props) {
     newColumnName,
     newColumnNotNull,
     newColumnType,
+    newColumnTypeParamError,
+    newColumnTypeParams,
     refreshStructure,
     refreshTables,
     runAlter,
@@ -582,7 +602,15 @@ export default function EditTable({ tableName, tabId }: Props) {
             onNewColumnNameChange={setNewColumnName}
             newColumnNameError={newColumnNameError}
             newColumnType={newColumnType}
-            onNewColumnTypeChange={setNewColumnType}
+            onNewColumnTypeChange={(val) => {
+              setNewColumnType(val);
+              setNewColumnTypeParams(undefined);
+            }}
+            newColumnTypeParams={newColumnTypeParams}
+            onNewColumnTypeParamsChange={(params) => {
+              setNewColumnTypeParams(normalizeTypeParams(newColumnType, params));
+            }}
+            newColumnTypeParamError={newColumnTypeParamError}
             newColumnDefault={newColumnDefault}
             onNewColumnDefaultChange={setNewColumnDefault}
             newColumnNotNull={newColumnNotNull}

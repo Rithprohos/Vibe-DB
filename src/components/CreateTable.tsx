@@ -10,8 +10,11 @@ import {
   DEFAULT_TABLE_NAME,
   createEmptyColumn,
   createDefaultIdColumn,
+  normalizeTypeParams,
+  validateTypeParams,
   type ColumnDef,
 } from '../lib/createTableConstants';
+import { TypeParameterFields } from './TypeParameterFields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -85,7 +88,7 @@ const ColumnRow = memo(function ColumnRow({
 
   const handleTypeChange = useCallback(
     (val: string) => {
-      onUpdate(col.id, { type: val });
+      onUpdate(col.id, { type: val, typeParams: undefined });
     },
     [col.id, onUpdate],
   );
@@ -200,6 +203,12 @@ const ColumnRow = memo(function ColumnRow({
             </SelectGroup>
           </SelectContent>
         </Select>
+        <TypeParameterFields
+          typeValue={col.type}
+          params={col.typeParams}
+          onChange={(typeParams) => onUpdate(col.id, { typeParams })}
+          size="compact"
+        />
       </TableCell>
 
       {/* Primary Key */}
@@ -357,6 +366,10 @@ export default function CreateTable({ tabId }: Props) {
     });
     return errorMap;
   }, [columns]);
+  const hasTypeParamError = useMemo(
+    () => columns.some((column) => Boolean(validateTypeParams(column.type, column.typeParams))),
+    [columns],
+  );
 
   // ── Stabilized callbacks (Rule #4) ──
   const updateColumn = useCallback(
@@ -365,10 +378,14 @@ export default function CreateTable({ tabId }: Props) {
         prev.map(col => {
           if (col.id !== id) return col;
           const updated = { ...col, ...updates };
+          if ('type' in updates) {
+            updated.typeParams = normalizeTypeParams(updated.type, updated.typeParams);
+          }
           // AUTOINCREMENT requires INTEGER PRIMARY KEY
           if (updates.autoIncrement && updated.autoIncrement) {
             updated.primaryKey = true;
             updated.type = 'INTEGER';
+            updated.typeParams = undefined;
           }
           // If unsetting PK, also unset autoincrement
           if ('primaryKey' in updates && !updates.primaryKey) {
@@ -434,7 +451,15 @@ export default function CreateTable({ tabId }: Props) {
         const invalidColumn = columns.find(
           (col) => col.name.trim().length > 0 && validateColumnName(col.name),
         );
+        const invalidTypeColumn = columns.find((col) =>
+          Boolean(validateTypeParams(col.type, col.typeParams)),
+        );
         if (invalidColumn) {
+          if (requestId !== sqlPreviewRequestIdRef.current) return;
+          setSql('');
+          return;
+        }
+        if (invalidTypeColumn) {
           if (requestId !== sqlPreviewRequestIdRef.current) return;
           setSql('');
           return;
@@ -466,6 +491,16 @@ export default function CreateTable({ tabId }: Props) {
     if (invalidColumn) {
       const colError = validateColumnName(invalidColumn.name);
       setError(colError ?? "Invalid column name");
+      return;
+    }
+    const invalidTypeColumn = columns.find((col) =>
+      Boolean(validateTypeParams(col.type, col.typeParams)),
+    );
+    if (invalidTypeColumn) {
+      setError(
+        validateTypeParams(invalidTypeColumn.type, invalidTypeColumn.typeParams) ??
+          'Invalid type parameters',
+      );
       return;
     }
 
@@ -755,7 +790,14 @@ export default function CreateTable({ tabId }: Props) {
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={saving || !tableName.trim() || validColumnCount === 0}
+              disabled={
+                saving ||
+                !tableName.trim() ||
+                validColumnCount === 0 ||
+                Boolean(liveTableNameError) ||
+                Object.keys(liveColumnNameErrors).length > 0 ||
+                hasTypeParamError
+              }
               className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shadow-glow"
             >
               {saving ? (

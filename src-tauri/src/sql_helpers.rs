@@ -330,12 +330,25 @@ pub fn build_update_queries(
         .collect()
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TypeParams {
+    #[serde(default)]
+    length: Option<u32>,
+    #[serde(default)]
+    precision: Option<i32>,
+    #[serde(default)]
+    scale: Option<i32>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTableColumnInput {
     name: String,
     #[serde(rename = "type")]
     col_type: String,
+    #[serde(default)]
+    type_params: Option<TypeParams>,
     #[serde(default)]
     primary_key: bool,
     #[serde(default)]
@@ -571,24 +584,28 @@ pub fn build_create_table_sql(
             parts.push(quote_identifier(column.name.trim()));
 
             let column_type = column.col_type.trim();
-            let serial_type = column
-                .auto_increment
-                .then(|| postgres_serial_type(column_type))
-                .flatten();
+            validate_type_params(column_type, column.type_params.as_ref())?;
 
             match dialect {
                 CreateTableDialect::Postgres => {
-                    if let Some(serial_type) = serial_type {
-                        parts.push(serial_type.to_string());
+                    let serial_type = column
+                        .auto_increment
+                        .then(|| postgres_serial_type(column_type))
+                        .flatten();
+                    let formatted_type = if let Some(st) = serial_type {
+                        st.to_string()
                     } else {
-                        parts.push(column_type.to_string());
-                    }
+                        format_column_type(column_type, column.type_params.as_ref())
+                    };
+                    parts.push(formatted_type);
                     if column.primary_key {
                         parts.push("PRIMARY KEY".to_string());
                     }
                 }
                 CreateTableDialect::Sqlite | CreateTableDialect::Turso => {
-                    parts.push(column_type.to_string());
+                    let formatted_type =
+                        format_column_type(column_type, column.type_params.as_ref());
+                    parts.push(formatted_type);
                     if column.primary_key {
                         parts.push("PRIMARY KEY".to_string());
                     }
@@ -615,9 +632,9 @@ pub fn build_create_table_sql(
                 parts.push(format!("DEFAULT {default_val}"));
             }
 
-            format!("  {}", parts.join(" "))
+            Ok(format!("  {}", parts.join(" ")))
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
 
     let if_not_exists_sql = if if_not_exists { " IF NOT EXISTS" } else { "" };
 
@@ -649,6 +666,113 @@ fn postgres_serial_type(column_type: &str) -> Option<&'static str> {
     } else {
         None
     }
+}
+
+fn validate_type_params(column_type: &str, type_params: Option<&TypeParams>) -> Result<(), String> {
+    let type_upper = column_type.to_ascii_uppercase();
+    let Some(params) = type_params else {
+        return Ok(());
+    };
+
+    if matches!(type_upper.as_str(), "VARCHAR" | "CHAR" | "BPCHAR") {
+        if let Some(length) = params.length {
+            if length == 0 {
+                return Err("Length must be at least 1".to_string());
+            }
+            if length > 10_485_760 {
+                return Err("Length is too large".to_string());
+            }
+        }
+        return Ok(());
+    }
+
+    if matches!(type_upper.as_str(), "NUMERIC" | "DECIMAL") {
+        if let Some(precision) = params.precision {
+            if precision < 1 {
+                return Err("Precision must be at least 1".to_string());
+            }
+            if precision > 1000 {
+                return Err("Precision is too large".to_string());
+            }
+        }
+
+        if let Some(scale) = params.scale {
+            if scale < 0 {
+                return Err("Scale cannot be negative".to_string());
+            }
+            if let Some(precision) = params.precision {
+                if scale > precision {
+                    return Err("Scale cannot exceed precision".to_string());
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    if matches!(
+        type_upper.as_str(),
+        "TIME" | "TIMETZ" | "TIMESTAMP" | "TIMESTAMPTZ" | "INTERVAL"
+    ) {
+        if let Some(precision) = params.precision {
+            if precision < 0 {
+                return Err("Precision cannot be negative".to_string());
+            }
+            if precision > 6 {
+                return Err("Precision cannot exceed 6".to_string());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Format a column type with its parameters (VARCHAR(n), NUMERIC(p,s), etc.)
+fn format_column_type(column_type: &str, type_params: Option<&TypeParams>) -> String {
+    let type_upper = column_type.to_ascii_uppercase();
+    let params = match type_params {
+        Some(p) => p,
+        None => return column_type.to_string(),
+    };
+
+    // Types that support length parameter (VARCHAR, CHAR, BPCHAR)
+    let supports_length = matches!(type_upper.as_str(), "VARCHAR" | "CHAR" | "BPCHAR");
+    if supports_length {
+        if let Some(length) = params.length {
+            if length > 0 {
+                return format!("{}({})", column_type, length);
+            }
+        }
+    }
+
+    // Types that support precision/scale (NUMERIC, DECIMAL)
+    let supports_precision_scale = matches!(type_upper.as_str(), "NUMERIC" | "DECIMAL");
+    if supports_precision_scale {
+        if let Some(precision) = params.precision {
+            if precision > 0 {
+                if let Some(scale) = params.scale {
+                    if scale >= 0 {
+                        return format!("{}({},{})", column_type, precision, scale);
+                    }
+                }
+                return format!("{}({})", column_type, precision);
+            }
+        }
+    }
+
+    // Types that support precision only (TIME, TIMETZ, TIMESTAMP, TIMESTAMPTZ, INTERVAL)
+    let supports_precision = matches!(
+        type_upper.as_str(),
+        "TIME" | "TIMETZ" | "TIMESTAMP" | "TIMESTAMPTZ" | "INTERVAL"
+    );
+    if supports_precision {
+        if let Some(precision) = params.precision {
+            if precision >= 0 {
+                return format!("{}({})", column_type, precision);
+            }
+        }
+    }
+
+    column_type.to_string()
 }
 
 fn normalize_view_select_sql(select_sql: &str) -> Result<String, String> {

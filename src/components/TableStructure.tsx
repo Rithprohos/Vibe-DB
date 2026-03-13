@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore, type TableStructureData } from '../store/useAppStore';
 import { getTableStructure } from '../lib/db';
+import { formatColumnTypeDisplay } from '../lib/typeDisplay';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Key, Link2, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -88,7 +89,7 @@ export default function TableStructure({ tableName, tabId }: Props) {
                       typeLower.includes('blob') ? "bg-purple-500/10 text-purple-500 border-purple-500/20" :
                       "bg-muted text-muted-foreground border-border"
                     )}>
-                      {col.col_type || '—'}
+                      {formatColumnTypeDisplay(col.col_type)}
                     </span>
                   </TableCell>
                   <TableCell>
