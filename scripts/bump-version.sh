@@ -9,7 +9,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TAURI_CONF="$ROOT_DIR/src-tauri/tauri.conf.json"
 PACKAGE_JSON="$ROOT_DIR/package.json"
 
-NEW_VERSION=$(cd "$ROOT_DIR" && npm version "$BUMP_TYPE" --no-git-tag-version --silent)
+RAW_VERSION=$(cd "$ROOT_DIR" && npm version "$BUMP_TYPE" --no-git-tag-version --silent)
+NEW_VERSION="${RAW_VERSION#v}"
 TAG_NAME="v$NEW_VERSION"
 
 TMP=$(mktemp)
