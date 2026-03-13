@@ -1,4 +1,4 @@
-import { MAX_TABS } from "../constants";
+import { MAX_QUICK_SEARCH_RECENT_ITEMS, MAX_TABS } from "../constants";
 import {
   createDefaultTableViewState,
   getSelectedTableForTab,
@@ -12,6 +12,7 @@ type TabsSlice = Pick<
   | "tabs"
   | "activeTabId"
   | "tableViewStateByTabId"
+  | "quickSearchRecentItems"
   | "addTab"
   | "closeTab"
   | "closeAllTabs"
@@ -29,6 +30,7 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
     tabs: [],
     activeTabId: null,
     tableViewStateByTabId: {},
+    quickSearchRecentItems: [],
 
     addTab: (tab) =>
       set((state) => {
@@ -105,6 +107,21 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
       })),
 
     openTableTab: (connectionId, tableName, type) => {
+      const nextRecentItems = (recentItems: AppState["quickSearchRecentItems"]) => [
+        {
+          connectionId,
+          tableName,
+          openedAt: Date.now(),
+        },
+        ...recentItems.filter(
+          (item) =>
+            !(
+              item.connectionId === connectionId &&
+              item.tableName === tableName
+            ),
+        ),
+      ].slice(0, MAX_QUICK_SEARCH_RECENT_ITEMS);
+
       const state = get();
       const existing = state.tabs.find(
         (t) =>
@@ -113,7 +130,11 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
           t.type === type,
       );
       if (existing) {
-        set({ activeTabId: existing.id, selectedTable: tableName });
+        set({
+          activeTabId: existing.id,
+          selectedTable: tableName,
+          quickSearchRecentItems: nextRecentItems(state.quickSearchRecentItems),
+        });
         return;
       }
 
@@ -136,6 +157,9 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
         tabs: [...currentState.tabs, tab].slice(-MAX_TABS),
         activeTabId: id,
         selectedTable: tableName,
+        quickSearchRecentItems: nextRecentItems(
+          currentState.quickSearchRecentItems,
+        ),
       }));
     },
   };

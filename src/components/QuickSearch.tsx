@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   buildQuickSearchTableItems,
+  getQuickSearchRecentTableItems,
   normalizeQuickSearchQuery,
   searchQuickSearchTableItems,
 } from '@/lib/quickSearch';
@@ -33,13 +34,21 @@ const selectors = {
   isQuickSearchOpen: (state: AppState) => state.isQuickSearchOpen,
   setIsQuickSearchOpen: (state: AppState) => state.setIsQuickSearchOpen,
   activeSidebarConnectionId: (state: AppState) => state.activeSidebarConnectionId,
+  quickSearchRecentItems: (state: AppState) => state.quickSearchRecentItems,
   openTableTab: (state: AppState) => state.openTableTab,
 };
+
+interface QuickSearchSection {
+  id: string;
+  label: string | null;
+  items: ReturnType<typeof buildQuickSearchTableItems>;
+}
 
 export default function QuickSearch() {
   const isQuickSearchOpen = useAppStore(selectors.isQuickSearchOpen);
   const setIsQuickSearchOpen = useAppStore(selectors.setIsQuickSearchOpen);
   const activeSidebarConnectionId = useAppStore(selectors.activeSidebarConnectionId);
+  const quickSearchRecentItems = useAppStore(selectors.quickSearchRecentItems);
   const openTableTab = useAppStore(selectors.openTableTab);
   const activeConnection = useAppStore(
     useCallback(
@@ -91,6 +100,58 @@ export default function QuickSearch() {
       RESULT_LIMIT,
     );
   }, [normalizedQuery, searchableTables]);
+  const recentResults = useMemo(() => {
+    return getQuickSearchRecentTableItems(
+      searchableTables,
+      quickSearchRecentItems,
+      activeSidebarConnectionId,
+      RESULT_LIMIT,
+    );
+  }, [
+    activeSidebarConnectionId,
+    quickSearchRecentItems,
+    searchableTables,
+  ]);
+  const sections = useMemo<QuickSearchSection[]>(() => {
+    if (normalizedQuery) {
+      return [{ id: 'results', label: null, items: results }];
+    }
+
+    if (recentResults.length === 0) {
+      return [{ id: 'tables', label: null, items: results }];
+    }
+
+    const recentQualifiedNames = new Set(
+      recentResults.map((item) => item.qualifiedName),
+    );
+    const remainingResults = searchableTables
+      .filter((item) => !recentQualifiedNames.has(item.qualifiedName))
+      .slice(0, Math.max(0, RESULT_LIMIT - recentResults.length));
+
+    return [
+      {
+        id: 'recent',
+        label: 'Recent tables',
+        items: recentResults,
+      },
+      {
+        id: 'tables',
+        label: remainingResults.length > 0 ? 'All tables' : null,
+        items: remainingResults,
+      },
+    ].filter((section) => section.items.length > 0);
+  }, [normalizedQuery, recentResults, results, searchableTables]);
+  const visibleResults = useMemo(
+    () => sections.flatMap((section) => section.items),
+    [sections],
+  );
+  const visibleResultIndexByQualifiedName = useMemo(
+    () =>
+      new Map(
+        visibleResults.map((item, index) => [item.qualifiedName, index] as const),
+      ),
+    [visibleResults],
+  );
 
   useEffect(() => {
     if (!isQuickSearchOpen) {
@@ -105,25 +166,25 @@ export default function QuickSearch() {
   }, [normalizedQuery]);
 
   useEffect(() => {
-    if (results.length === 0) {
+    if (visibleResults.length === 0) {
       setHighlightedIndex(0);
       return;
     }
 
     setHighlightedIndex((currentIndex) =>
-      Math.min(currentIndex, results.length - 1),
+      Math.min(currentIndex, visibleResults.length - 1),
     );
-  }, [results.length]);
+  }, [visibleResults.length]);
 
   useEffect(() => {
-    if (!isQuickSearchOpen || results.length === 0) {
+    if (!isQuickSearchOpen || visibleResults.length === 0) {
       return;
     }
 
     resultRefs.current[highlightedIndex]?.scrollIntoView({
       block: 'nearest',
     });
-  }, [highlightedIndex, isQuickSearchOpen, results.length]);
+  }, [highlightedIndex, isQuickSearchOpen, visibleResults.length]);
 
   const closeQuickSearch = useCallback(() => {
     setIsQuickSearchOpen(false);
@@ -135,7 +196,7 @@ export default function QuickSearch() {
         return;
       }
 
-      const selected = results[index];
+      const selected = visibleResults[index];
       if (!selected) {
         return;
       }
@@ -143,7 +204,7 @@ export default function QuickSearch() {
       openTableTab(activeSidebarConnectionId, selected.qualifiedName, 'data');
       setIsQuickSearchOpen(false);
     },
-    [activeSidebarConnectionId, openTableTab, results, setIsQuickSearchOpen],
+    [activeSidebarConnectionId, openTableTab, setIsQuickSearchOpen, visibleResults],
   );
 
   const handleInputKeyDown = useCallback(
@@ -154,14 +215,14 @@ export default function QuickSearch() {
         return;
       }
 
-      if (results.length === 0) {
+      if (visibleResults.length === 0) {
         return;
       }
 
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setHighlightedIndex((currentIndex) =>
-          Math.min(currentIndex + 1, results.length - 1),
+          Math.min(currentIndex + 1, visibleResults.length - 1),
         );
         return;
       }
@@ -177,7 +238,7 @@ export default function QuickSearch() {
         openHighlightedTable(highlightedIndex);
       }
     },
-    [closeQuickSearch, highlightedIndex, openHighlightedTable, results.length],
+    [closeQuickSearch, highlightedIndex, openHighlightedTable, visibleResults.length],
   );
 
   const renderEmptyState = () => {
@@ -246,10 +307,10 @@ export default function QuickSearch() {
               className="h-auto border-0 bg-transparent px-0 py-0 font-mono text-[13px] shadow-none focus-visible:ring-0"
               role="combobox"
               aria-autocomplete="list"
-              aria-expanded={results.length > 0}
+              aria-expanded={visibleResults.length > 0}
               aria-controls={LISTBOX_ID}
               aria-activedescendant={
-                results[highlightedIndex]
+                visibleResults[highlightedIndex]
                   ? `quick-search-option-${highlightedIndex}`
                   : undefined
               }
@@ -278,15 +339,15 @@ export default function QuickSearch() {
             <span>
               {isSearchPending
                 ? 'Searching...'
-                : results.length > 0
-                  ? `${results.length} result${results.length === 1 ? '' : 's'}`
+                : visibleResults.length > 0
+                  ? `${visibleResults.length} result${visibleResults.length === 1 ? '' : 's'}`
                   : 'No results'}
             </span>
           </div>
         </div>
 
         <div className="max-h-[420px] min-h-[120px]">
-          {results.length === 0 ? (
+          {visibleResults.length === 0 ? (
             renderEmptyState()
           ) : (
             <div
@@ -295,52 +356,63 @@ export default function QuickSearch() {
               aria-busy={isSearchPending}
               className="h-[420px] overflow-y-auto px-1.5 py-1"
             >
-              {results.map((item, index) => {
-                const isHighlighted = index === highlightedIndex;
+              {sections.map((section) => (
+                <div key={section.id}>
+                  {section.label ? (
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      {section.label}
+                    </div>
+                  ) : null}
+                  {section.items.map((item) => {
+                    const index =
+                      visibleResultIndexByQualifiedName.get(item.qualifiedName) ?? 0;
+                    const isHighlighted = index === highlightedIndex;
 
-                return (
-                  <div
-                    key={item.qualifiedName}
-                    id={`quick-search-option-${index}`}
-                    ref={(element) => {
-                      resultRefs.current[index] = element;
-                    }}
-                    role="option"
-                    tabIndex={-1}
-                    aria-selected={isHighlighted}
-                    className={cn(
-                      'flex w-full cursor-pointer items-center gap-3 border border-transparent px-2 py-2 text-left transition-colors',
-                      isHighlighted
-                        ? 'border-primary/30 bg-primary/10 text-foreground'
-                        : 'text-muted-foreground hover:border-border/70 hover:bg-secondary/40 hover:text-foreground',
-                    )}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                    }}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                    onClick={() => openHighlightedTable(index)}
-                  >
-                    <Database
-                      size={14}
-                      className={cn(
-                        'shrink-0',
-                        isHighlighted ? 'text-primary' : 'text-muted-foreground',
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-mono text-[12px] text-foreground">
-                        {item.qualifiedName}
+                    return (
+                      <div
+                        key={`${section.id}:${item.qualifiedName}`}
+                        id={`quick-search-option-${index}`}
+                        ref={(element) => {
+                          resultRefs.current[index] = element;
+                        }}
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={isHighlighted}
+                        className={cn(
+                          'flex w-full cursor-pointer items-center gap-3 border border-transparent px-2 py-2 text-left transition-colors',
+                          isHighlighted
+                            ? 'border-primary/30 bg-primary/10 text-foreground'
+                            : 'text-muted-foreground hover:border-border/70 hover:bg-secondary/40 hover:text-foreground',
+                        )}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                        }}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                        onClick={() => openHighlightedTable(index)}
+                      >
+                        <Database
+                          size={14}
+                          className={cn(
+                            'shrink-0',
+                            isHighlighted ? 'text-primary' : 'text-muted-foreground',
+                          )}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-mono text-[12px] text-foreground">
+                            {item.qualifiedName}
+                          </div>
+                          <div className="mt-0.5 truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                            {item.schema ? `Schema ${item.schema}` : 'Table'}
+                          </div>
+                        </div>
+                        <div className="shrink-0 border border-border/70 bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          Enter
+                        </div>
                       </div>
-                      <div className="mt-0.5 truncate text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                        {item.schema ? `Schema ${item.schema}` : 'Table'}
-                      </div>
-                    </div>
-                    <div className="shrink-0 border border-border/70 bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                      Enter
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </div>

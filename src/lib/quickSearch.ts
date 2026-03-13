@@ -1,5 +1,5 @@
 import { getQualifiedTableName, getSchemaName } from '@/lib/databaseObjects';
-import type { TableInfo } from '@/store/useAppStore';
+import type { QuickSearchRecentItem, TableInfo } from '@/store/useAppStore';
 
 export interface QuickSearchTableItem {
   qualifiedName: string;
@@ -104,4 +104,40 @@ export function searchQuickSearchTableItems(
     ...nameSubstringMatches,
     ...fallbackMatches,
   ].slice(0, limit);
+}
+
+export function getQuickSearchRecentTableItems(
+  items: QuickSearchTableItem[],
+  recentItems: QuickSearchRecentItem[],
+  connectionId: string | null,
+  limit: number,
+): QuickSearchTableItem[] {
+  if (!connectionId || limit <= 0) {
+    return [];
+  }
+
+  const itemsByQualifiedName = new Map(
+    items.map((item) => [item.qualifiedName, item] as const),
+  );
+
+  const resolvedRecentItems: QuickSearchTableItem[] = [];
+
+  for (const recentItem of recentItems) {
+    if (recentItem.connectionId !== connectionId) {
+      continue;
+    }
+
+    const matchedItem = itemsByQualifiedName.get(recentItem.tableName);
+    if (!matchedItem) {
+      continue;
+    }
+
+    resolvedRecentItems.push(matchedItem);
+
+    if (resolvedRecentItems.length >= limit) {
+      break;
+    }
+  }
+
+  return resolvedRecentItems;
 }

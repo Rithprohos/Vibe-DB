@@ -2,10 +2,11 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   buildQuickSearchTableItems,
+  getQuickSearchRecentTableItems,
   normalizeQuickSearchQuery,
   searchQuickSearchTableItems,
 } from '../src/lib/quickSearch';
-import type { TableInfo } from '../src/store/useAppStore';
+import type { QuickSearchRecentItem, TableInfo } from '../src/store/useAppStore';
 
 const TABLES: TableInfo[] = [
   { name: 'users', table_type: 'table' },
@@ -13,6 +14,11 @@ const TABLES: TableInfo[] = [
   { name: 'audit_log', table_type: 'table' },
   { name: 'users', table_type: 'table', schema: 'admin' },
   { name: 'user_view', table_type: 'view' },
+];
+const RECENT_ITEMS: QuickSearchRecentItem[] = [
+  { connectionId: 'conn-a', tableName: 'audit_log', openedAt: 30 },
+  { connectionId: 'conn-b', tableName: 'users', openedAt: 20 },
+  { connectionId: 'conn-a', tableName: 'admin.users', openedAt: 10 },
 ];
 
 describe('quick search helpers', () => {
@@ -46,6 +52,16 @@ describe('quick search helpers', () => {
     const matches = searchQuickSearchTableItems(items, 'admin', 10);
 
     expect(matches.map((item) => item.qualifiedName)).toEqual(['admin.users']);
+  });
+
+  test('returns recent tables scoped to the active connection', () => {
+    const items = buildQuickSearchTableItems(TABLES);
+    const matches = getQuickSearchRecentTableItems(items, RECENT_ITEMS, 'conn-a', 10);
+
+    expect(matches.map((item) => item.qualifiedName)).toEqual([
+      'audit_log',
+      'admin.users',
+    ]);
   });
 
   test('respects the result limit', () => {
