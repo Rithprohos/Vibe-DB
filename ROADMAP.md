@@ -104,14 +104,9 @@ See [`changelog/`](./changelog/) for completed features.
 
 ### Upcoming Tasks
 
-**Backend SQL Generation (High Priority)**
+**Backend SQL Generation**
 
-Move SQL query building from frontend to backend for security and cleaner architecture:
-
-- [x] Add `update_rows` command - Accept table name + column changes, build UPDATE queries in Rust
-- [x] Add `insert_rows` command - Accept table name + row data, build INSERT queries in Rust
-- [x] Deprecate frontend SQL builders (`buildWhereClause`, `buildDeleteQueries`, etc.)
-- [x] Frontend becomes "UI only" - sends structured data, receives results
+SQL query building has been moved to the Rust backend. See [`changelog/v0.4.6.md`](./changelog/v0.4.6.md).
 
 **AI Panel Improvements**
 
@@ -141,7 +136,7 @@ Move SQL query building from frontend to backend for security and cleaner archit
 - [ ] Keep pagination/filter/sort execution fully in Rust commands
 - [ ] Add prepared statements for repeated table patterns
 - [ ] Return typed rows with reusable column metadata maps
-- [x] Debounce UI-triggered query refreshes
+
 - [ ] Keep metadata fetches separate from row fetches
 - [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
 - [ ] Expand Rust-side command timing instrumentation
@@ -278,7 +273,7 @@ Full PostgreSQL database support.
 #### High-Priority Follow-Ups
 
 - [ ] ARRAY: broaden PostgreSQL array decode and avoid null fallback for unsupported array element types
-- [x] Parameterized types: support `VARCHAR(n)`, `NUMERIC(p,s)`, and temporal precision in Create/Edit UI
+
 - [ ] BYTEA: add binary preview/inspection UX (size + hex/text preview)
 - [ ] INTERVAL: standardize decode/display formatting and add integration coverage
 
@@ -390,8 +385,6 @@ Stronghold vault plumbing is installed and working for AI keys and Turso auth to
 - [ ] Import/export between engines
 - [ ] Schema migration tools
 - [ ] Multi-window support (VS Code style) — allow multiple independent windows with shared connections but isolated tabs/active connection per window
-
----
 
 ## Timeline (Estimated)
 
