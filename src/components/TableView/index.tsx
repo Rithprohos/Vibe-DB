@@ -34,8 +34,10 @@ import { RowInspector } from './RowInspector';
 import { copyToClipboard } from '@/lib/copy';
 import { Checkbox } from '@/components/ui/checkbox';
 import { stringifyCellValue } from '@/lib/formatters';
+import { formatColumnTypeDisplay } from '@/lib/typeDisplay';
 
 const PAGE_SIZE_OPTIONS = ['50', '100', '200', '500'] as const;
+const QUERY_REFRESH_DEBOUNCE_MS = 250;
 
 export default function TableView({ tableName, tabId }: TableViewProps) {
   useDevRenderCounter('TableView', `${tableName}:${tabId}`);
@@ -54,6 +56,8 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   );
   const [checkedRowIndices, setCheckedRowIndices] = useState<Set<number>>(() => new Set());
   const commitFlashTimerRef = useRef<number | null>(null);
+  const dataRefreshTimerRef = useRef<number | null>(null);
+  const metadataRefreshTimerRef = useRef<number | null>(null);
 
   const {
     data,
@@ -94,14 +98,37 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   const skipInitialDataFetchRef = useRef(hasLoadedData);
   const skipInitialMetadataFetchRef = useRef(hasLoadedStructure && hasLoadedRowCount);
+  const tableContextKey = `${activeConnection?.connId ?? 'none'}:${tableName}`;
+  const dataRefreshContextRef = useRef<string | null>(tableContextKey);
+  const metadataRefreshContextRef = useRef<string | null>(tableContextKey);
+
+  const clearDataRefreshTimer = useCallback(() => {
+    if (dataRefreshTimerRef.current !== null) {
+      window.clearTimeout(dataRefreshTimerRef.current);
+      dataRefreshTimerRef.current = null;
+    }
+  }, []);
+
+  const clearMetadataRefreshTimer = useCallback(() => {
+    if (metadataRefreshTimerRef.current !== null) {
+      window.clearTimeout(metadataRefreshTimerRef.current);
+      metadataRefreshTimerRef.current = null;
+    }
+  }, []);
 
   const refreshVisibleData = useCallback(
-    () => fetchData(appliedFilters),
-    [fetchData, appliedFilters],
+    () => {
+      clearDataRefreshTimer();
+      return fetchData(appliedFilters);
+    },
+    [appliedFilters, clearDataRefreshTimer, fetchData],
   );
 
   const refreshAfterDelete = useCallback(
     async (deletedRows: number) => {
+      clearDataRefreshTimer();
+      clearMetadataRefreshTimer();
+
       if (deletedRows <= 0) {
         await fetchData(appliedFilters);
         return;
@@ -121,27 +148,89 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
       await fetchData(appliedFilters);
     },
-    [appliedFilters, fetchData, fetchRowCount, page, pageSize, setPage],
+    [
+      appliedFilters,
+      clearDataRefreshTimer,
+      clearMetadataRefreshTimer,
+      fetchData,
+      fetchRowCount,
+      page,
+      pageSize,
+      setPage,
+    ],
   );
 
-  // Trigger data fetching for rows (page/sort/filter)
   useEffect(() => {
     if (skipInitialDataFetchRef.current) {
       skipInitialDataFetchRef.current = false;
       return;
     }
-    fetchData(appliedFilters);
-  }, [fetchData, appliedFilters]);
 
-  // Fetch structure and total count only when filter/connection/table context changes
+    const contextChanged = dataRefreshContextRef.current !== tableContextKey;
+    dataRefreshContextRef.current = tableContextKey;
+
+    clearDataRefreshTimer();
+
+    if (!hasLoadedData || contextChanged) {
+      void fetchData(appliedFilters);
+      return;
+    }
+
+    dataRefreshTimerRef.current = window.setTimeout(() => {
+      dataRefreshTimerRef.current = null;
+      void fetchData(appliedFilters);
+    }, QUERY_REFRESH_DEBOUNCE_MS);
+
+    return clearDataRefreshTimer;
+  }, [
+    appliedFilters,
+    clearDataRefreshTimer,
+    fetchData,
+    hasLoadedData,
+    page,
+    pageSize,
+    sortCol,
+    sortDir,
+    tableContextKey,
+  ]);
+
   useEffect(() => {
     if (skipInitialMetadataFetchRef.current) {
       skipInitialMetadataFetchRef.current = false;
       return;
     }
-    fetchStructure();
-    fetchRowCount(appliedFilters);
-  }, [fetchStructure, fetchRowCount, appliedFilters]);
+
+    const contextChanged = metadataRefreshContextRef.current !== tableContextKey;
+    metadataRefreshContextRef.current = tableContextKey;
+
+    clearMetadataRefreshTimer();
+
+    const runMetadataRefresh = () =>
+      Promise.all([
+        fetchStructure(),
+        fetchRowCount(appliedFilters),
+      ]);
+
+    if (!hasLoadedStructure || !hasLoadedRowCount || contextChanged) {
+      void runMetadataRefresh();
+      return;
+    }
+
+    metadataRefreshTimerRef.current = window.setTimeout(() => {
+      metadataRefreshTimerRef.current = null;
+      void runMetadataRefresh();
+    }, QUERY_REFRESH_DEBOUNCE_MS);
+
+    return clearMetadataRefreshTimer;
+  }, [
+    appliedFilters,
+    clearMetadataRefreshTimer,
+    fetchRowCount,
+    fetchStructure,
+    hasLoadedRowCount,
+    hasLoadedStructure,
+    tableContextKey,
+  ]);
 
   const columnInfos = useMemo(() => structure?.columns ?? [], [structure]);
 
@@ -299,10 +388,21 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   }, [structure?.indexes]);
 
   const handleRefreshAll = useCallback(() => {
-    fetchStructure();
-    fetchRowCount(appliedFilters);
-    fetchData(appliedFilters);
-  }, [fetchStructure, fetchRowCount, fetchData, appliedFilters]);
+    clearDataRefreshTimer();
+    clearMetadataRefreshTimer();
+    void Promise.all([
+      fetchStructure(),
+      fetchRowCount(appliedFilters),
+      fetchData(appliedFilters),
+    ]);
+  }, [
+    appliedFilters,
+    clearDataRefreshTimer,
+    clearMetadataRefreshTimer,
+    fetchData,
+    fetchRowCount,
+    fetchStructure,
+  ]);
 
   const commitPendingWithFeedback = useCallback(async () => {
     const activeEdit =
@@ -421,8 +521,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
     gridCols.forEach((colName) => {
       const columnInfo = columnInfoByName[colName];
-      let type = columnInfo?.col_type.toLowerCase() || 'text';
-      if (type === 'integer') type = 'int';
+      const typeLabel = formatColumnTypeDisplay(columnInfo?.col_type ?? 'text');
       const isPk = columnInfo?.pk;
       const indexMeta = indexMetaByColumnName[colName];
       const hasIndex = Boolean(indexMeta);
@@ -456,8 +555,8 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                 "text-[11px] tracking-tight truncate shrink-0",
                 isPk ? "text-amber-500/90 font-black uppercase" : "font-bold text-foreground/90"
               )}>{colName}</span>
-              <span className="text-[9px] font-mono tracking-tight text-primary/40 group-hover:text-primary/70 transition-colors lowercase truncate pt-0.5">
-                {type}
+              <span className="text-[9px] font-mono tracking-tight text-primary/40 group-hover:text-primary/70 transition-colors truncate pt-0.5">
+                {typeLabel}
               </span>
               <div className="flex-1" />
               {sortCol === colName && (
@@ -498,11 +597,13 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   useEffect(() => {
     return () => {
+      clearDataRefreshTimer();
+      clearMetadataRefreshTimer();
       if (commitFlashTimerRef.current) {
         window.clearTimeout(commitFlashTimerRef.current);
       }
     };
-  }, []);
+  }, [clearDataRefreshTimer, clearMetadataRefreshTimer]);
 
   // Global keyboard shortcuts for saving/discarding
   useEffect(() => {

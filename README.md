@@ -8,6 +8,7 @@
   <a href="./README.md"><b>🏠 Overview</b></a> &nbsp;•&nbsp;
   <a href="./ROADMAP.md">🗺️ Roadmap</a> &nbsp;•&nbsp;
   <a href="https://github.com/Rithprohos/vibe-db/releases">🚀 Releases</a> &nbsp;•&nbsp;
+  <a href="./changelog/">📜 Changelog</a> &nbsp;•&nbsp;
   <a href="./LICENSE">⚖️ License</a>
 </p>
 
@@ -31,10 +32,12 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
 ## 🛠️ Core Features
 
 - **🚀 High Performance** — TanStack virtualization across table browsing, query results, logs, and sidebar lists, plus aggressive code-splitting for heavy UI paths.
-- **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction.
+- **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction. All row inserts, updates, and deletes are built and executed in Rust.
 - **🌍 Multi-Engine Ready** — SQLite, Turso (libSQL), and PostgreSQL supported. MySQL coming soon.
-- **🏗️ Visual Table Builder** — Create tables with a polished GUI including real-time, syntax-highlighted SQL preview.
-- **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions.
+- **🏗️ Visual Table & View Builder** — Create tables and views with a polished GUI including real-time, syntax-highlighted SQL preview.
+- **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions, plus click-to-sort columns and drag-to-resize headers.
+- **🔎 Row Inspector** — Side panel for detailed row viewing and in-place field editing with save/cancel flow and JSON-aware helpers.
+- **🗑️ Safe Row Deletion** — Multi-select rows and delete with a production-environment confirmation guard to prevent accidental data loss.
 - **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
 - **✨ Pollinations AI** — Intelligent SQL assistance built right into the query editor.
 - **🎨 Premium Themes** — Switch between **Dark**, **Light**, and **Purple Solarized** modes.
@@ -58,10 +61,10 @@ bun run tauri build
 
 ## 🏗️ Architecture
 
-- **Frontend**: React 19 + TypeScript + Zustand + Tailwind CSS
-- **Backend**: Rust + Tauri v2 + sqlx (SQLite) + libsql (Turso)
-- **Editor**: CodeMirror 6 with SQL support
-- **State**: Persistent JSON via `tauri-plugin-store`
+- **Frontend**: React 19 + TypeScript + Zustand + Vanilla CSS (design token system)
+- **Backend**: Rust + Tauri v2 + sqlx (SQLite & PostgreSQL) + libsql (Turso)
+- **Editor**: CodeMirror 6 with SQL syntax support
+- **State**: Persistent JSON via `tauri-plugin-store`; secrets via `tauri-plugin-stronghold`
 
 ## 🔐 Security Posture
 
@@ -86,4 +89,4 @@ As of **March 11, 2026**, VibeDB includes important baseline protections, but se
 
 ---
 
-_Crafted with vibe coding and AI assistance. See [ROADMAP.md](./ROADMAP.md) for upcoming features (MySQL support)._
+_Crafted with vibe coding and AI assistance. See [ROADMAP.md](./ROADMAP.md) for upcoming features — MySQL is next._

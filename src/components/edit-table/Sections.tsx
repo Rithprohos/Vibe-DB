@@ -1,6 +1,8 @@
-import type { SqliteType } from '../../lib/createTableConstants';
-import { getSqliteTypeColor } from '../../lib/createTableConstants';
+import type { SqliteType, TypeParams } from '../../lib/createTableConstants';
+import { getSqliteTypeColor, supportsTypeParams } from '../../lib/createTableConstants';
 import type { ColumnInfo, IndexInfo } from '../../store/useAppStore';
+import { TypeParameterFields } from '../TypeParameterFields';
+import { formatColumnTypeDisplay } from '../../lib/typeDisplay';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -148,6 +150,9 @@ interface EditTableOperationsPanelProps {
   newColumnNameError: string | null;
   newColumnType: string;
   onNewColumnTypeChange: (value: string) => void;
+  newColumnTypeParams?: TypeParams;
+  onNewColumnTypeParamsChange?: (params: TypeParams | undefined) => void;
+  newColumnTypeParamError: string | null;
   newColumnDefault: string;
   onNewColumnDefaultChange: (value: string) => void;
   newColumnNotNull: boolean;
@@ -198,6 +203,9 @@ export function EditTableOperationsPanel({
   newColumnNameError,
   newColumnType,
   onNewColumnTypeChange,
+  newColumnTypeParams,
+  onNewColumnTypeParamsChange,
+  newColumnTypeParamError,
   newColumnDefault,
   onNewColumnDefaultChange,
   newColumnNotNull,
@@ -313,6 +321,15 @@ export function EditTableOperationsPanel({
               </SelectGroup>
             </SelectContent>
           </Select>
+          {/* Type Parameters */}
+          {supportsTypeParams(newColumnType) && onNewColumnTypeParamsChange ? (
+            <TypeParameterFields
+              typeValue={newColumnType}
+              params={newColumnTypeParams}
+              onChange={onNewColumnTypeParamsChange}
+              size="default"
+            />
+          ) : null}
           <Input
             value={newColumnDefault}
             onChange={(e) => onNewColumnDefaultChange(e.target.value)}
@@ -334,7 +351,8 @@ export function EditTableOperationsPanel({
               loadingColumns ||
               isBusy('add-column') ||
               !newColumnName.trim() ||
-              Boolean(newColumnNameError)
+              Boolean(newColumnNameError) ||
+              Boolean(newColumnTypeParamError)
             }
             className="h-8"
           >
@@ -658,7 +676,7 @@ export function EditTableSchemaSidebar({
                   >
                     <td className="px-4 py-2 font-medium text-foreground">{column.name}</td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {column.col_type || '—'}
+                      {formatColumnTypeDisplay(column.col_type)}
                     </td>
                     <td className="px-3 py-2 text-center text-muted-foreground">
                       {column.notnull ? 'Y' : 'N'}

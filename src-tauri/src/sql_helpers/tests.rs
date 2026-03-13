@@ -2,7 +2,7 @@ use super::{
     build_create_table_sql, build_create_view_sql, build_delete_queries, build_insert_queries,
     build_insert_query, build_update_queries, build_where_clause_for_row,
     quote_qualified_identifier, CreateTableColumnInput, RowDataInput, RowIdentifierInput,
-    RowUpdateInput,
+    RowUpdateInput, TypeParams,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -241,6 +241,7 @@ fn build_create_table_sql_sqlite_with_autoincrement() {
     let columns = vec![CreateTableColumnInput {
         name: "id".to_string(),
         col_type: "INTEGER".to_string(),
+        type_params: None,
         primary_key: true,
         auto_increment: true,
         not_null: false,
@@ -269,6 +270,7 @@ fn build_create_table_sql_postgres_with_serial() {
     let columns = vec![CreateTableColumnInput {
         name: "id".to_string(),
         col_type: "INTEGER".to_string(),
+        type_params: None,
         primary_key: true,
         auto_increment: true,
         not_null: false,
@@ -302,6 +304,7 @@ fn build_create_table_sql_postgres_with_bigserial() {
     let columns = vec![CreateTableColumnInput {
         name: "id".to_string(),
         col_type: "BIGINT".to_string(),
+        type_params: None,
         primary_key: true,
         auto_increment: true,
         not_null: false,
@@ -335,6 +338,7 @@ fn build_create_table_sql_postgres_supports_if_not_exists() {
     let columns = vec![CreateTableColumnInput {
         name: "id".to_string(),
         col_type: "INTEGER".to_string(),
+        type_params: None,
         primary_key: true,
         auto_increment: false,
         not_null: false,
@@ -363,6 +367,7 @@ fn build_create_table_sql_rejects_unknown_engine() {
     let columns = vec![CreateTableColumnInput {
         name: "id".to_string(),
         col_type: "INTEGER".to_string(),
+        type_params: None,
         primary_key: true,
         auto_increment: false,
         not_null: false,
@@ -602,4 +607,263 @@ fn build_insert_query_rejects_empty_column_name() {
     let error = build_insert_query("users", &row).expect_err("expected empty column name error");
 
     assert_eq!(error, "Column name is required");
+}
+
+// Parameterized type tests
+
+#[test]
+fn build_create_table_sql_postgres_with_varchar_length() {
+    let columns = vec![CreateTableColumnInput {
+        name: "name".to_string(),
+        col_type: "VARCHAR".to_string(),
+        type_params: Some(TypeParams {
+            length: Some(255),
+            precision: None,
+            scale: None,
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: true,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "users".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("VARCHAR(255)"),
+        "PostgreSQL should support VARCHAR(n). Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_postgres_with_numeric_precision_scale() {
+    let columns = vec![CreateTableColumnInput {
+        name: "price".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(10),
+            scale: Some(2),
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "products".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("NUMERIC(10,2)"),
+        "PostgreSQL should support NUMERIC(p,s). Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_postgres_with_timestamp_precision() {
+    let columns = vec![CreateTableColumnInput {
+        name: "created_at".to_string(),
+        col_type: "TIMESTAMP".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(3),
+            scale: None,
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "events".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("TIMESTAMP(3)"),
+        "PostgreSQL should support TIMESTAMP(p). Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_sqlite_with_varchar_length() {
+    let columns = vec![CreateTableColumnInput {
+        name: "name".to_string(),
+        col_type: "VARCHAR".to_string(),
+        type_params: Some(TypeParams {
+            length: Some(100),
+            precision: None,
+            scale: None,
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "users".to_string(),
+        columns,
+        false,
+        Some("sqlite".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("VARCHAR(100)"),
+        "SQLite should support VARCHAR(n). Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_without_params_uses_base_type() {
+    let columns = vec![CreateTableColumnInput {
+        name: "name".to_string(),
+        col_type: "VARCHAR".to_string(),
+        type_params: None,
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "users".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("VARCHAR"),
+        "Should support base type without params. Got: {}",
+        sql
+    );
+    assert!(
+        !sql.contains("VARCHAR("),
+        "Should not have parentheses when no params. Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_numeric_with_precision_only() {
+    let columns = vec![CreateTableColumnInput {
+        name: "amount".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(18),
+            scale: None,
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "payments".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("NUMERIC(18)"),
+        "Should support NUMERIC with precision only. Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_rejects_scale_greater_than_precision() {
+    let columns = vec![CreateTableColumnInput {
+        name: "price".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(4),
+            scale: Some(5),
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let error = build_create_table_sql(
+        "products".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect_err("expected validation error");
+
+    assert_eq!(error, "Scale cannot exceed precision");
+}
+
+#[test]
+fn build_create_table_sql_rejects_temporal_precision_above_six() {
+    let columns = vec![CreateTableColumnInput {
+        name: "created_at".to_string(),
+        col_type: "TIMESTAMP".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(7),
+            scale: None,
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let error = build_create_table_sql(
+        "events".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+    )
+    .expect_err("expected validation error");
+
+    assert_eq!(error, "Precision cannot exceed 6");
 }

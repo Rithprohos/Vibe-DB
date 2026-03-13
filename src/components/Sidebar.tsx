@@ -11,24 +11,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Database, LayoutTemplate, Eye, RefreshCw, Plus, ChevronRight, ChevronDown, Inbox, Pencil, X, Cloud, Server } from 'lucide-react';
+import { Database, LayoutTemplate, Eye, RefreshCw, Plus, Inbox, Pencil, X, Cloud, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import SavedQueriesSection from './SavedQueriesSection';
+import SidebarObjectSection from './SidebarObjectSection';
 import { useDevRenderCounter } from '@/lib/dev-performance';
 import {
   ALL_SCHEMAS_VALUE,
-  getQualifiedTableName,
   getSchemaName,
 } from '@/lib/databaseObjects';
 import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+import { ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -55,8 +49,6 @@ export default function Sidebar() {
   const [isResizing, setIsResizing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
-  const [contextMenuEpoch, setContextMenuEpoch] = useState(0);
   const [selectedSchema, setSelectedSchema] = useState(ALL_SCHEMAS_VALUE);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -64,9 +56,6 @@ export default function Sidebar() {
   const currentWidthRef = useRef(260);
   const rafIdRef = useRef<number | null>(null);
   const targetWidthRef = useRef(260);
-  const tablesListRef = useRef<HTMLDivElement>(null);
-  const viewsListRef = useRef<HTMLDivElement>(null);
-
   const startResizing = useCallback(() => {
     isResizingRef.current = true;
     setIsResizing(true);
@@ -196,20 +185,6 @@ export default function Sidebar() {
 
     return { filteredTables: nextTables, filteredViews: nextViews };
   }, [tables, normalizedSearch, selectedSchema, showSchemaFilter]);
-
-  const tableVirtualizer = useVirtualizer({
-    count: tablesOpen ? filteredTables.length : 0,
-    getScrollElement: () => tablesListRef.current,
-    estimateSize: () => 34,
-    overscan: 12,
-  });
-
-  const viewVirtualizer = useVirtualizer({
-    count: viewsOpen ? filteredViews.length : 0,
-    getScrollElement: () => viewsListRef.current,
-    estimateSize: () => 34,
-    overscan: 12,
-  });
 
   const handleRefresh = async () => {
     if (!activeConnection?.connId || isRefreshing) return;
@@ -485,210 +460,48 @@ export default function Sidebar() {
 
           <div className="flex-1 min-h-0 px-3 pb-4">
             <div className="flex h-full min-h-0 flex-col space-y-4">
-              {/* Views */}
-              <div className="space-y-1">
-                <div
-                  className="flex items-center space-x-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors group px-2 py-1"
-                  onClick={() => setViewsOpen(!viewsOpen)}
-                >
-                  <span className="text-[10px] transform transition-transform text-muted-foreground group-hover:text-primary">
-                    {viewsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  </span>
-                  <span className="flex-1">Views</span>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
-                      {filteredViews.length}
-                    </span>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-indigo-500/20 hover:text-indigo-400 transition-all"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateView();
-                      }}
-                      title="Create View"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
-                
-                {viewsOpen && (
-                  <div ref={viewsListRef} className="max-h-80 overflow-auto pr-1">
-                    <div style={{ height: `${viewVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-                      {viewVirtualizer.getVirtualItems().map((virtualItem) => {
-                        const t = filteredViews[virtualItem.index];
-                        const qualifiedName = getQualifiedTableName(t);
-                        const schemaName = getSchemaName(t);
-                        const menuKey = `view:${qualifiedName}`;
-                        return (
-                          <div
-                            key={qualifiedName}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualItem.start}px)`,
-                              paddingBottom: '2px',
-                            }}
-                          >
-                            <ContextMenu
-                              key={`${menuKey}:${contextMenuEpoch}`}
-                              onOpenChange={setIsContextMenuOpen}
-                            >
-                              <ContextMenuTrigger asChild>
-                                <div
-                                  className={cn(
-                                    "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                    selectedTable === qualifiedName
-                                      ? "bg-primary/10 text-primary border border-primary/20"
-                                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                                  )}
-                                  onClick={() => openTableTab(activeConnection!.id, qualifiedName, 'data')}
-                                  onDoubleClick={() => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
-                                >
-                                  <Eye size={14} className={selectedTable === qualifiedName ? "text-primary" : "text-muted-foreground"} />
-                                  <span className="truncate">{t.name}</span>
-                                  {showSchemaBadge && schemaName && (
-                                    <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
-                                      {schemaName}
-                                    </span>
-                                  )}
-                                </div>
-                              </ContextMenuTrigger>
-                              <ContextMenuContent className="w-48">
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, qualifiedName, 'data');
-                                  }}
-                                >
-                                  Open Data
-                                </ContextMenuItem>
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, qualifiedName, 'structure');
-                                  }}
-                                >
-                                  Open Structure
-                                </ContextMenuItem>
-                              </ContextMenuContent>
-                            </ContextMenu>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <SavedQueriesSection />
 
-              {/* Tables */}
-              <div className="flex min-h-0 flex-1 flex-col space-y-1">
-                <div
-                  className="flex items-center space-x-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors group px-2 py-1"
-                  onClick={() => setTablesOpen(!tablesOpen)}
-                >
-                  <span className="text-[10px] transform transition-transform text-muted-foreground group-hover:text-primary">
-                    {tablesOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                  </span>
-                  <span className="flex-1">Tables</span>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-background px-1.5 py-0.5 rounded text-[10px] font-mono border border-border">
-                      {filteredTables.length}
-                    </span>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-emerald-500/20 hover:text-emerald-400 transition-all"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateTable();
-                      }}
-                      title="Create Table"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
-                
-                {tablesOpen && (
-                  <div ref={tablesListRef} className="flex-1 min-h-0 overflow-auto pr-1">
-                    <div style={{ height: `${tableVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-                      {tableVirtualizer.getVirtualItems().map((virtualItem) => {
-                        const t = filteredTables[virtualItem.index];
-                        const qualifiedName = getQualifiedTableName(t);
-                        const schemaName = getSchemaName(t);
-                        const menuKey = `table:${qualifiedName}`;
-                        return (
-                          <div
-                            key={qualifiedName}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualItem.start}px)`,
-                              paddingBottom: '2px',
-                            }}
-                          >
-                            <ContextMenu
-                              key={`${menuKey}:${contextMenuEpoch}`}
-                              onOpenChange={setIsContextMenuOpen}
-                            >
-                              <ContextMenuTrigger asChild>
-                                <div
-                                  className={cn(
-                                    "flex items-center space-x-2 px-2 py-1.5 rounded-md text-sm cursor-pointer transition-all",
-                                    selectedTable === qualifiedName
-                                      ? "bg-primary/10 text-primary border border-primary/20"
-                                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                                  )}
-                                  onClick={() => openTableTab(activeConnection!.id, qualifiedName, 'data')}
-                                  onDoubleClick={() => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
-                                >
-                                  <LayoutTemplate size={14} className={selectedTable === qualifiedName ? "text-primary" : "text-muted-foreground"} />
-                                  <span className="truncate">{t.name}</span>
-                                  {showSchemaBadge && schemaName && (
-                                    <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
-                                      {schemaName}
-                                    </span>
-                                  )}
-                                </div>
-                              </ContextMenuTrigger>
-                              <ContextMenuContent className="w-48">
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, qualifiedName, 'data');
-                                  }}
-                                >
-                                  Open Data
-                                </ContextMenuItem>
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    openTableTab(activeConnection!.id, qualifiedName, 'structure');
-                                  }}
-                                >
-                                  Open Structure
-                                </ContextMenuItem>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem
-                                  onClick={() => {
-                                    setIsContextMenuOpen(false);
-                                    handleEditTable(qualifiedName);
-                                  }}
-                                >
-                                  Edit Table
-                                </ContextMenuItem>
-                              </ContextMenuContent>
-                            </ContextMenu>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              <SidebarObjectSection
+                title="Views"
+                items={filteredViews}
+                open={viewsOpen}
+                onToggle={() => setViewsOpen(!viewsOpen)}
+                onCreate={handleCreateView}
+                createTitle="Create View"
+                createButtonClassName="hover:bg-indigo-500/20 hover:text-indigo-400"
+                itemIcon={Eye}
+                selectedItem={selectedTable}
+                showSchemaBadge={showSchemaBadge}
+                listClassName="max-h-80 overflow-auto pr-1"
+                onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
+              />
+
+              <SidebarObjectSection
+                title="Tables"
+                items={filteredTables}
+                open={tablesOpen}
+                onToggle={() => setTablesOpen(!tablesOpen)}
+                onCreate={handleCreateTable}
+                createTitle="Create Table"
+                createButtonClassName="hover:bg-emerald-500/20 hover:text-emerald-400"
+                itemIcon={LayoutTemplate}
+                selectedItem={selectedTable}
+                showSchemaBadge={showSchemaBadge}
+                listClassName="flex-1 min-h-0 overflow-auto pr-1"
+                containerClassName="flex min-h-0 flex-1 flex-col"
+                onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
+                renderMenuItems={(qualifiedName) => (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => handleEditTable(qualifiedName)}>
+                      Edit Table
+                    </ContextMenuItem>
+                  </>
                 )}
-              </div>
+              />
 
               {/* Empty state */}
               {filteredTables.length === 0 && filteredViews.length === 0 && !search && (
@@ -708,24 +521,10 @@ export default function Sidebar() {
               )}
             </div>
           </div>
+
         </div>
       )}
 
-      {isContextMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          onPointerDown={() => {
-            setContextMenuEpoch((value) => value + 1);
-            setIsContextMenuOpen(false);
-          }}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setContextMenuEpoch((value) => value + 1);
-            setIsContextMenuOpen(false);
-          }}
-        />
-      )}
-      
       {/* Resizer handle */}
       <div 
         className={cn(

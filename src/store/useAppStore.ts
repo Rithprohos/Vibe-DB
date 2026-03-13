@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createAiSlice } from "./slices/aiSlice";
 import { createConnectionSlice } from "./slices/connectionSlice";
+import { createSavedQueriesSlice } from "./slices/savedQueriesSlice";
 import { createTabsSlice } from "./slices/tabsSlice";
 import { createUiSlice } from "./slices/uiSlice";
 import { storage } from "./storage";
@@ -22,6 +23,7 @@ export type {
   IndexInfo,
   QueryResult,
   QueryResultLight,
+  SavedQuery,
   SqlLog,
   Tab,
   TabType,
@@ -39,6 +41,7 @@ export const useAppStore = create<AppState>()(
       ...createUiSlice(set),
       ...createAiSlice(set),
       ...createConnectionSlice(set),
+      ...createSavedQueriesSlice(set, get),
       ...createTabsSlice(set, get),
     }),
     {
@@ -62,6 +65,7 @@ export const useAppStore = create<AppState>()(
         activeSidebarConnectionId: state.activeSidebarConnectionId,
         tabs: state.tabs,
         activeTabId: state.activeTabId,
+        savedQueries: state.savedQueries,
         theme: state.theme,
         developerToolsEnabled: state.developerToolsEnabled,
         aiProviderMode: state.aiProviderMode,

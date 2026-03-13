@@ -1,9 +1,25 @@
 // Constants and types for the Create Table feature
 
+/** Type parameter configuration for parameterized types like VARCHAR(n), NUMERIC(p,s) */
+export interface TypeParams {
+  length?: number;
+  precision?: number;
+  scale?: number;
+}
+
+export type TypeParamKind = 'length' | 'precision-scale' | 'precision';
+
+export interface TypeParamConfig {
+  supportsParams: boolean;
+  paramType?: TypeParamKind;
+}
+
 export interface ColumnDef {
   id: string;
   name: string;
   type: string;
+  /** Type parameters for parameterized types (VARCHAR(n), NUMERIC(p,s), etc.) */
+  typeParams?: TypeParams;
   primaryKey: boolean;
   autoIncrement: boolean;
   notNull: boolean;
@@ -16,6 +32,8 @@ export interface SqliteType {
   value: string;
   label: string;
   color: string;
+  supportsParams?: boolean;
+  paramType?: TypeParamKind;
 }
 
 export type SupportedEngine = "sqlite" | "turso" | "postgres";
@@ -35,8 +53,8 @@ const DATA_TYPE_OPTIONS: readonly DataTypeOption[] = [
   { value: "TEXT", label: "TEXT", color: "text-emerald-500", engines: ["sqlite", "turso", "postgres"] },
   { value: "REAL", label: "REAL", color: "text-blue-500", engines: ["sqlite", "turso"] },
   { value: "BLOB", label: "BLOB", color: "text-purple-500", engines: ["sqlite", "turso"] },
-  { value: "NUMERIC", label: "NUMERIC", color: "text-rose-500", engines: ["sqlite", "turso", "postgres"] },
-  { value: "VARCHAR", label: "VARCHAR", color: "text-teal-500", engines: ["sqlite", "turso", "postgres"] },
+  { value: "NUMERIC", label: "NUMERIC", color: "text-rose-500", engines: ["sqlite", "turso", "postgres"], supportsParams: true, paramType: "precision-scale" },
+  { value: "VARCHAR", label: "VARCHAR", color: "text-teal-500", engines: ["sqlite", "turso", "postgres"], supportsParams: true, paramType: "length" },
   { value: "BOOLEAN", label: "BOOLEAN", color: "text-lime-500", engines: ["postgres"] },
   { value: "SMALLINT", label: "SMALLINT", color: "text-amber-400", engines: ["postgres"] },
   { value: "BIGINT", label: "BIGINT", color: "text-amber-400", engines: ["postgres"] },
@@ -49,13 +67,13 @@ const DATA_TYPE_OPTIONS: readonly DataTypeOption[] = [
   { value: "JSONB", label: "JSONB", color: "text-pink-400", engines: ["postgres"] },
   { value: "BYTEA", label: "BYTEA", color: "text-purple-400", engines: ["postgres"] },
   { value: "DATE", label: "DATE", color: "text-orange-400", engines: ["postgres"] },
-  { value: "TIME", label: "TIME", color: "text-orange-400", engines: ["postgres"] },
-  { value: "TIMETZ", label: "TIMETZ", color: "text-orange-400", engines: ["postgres"] },
-  { value: "TIMESTAMP", label: "TIMESTAMP", color: "text-orange-400", engines: ["postgres"] },
-  { value: "TIMESTAMPTZ", label: "TIMESTAMPTZ", color: "text-orange-400", engines: ["postgres"] },
-  { value: "INTERVAL", label: "INTERVAL", color: "text-orange-300", engines: ["postgres"] },
-  { value: "CHAR", label: "CHAR", color: "text-teal-400", engines: ["postgres"] },
-  { value: "BPCHAR", label: "BPCHAR", color: "text-teal-400", engines: ["postgres"] },
+  { value: "TIME", label: "TIME", color: "text-orange-400", engines: ["postgres"], supportsParams: true, paramType: "precision" },
+  { value: "TIMETZ", label: "TIMETZ", color: "text-orange-400", engines: ["postgres"], supportsParams: true, paramType: "precision" },
+  { value: "TIMESTAMP", label: "TIMESTAMP", color: "text-orange-400", engines: ["postgres"], supportsParams: true, paramType: "precision" },
+  { value: "TIMESTAMPTZ", label: "TIMESTAMPTZ", color: "text-orange-400", engines: ["postgres"], supportsParams: true, paramType: "precision" },
+  { value: "INTERVAL", label: "INTERVAL", color: "text-orange-300", engines: ["postgres"], supportsParams: true, paramType: "precision" },
+  { value: "CHAR", label: "CHAR", color: "text-teal-400", engines: ["postgres"], supportsParams: true, paramType: "length" },
+  { value: "BPCHAR", label: "BPCHAR", color: "text-teal-400", engines: ["postgres"], supportsParams: true, paramType: "length" },
   { value: "XML", label: "XML", color: "text-rose-400", engines: ["postgres"] },
   { value: "INET", label: "INET", color: "text-sky-400", engines: ["postgres"] },
   { value: "CIDR", label: "CIDR", color: "text-sky-400", engines: ["postgres"] },
@@ -77,7 +95,13 @@ export function getSqliteTypeColor(typeName: string): string {
 export function getDataTypesForEngine(engine: SupportedEngine): readonly SqliteType[] {
   return DATA_TYPE_OPTIONS
     .filter((option) => option.engines.includes(engine))
-    .map(({ value, label, color }) => ({ value, label, color }));
+    .map(({ value, label, color, supportsParams, paramType }) => ({
+      value,
+      label,
+      color,
+      supportsParams,
+      paramType,
+    }));
 }
 
 export function getEngineTypeLabel(engine: SupportedEngine): string {
@@ -127,4 +151,132 @@ export function createDefaultIdColumn(): ColumnDef {
     autoIncrement: true,
     notNull: true,
   };
+}
+
+/** Get parameter config for a data type. */
+export function getTypeParamConfig(typeValue: string): TypeParamConfig | null {
+  const typeOption = DATA_TYPE_OPTIONS.find(t => t.value === typeValue);
+  if (!typeOption) return null;
+  return {
+    supportsParams: typeOption.supportsParams ?? false,
+    paramType: typeOption.paramType,
+  };
+}
+
+/** Check if a type supports parameters. */
+export function supportsTypeParams(typeValue: string): boolean {
+  return getTypeParamConfig(typeValue)?.supportsParams ?? false;
+}
+
+/** Remove params that do not apply to the selected type. */
+export function normalizeTypeParams(
+  typeValue: string,
+  params?: TypeParams,
+): TypeParams | undefined {
+  const config = getTypeParamConfig(typeValue);
+  if (!config?.supportsParams || !params) {
+    return undefined;
+  }
+
+  switch (config.paramType) {
+    case 'length':
+      return params.length !== undefined ? { length: params.length } : undefined;
+    case 'precision-scale':
+      if (params.precision === undefined && params.scale === undefined) {
+        return undefined;
+      }
+      return {
+        precision: params.precision,
+        scale: params.scale,
+      };
+    case 'precision':
+      return params.precision !== undefined ? { precision: params.precision } : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** Format a type with its parameters for SQL generation. */
+export function formatTypeWithParams(typeValue: string, params?: TypeParams): string {
+  const config = getTypeParamConfig(typeValue);
+  const normalizedParams = normalizeTypeParams(typeValue, params);
+  if (!config?.supportsParams || !normalizedParams) {
+    return typeValue;
+  }
+
+  switch (config.paramType) {
+    case 'length':
+      if (normalizedParams.length !== undefined && normalizedParams.length > 0) {
+        return `${typeValue}(${normalizedParams.length})`;
+      }
+      break;
+    case 'precision-scale':
+      if (normalizedParams.precision !== undefined && normalizedParams.precision > 0) {
+        if (normalizedParams.scale !== undefined && normalizedParams.scale >= 0) {
+          return `${typeValue}(${normalizedParams.precision},${normalizedParams.scale})`;
+        }
+        return `${typeValue}(${normalizedParams.precision})`;
+      }
+      break;
+    case 'precision':
+      if (normalizedParams.precision !== undefined && normalizedParams.precision >= 0) {
+        return `${typeValue}(${normalizedParams.precision})`;
+      }
+      break;
+  }
+  return typeValue;
+}
+
+/** Validate type parameters. */
+export function validateTypeParams(typeValue: string, params?: TypeParams): string | null {
+  const config = getTypeParamConfig(typeValue);
+  const normalizedParams = normalizeTypeParams(typeValue, params);
+  if (!config?.supportsParams || !normalizedParams) {
+    return null;
+  }
+
+  switch (config.paramType) {
+    case 'length':
+      if (normalizedParams.length !== undefined) {
+        if (normalizedParams.length < 1) {
+          return 'Length must be at least 1';
+        }
+        if (normalizedParams.length > 10485760) {
+          return 'Length is too large';
+        }
+      }
+      break;
+    case 'precision-scale':
+      if (normalizedParams.precision !== undefined) {
+        if (normalizedParams.precision < 1) {
+          return 'Precision must be at least 1';
+        }
+        if (normalizedParams.precision > 1000) {
+          return 'Precision is too large';
+        }
+      }
+      if (normalizedParams.scale !== undefined) {
+        if (normalizedParams.scale < 0) {
+          return 'Scale cannot be negative';
+        }
+        if (
+          normalizedParams.precision !== undefined &&
+          normalizedParams.scale > normalizedParams.precision
+        ) {
+          return 'Scale cannot exceed precision';
+        }
+      }
+      break;
+    case 'precision':
+      if (normalizedParams.precision !== undefined) {
+        if (normalizedParams.precision < 0) {
+          return 'Precision cannot be negative';
+        }
+        if (normalizedParams.precision > 6) {
+          return 'Precision cannot exceed 6';
+        }
+      }
+      break;
+  }
+  return null;
 }

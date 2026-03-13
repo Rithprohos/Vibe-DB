@@ -109,6 +109,15 @@ export interface ToastItem {
   type: "success" | "error" | "info";
 }
 
+export interface SavedQuery {
+  id: string;
+  name: string;
+  sql: string;
+  connectionId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type TabType =
   | "data"
   | "structure"
@@ -160,6 +169,8 @@ export interface Tab {
   result?: QueryResult | null;
   error?: string;
   createViewDraft?: CreateViewDraft;
+  savedQueryId?: string | null;
+  savedQueryName?: string | null;
 }
 
 export interface AppState {
@@ -184,6 +195,9 @@ export interface AppState {
 
   // Toasts
   toasts: ToastItem[];
+
+  // Saved queries
+  savedQueries: SavedQuery[];
 
   // Settings Modal
   showSettingsModal: boolean;
@@ -258,6 +272,15 @@ export interface AppState {
   clearLogs: () => void;
   setShowLogDrawer: (val: BooleanSetter) => void;
   setShowSettingsModal: (val: boolean) => void;
+  saveQuery: (input: {
+    id?: string;
+    name: string;
+    sql: string;
+    connectionId: string | null;
+  }) => SavedQuery;
+  renameSavedQuery: (id: string, name: string) => void;
+  deleteSavedQuery: (id: string) => void;
+  unlinkTabsForSavedQuery: (savedQueryId: string) => void;
   showToast: (toast: Omit<ToastItem, "id">) => void;
   dismissToast: (id: string) => void;
 
