@@ -280,6 +280,10 @@
   .glow-shadow {
     box-shadow: 0 0 10px rgba(var(--glow-color), 0.4);
   }
+
+  .schema-relationship-path {
+    animation: schema-dash-flow 1s linear infinite;
+  }
 }
 
 /* Base styles for app layout */
@@ -337,4 +341,15 @@
 }
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+@keyframes schema-dash-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -16; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schema-relationship-path {
+    animation: none;
+  }
 }

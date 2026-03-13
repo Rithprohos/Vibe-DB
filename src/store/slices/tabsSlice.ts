@@ -1,7 +1,9 @@
 import { MAX_QUICK_SEARCH_RECENT_ITEMS, MAX_TABS } from "../constants";
 import {
+  createDefaultVisualizationState,
   createDefaultTableViewState,
   getSelectedTableForTab,
+  pruneVisualizationStateByTabs,
   pruneTableViewStateByTabs,
 } from "../helpers";
 import type { AppState } from "../types";
@@ -12,6 +14,7 @@ type TabsSlice = Pick<
   | "tabs"
   | "activeTabId"
   | "tableViewStateByTabId"
+  | "visualizationStateByTabId"
   | "quickSearchRecentItems"
   | "addTab"
   | "closeTab"
@@ -21,6 +24,9 @@ type TabsSlice = Pick<
   | "updateTab"
   | "updateTableViewState"
   | "openTableTab"
+  | "openVisualizationTab"
+  | "updateVisualizationState"
+  | "setVisualizationTablePosition"
 >;
 
 let tabCounter = 0;
@@ -30,6 +36,7 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
     tabs: [],
     activeTabId: null,
     tableViewStateByTabId: {},
+    visualizationStateByTabId: {},
     quickSearchRecentItems: [],
 
     addTab: (tab) =>
@@ -59,6 +66,10 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
             state.tableViewStateByTabId,
             newTabs,
           ),
+          visualizationStateByTabId: pruneVisualizationStateByTabs(
+            state.visualizationStateByTabId,
+            newTabs,
+          ),
           selectedTable: getSelectedTableForTab(newActiveTab),
         };
       }),
@@ -68,6 +79,7 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
         tabs: [],
         activeTabId: null,
         tableViewStateByTabId: {},
+        visualizationStateByTabId: {},
         selectedTable: null,
       })),
 
@@ -79,6 +91,10 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
           activeTabId: id,
           tableViewStateByTabId: pruneTableViewStateByTabs(
             state.tableViewStateByTabId,
+            nextTabs,
+          ),
+          visualizationStateByTabId: pruneVisualizationStateByTabs(
+            state.visualizationStateByTabId,
             nextTabs,
           ),
         };
@@ -102,6 +118,35 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
           [tabId]: {
             ...(state.tableViewStateByTabId[tabId] ?? createDefaultTableViewState()),
             ...updates,
+          },
+        },
+      })),
+
+    updateVisualizationState: (tabId, updates) =>
+      set((state) => ({
+        visualizationStateByTabId: {
+          ...state.visualizationStateByTabId,
+          [tabId]: {
+            ...(state.visualizationStateByTabId[tabId] ??
+              createDefaultVisualizationState()),
+            ...updates,
+          },
+        },
+      })),
+
+    setVisualizationTablePosition: (tabId, tableName, position) =>
+      set((state) => ({
+        visualizationStateByTabId: {
+          ...state.visualizationStateByTabId,
+          [tabId]: {
+            ...(state.visualizationStateByTabId[tabId] ??
+              createDefaultVisualizationState()),
+            positionsByTable: {
+              ...(
+                state.visualizationStateByTabId[tabId]?.positionsByTable ?? {}
+              ),
+              [tableName]: position,
+            },
           },
         },
       })),
@@ -160,6 +205,52 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
         quickSearchRecentItems: nextRecentItems(
           currentState.quickSearchRecentItems,
         ),
+      }));
+    },
+
+    openVisualizationTab: ({ connectionId, schemaName, sourceTable }) => {
+      const scopeLabel = schemaName?.trim()
+        ? schemaName.trim()
+        : "All Schemas";
+      const title = `${scopeLabel} (Visualize)`;
+
+      const state = get();
+      const existing = state.tabs.find(
+        (tab) => tab.connectionId === connectionId && tab.type === "visualize",
+      );
+
+      if (existing) {
+        set((currentState) => ({
+          tabs: currentState.tabs.map((tab) =>
+            tab.id === existing.id
+              ? {
+                  ...tab,
+                  title,
+                  schemaName: schemaName?.trim() ? schemaName.trim() : null,
+                  visualizeSourceTable: sourceTable?.trim() ? sourceTable.trim() : null,
+                }
+              : tab,
+          ),
+          activeTabId: existing.id,
+          selectedTable: null,
+        }));
+        return;
+      }
+
+      const id = `visualize-${++tabCounter}-${Date.now()}`;
+      const tab = {
+        id,
+        connectionId,
+        type: "visualize" as const,
+        title,
+        schemaName: schemaName?.trim() ? schemaName.trim() : null,
+        visualizeSourceTable: sourceTable?.trim() ? sourceTable.trim() : null,
+      };
+
+      set((currentState) => ({
+        tabs: [...currentState.tabs, tab].slice(-MAX_TABS),
+        activeTabId: id,
+        selectedTable: null,
       }));
     },
   };

@@ -34,6 +34,8 @@ export type {
   TableViewState,
   Theme,
   ToastItem,
+  VisualizationPoint,
+  VisualizationState,
 } from "./types";
 
 export const useAppStore = create<AppState>()(

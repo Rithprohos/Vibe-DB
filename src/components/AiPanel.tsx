@@ -15,6 +15,7 @@ import {
   pingAiProvider,
   type SchemaTable,
 } from '../lib/db';
+import { isSchemaFlagDisabled, isSchemaFlagEnabled } from '../lib/schemaFlags';
 import { useAppStore } from '../store/useAppStore';
 
 const SUGGESTIONS = [
@@ -134,8 +135,8 @@ export default function AiPanel() {
             columns: structure.columns.map(c => ({
               name: c.name,
               colType: c.col_type,
-              isPk: c.pk === 1,
-              isNullable: c.notnull === 0,
+              isPk: isSchemaFlagEnabled(c.pk),
+              isNullable: isSchemaFlagDisabled(c.notnull),
             })),
           });
         }

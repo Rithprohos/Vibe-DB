@@ -62,9 +62,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   const {
     data,
     loading,
-    hasLoadedData,
-    hasLoadedRowCount,
-    hasLoadedStructure,
     page,
     setPage,
     pageSize,
@@ -96,8 +93,10 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     handleClearAllFilters
   } = useFilters(tabId, setPage);
 
-  const skipInitialDataFetchRef = useRef(hasLoadedData);
-  const skipInitialMetadataFetchRef = useRef(hasLoadedStructure && hasLoadedRowCount);
+  const skipInitialDataFetchRef = useRef(data !== null);
+  const skipInitialMetadataFetchRef = useRef(
+    structure !== null && totalRows !== null,
+  );
   const tableContextKey = `${activeConnection?.connId ?? 'none'}:${tableName}`;
   const dataRefreshContextRef = useRef<string | null>(tableContextKey);
   const metadataRefreshContextRef = useRef<string | null>(tableContextKey);
@@ -171,7 +170,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
     clearDataRefreshTimer();
 
-    if (!hasLoadedData || contextChanged) {
+    if (data === null || contextChanged) {
       void fetchData(appliedFilters);
       return;
     }
@@ -186,7 +185,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     appliedFilters,
     clearDataRefreshTimer,
     fetchData,
-    hasLoadedData,
     page,
     pageSize,
     sortCol,
@@ -211,7 +209,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
         fetchRowCount(appliedFilters),
       ]);
 
-    if (!hasLoadedStructure || !hasLoadedRowCount || contextChanged) {
+    if (structure === null || totalRows === null || contextChanged) {
       void runMetadataRefresh();
       return;
     }
@@ -227,8 +225,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     clearMetadataRefreshTimer,
     fetchRowCount,
     fetchStructure,
-    hasLoadedRowCount,
-    hasLoadedStructure,
     tableContextKey,
   ]);
 
@@ -771,7 +767,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
             {activeFilterCount > 0 ? (
               <span className="text-primary font-bold">Filtered: </span>
             ) : null}
-            {totalRows.toLocaleString()} rows total
+            {(totalRows ?? 0).toLocaleString()} rows total
             {checkedRowCount > 0 ? (
               <span className="ml-3 text-primary font-bold">{checkedRowCount.toLocaleString()} selected</span>
             ) : null}

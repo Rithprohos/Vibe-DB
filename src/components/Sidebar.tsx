@@ -33,6 +33,7 @@ export default function Sidebar() {
   const selectedTable = useAppStore(s => s.selectedTable);
   const setTables = useAppStore(s => s.setTables);
   const openTableTab = useAppStore(s => s.openTableTab);
+  const openVisualizationTab = useAppStore(s => s.openVisualizationTab);
   const addTab = useAppStore(s => s.addTab);
 
   const activeConnection = activeSidebarConnectionId 
@@ -243,6 +244,23 @@ export default function Sidebar() {
     if (!activeConnection) return;
     openTableTab(activeConnection.id, tableName, 'edit-table');
   }, [activeConnection, openTableTab]);
+
+  const handleOpenVisualize = useCallback((tableName: string) => {
+    if (!activeConnection) return;
+
+    const schemaName =
+      activeConnection.type === 'postgres'
+        ? selectedSchema !== ALL_SCHEMAS_VALUE
+          ? selectedSchema
+          : null
+        : 'main';
+
+    openVisualizationTab({
+      connectionId: activeConnection.id,
+      schemaName,
+      sourceTable: tableName,
+    });
+  }, [activeConnection, openVisualizationTab, selectedSchema]);
 
   const handleRemoveConnection = useCallback(async (connectionId: string) => {
     try {
@@ -495,6 +513,9 @@ export default function Sidebar() {
                 onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
                 renderMenuItems={(qualifiedName) => (
                   <>
+                    <ContextMenuItem onClick={() => handleOpenVisualize(qualifiedName)}>
+                      Open Table Visualize
+                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem onClick={() => handleEditTable(qualifiedName)}>
                       Edit Table

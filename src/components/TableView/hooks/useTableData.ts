@@ -23,20 +23,11 @@ export const useTableData = (tableName: string, tabId: string) => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(() => cachedState?.page ?? 0);
   const [pageSize, setPageSizeState] = useState(() => cachedState?.pageSize ?? 100);
-  const [totalRows, setTotalRows] = useState(() => cachedState?.totalRows ?? 0);
+  const [totalRows, setTotalRows] = useState<number | null>(() => cachedState?.totalRows ?? null);
   const [structure, setStructure] = useState<TableStructureData | null>(() => cachedState?.structure ?? null);
   const [sortCol, setSortCol] = useState<string | null>(() => cachedState?.sortCol ?? null);
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">(
     () => cachedState?.sortDir ?? "ASC",
-  );
-  const [hasLoadedData, setHasLoadedData] = useState(
-    () => cachedState?.hasLoadedData ?? false,
-  );
-  const [hasLoadedRowCount, setHasLoadedRowCount] = useState(
-    () => cachedState?.hasLoadedRowCount ?? false,
-  );
-  const [hasLoadedStructure, setHasLoadedStructure] = useState(
-    () => cachedState?.hasLoadedStructure ?? false,
   );
   const structureRequestIdRef = useRef(0);
   const countRequestIdRef = useRef(0);
@@ -52,7 +43,6 @@ export const useTableData = (tableName: string, tabId: string) => {
       );
       if (requestId !== structureRequestIdRef.current) return;
       setStructure(struct);
-      setHasLoadedStructure(true);
     } catch (e: any) {
       console.error(e);
     }
@@ -66,7 +56,6 @@ export const useTableData = (tableName: string, tabId: string) => {
         const count = await getTableRowCount(tableName, activeConnection.connId, filters);
         if (requestId !== countRequestIdRef.current) return null;
         setTotalRows(count);
-        setHasLoadedRowCount(true);
         return count;
       } catch (e: any) {
         console.error(e);
@@ -93,7 +82,6 @@ export const useTableData = (tableName: string, tabId: string) => {
         );
         if (requestId !== dataRequestIdRef.current) return;
         setData(result);
-        setHasLoadedData(true);
       } catch (e: any) {
         console.error(e);
       } finally {
@@ -138,11 +126,8 @@ export const useTableData = (tableName: string, tabId: string) => {
   useEffect(() => {
     updateTableViewState(tabId, {
       data,
-      hasLoadedData,
       totalRows,
-      hasLoadedRowCount,
       structure,
-      hasLoadedStructure,
       page,
       pageSize,
       sortCol,
@@ -151,11 +136,8 @@ export const useTableData = (tableName: string, tabId: string) => {
   }, [
     tabId,
     data,
-    hasLoadedData,
     totalRows,
-    hasLoadedRowCount,
     structure,
-    hasLoadedStructure,
     page,
     pageSize,
     sortCol,
@@ -166,15 +148,12 @@ export const useTableData = (tableName: string, tabId: string) => {
   return {
     data,
     loading,
-    hasLoadedData,
-    hasLoadedRowCount,
-    hasLoadedStructure,
     page,
     setPage,
     pageSize,
     setPageSize,
     totalRows,
-    totalPages: Math.ceil(totalRows / pageSize),
+    totalPages: Math.ceil((totalRows ?? 0) / pageSize),
     structure,
     sortCol,
     setSortCol,
