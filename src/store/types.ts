@@ -78,11 +78,8 @@ export interface TableFilterCondition {
 
 export interface TableViewState {
   data: QueryResult | null;
-  hasLoadedData: boolean;
-  totalRows: number;
-  hasLoadedRowCount: boolean;
+  totalRows: number | null;
   structure: TableStructureData | null;
-  hasLoadedStructure: boolean;
   page: number;
   pageSize: number;
   sortCol: string | null;

@@ -15,11 +15,8 @@ export function getSelectedTableForTab(tab?: Tab | null): string | null {
 export function createDefaultTableViewState(): TableViewState {
   return {
     data: null,
-    hasLoadedData: false,
-    totalRows: 0,
-    hasLoadedRowCount: false,
+    totalRows: null,
     structure: null,
-    hasLoadedStructure: false,
     page: 0,
     pageSize: DEFAULT_TABLE_PAGE_SIZE,
     sortCol: null,
