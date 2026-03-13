@@ -5,13 +5,6 @@ import {
   isNumericColumn,
 } from "@/lib/sql/columnTypes";
 
-/**
- * @deprecated Use backend SQL generation instead. This function will be removed.
- * Frontend should send structured data to insert_rows/update_rows/delete_rows commands.
- */
-export const escapeSqlString = (value: string): string =>
-  value.replace(/'/g, "''");
-
 export const normalizeJsonInput = (value: string): string =>
   value.replace(/[\u201C\u201D]/g, '"').trim();
 
@@ -68,38 +61,4 @@ export const parseStructuredColumnValue = (
   }
 
   return value;
-};
-
-/**
- * @deprecated Use backend SQL generation instead. This function will be removed.
- * Frontend should send structured data to insert_rows/update_rows/delete_rows commands.
- */
-export const formatSqlValue = (
-  value: string,
-  columnInfo?: ColumnInfo,
-): string => {
-  if (value === "" || value === "NULL") {
-    return "NULL";
-  }
-
-  if (columnInfo && isJsonColumn(columnInfo.col_type)) {
-    const normalizedJson = normalizeJsonInput(value);
-    try {
-      JSON.parse(normalizedJson);
-    } catch {
-      throw new Error(
-        "Please enter valid JSON. Use double quotes for keys and string values.",
-      );
-    }
-    return `'${escapeSqlString(normalizedJson)}'`;
-  }
-
-  if (columnInfo && isNumericColumn(columnInfo.col_type)) {
-    if (Number.isNaN(Number(value))) {
-      throw new Error("Please enter a valid number");
-    }
-    return value;
-  }
-
-  return `'${escapeSqlString(value)}'`;
 };

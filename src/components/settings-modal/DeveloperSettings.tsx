@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlaskConical, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,8 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { executeTransaction, getTableStructure } from '@/lib/db';
-import { buildSampleDataTransaction, getInsertableColumns } from '@/lib/sampleData';
+import { getTableStructure, insertRows } from '@/lib/db';
+import {
+  buildSampleDataRowBatch,
+  getInsertableColumns,
+  SAMPLE_DATA_ROWS_PER_BATCH,
+} from '@/lib/sampleData';
 import { useAppStore } from '@/store/useAppStore';
 import { rowCountOptions } from './constants';
 
@@ -39,8 +43,23 @@ export function DeveloperSettings() {
   const [confirmInsert, setConfirmInsert] = useState(false);
   const [loadingStructure, setLoadingStructure] = useState(false);
   const [runningInsert, setRunningInsert] = useState(false);
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [progressRowsInserted, setProgressRowsInserted] = useState(0);
+  const [progressTotalRows, setProgressTotalRows] = useState(0);
+  const [progressCompletedBatches, setProgressCompletedBatches] = useState(0);
+  const [progressTotalBatches, setProgressTotalBatches] = useState(0);
   const [tableStructure, setTableStructure] = useState<Awaited<ReturnType<typeof getTableStructure>> | null>(null);
   const [structureError, setStructureError] = useState('');
+  const cancelRequestedRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(
+    () => () => {
+      isMountedRef.current = false;
+      cancelRequestedRef.current = true;
+    },
+    [],
+  );
 
   useEffect(() => {
     setSelectedTable((current) => {
@@ -105,15 +124,49 @@ export function DeveloperSettings() {
     }
 
     setRunningInsert(true);
+    setCancelRequested(false);
+    setProgressRowsInserted(0);
+    setProgressTotalRows(resolvedRowCount);
+    setProgressCompletedBatches(0);
+    setProgressTotalBatches(Math.ceil(resolvedRowCount / SAMPLE_DATA_ROWS_PER_BATCH));
+    cancelRequestedRef.current = false;
+
     try {
-      const queries = buildSampleDataTransaction(selectedTable, tableStructure?.columns ?? [], resolvedRowCount);
-      const result = await executeTransaction(queries, activeConnection.connId);
-      showAlert({
-        title: 'Sample data generated',
-        message: result.message || `Inserted ${resolvedRowCount} rows into ${selectedTable}.`,
-        type: 'success',
-      });
-      setConfirmInsert(false);
+      const columns = tableStructure?.columns ?? [];
+      let insertedRows = 0;
+
+      for (
+        let start = 0;
+        start < resolvedRowCount && !cancelRequestedRef.current;
+        start += SAMPLE_DATA_ROWS_PER_BATCH
+      ) {
+        const batchSize = Math.min(SAMPLE_DATA_ROWS_PER_BATCH, resolvedRowCount - start);
+        const rows = buildSampleDataRowBatch(columns, start + 1, batchSize);
+        const result = await insertRows(selectedTable, rows, activeConnection.connId);
+        insertedRows += result.rows_affected ?? batchSize;
+
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        setProgressRowsInserted(Math.min(insertedRows, resolvedRowCount));
+        setProgressCompletedBatches((current) => current + 1);
+      }
+
+      if (cancelRequestedRef.current) {
+        showAlert({
+          title: 'Sample data generation cancelled',
+          message: `Inserted ${insertedRows.toLocaleString()} rows into ${selectedTable} before cancellation.`,
+          type: 'warning',
+        });
+      } else {
+        showAlert({
+          title: 'Sample data generated',
+          message: `Inserted ${insertedRows.toLocaleString()} rows into ${selectedTable}.`,
+          type: 'success',
+        });
+        setConfirmInsert(false);
+      }
     } catch (error) {
       console.error('Failed to generate sample data:', error);
       showAlert({
@@ -122,7 +175,11 @@ export function DeveloperSettings() {
         type: 'error',
       });
     } finally {
-      setRunningInsert(false);
+      if (isMountedRef.current) {
+        setRunningInsert(false);
+        setCancelRequested(false);
+      }
+      cancelRequestedRef.current = false;
     }
   }, [
     developerToolsEnabled,
@@ -134,6 +191,11 @@ export function DeveloperSettings() {
     tableStructure,
     showAlert,
   ]);
+  const handleCancelGenerate = useCallback(() => {
+    if (!runningInsert || cancelRequestedRef.current) return;
+    cancelRequestedRef.current = true;
+    setCancelRequested(true);
+  }, [runningInsert]);
 
   const canGenerate =
     developerToolsEnabled &&
@@ -144,6 +206,10 @@ export function DeveloperSettings() {
     confirmInsert &&
     !loadingStructure &&
     !runningInsert;
+  const progressPercent = useMemo(() => {
+    if (progressTotalRows === 0) return 0;
+    return Math.min(100, Math.round((progressRowsInserted / progressTotalRows) * 100));
+  }, [progressRowsInserted, progressTotalRows]);
 
   if (!developerToolsEnabled) {
     return (
@@ -186,7 +252,7 @@ export function DeveloperSettings() {
               <Select
                 value={selectedTable}
                 onValueChange={setSelectedTable}
-                disabled={connectionTables.length === 0}
+                disabled={runningInsert || connectionTables.length === 0}
               >
                 <SelectTrigger id="sample-table">
                   <SelectValue placeholder="Select a table" />
@@ -205,7 +271,7 @@ export function DeveloperSettings() {
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_140px]">
             <div className="space-y-2">
               <Label htmlFor="sample-row-count">Rows to insert</Label>
-              <Select value={rowCount} onValueChange={setRowCount}>
+              <Select value={rowCount} onValueChange={setRowCount} disabled={runningInsert}>
                 <SelectTrigger id="sample-row-count">
                   <SelectValue />
                 </SelectTrigger>
@@ -229,22 +295,55 @@ export function DeveloperSettings() {
                 value={customRowCount}
                 onChange={(event) => setCustomRowCount(event.target.value)}
                 placeholder="500"
-                disabled={rowCount !== 'custom'}
+                disabled={runningInsert || rowCount !== 'custom'}
               />
             </div>
           </div>
 
           <div className="space-y-1 rounded-md border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-            <div>Insert mode: batched multi-row inserts inside a single transaction.</div>
+            <div>Insert mode: batched multi-row inserts, one backend transaction per batch.</div>
             <div>Insertable columns: {loadingStructure ? 'Loading...' : insertableColumns.length}</div>
-            <div>Estimated batches: {resolvedRowCount > 0 ? Math.ceil(resolvedRowCount / 200) : 0}</div>
+            <div>
+              Estimated batches: {resolvedRowCount > 0 ? Math.ceil(resolvedRowCount / SAMPLE_DATA_ROWS_PER_BATCH) : 0}
+            </div>
             {structureError ? <div className="text-destructive">{structureError}</div> : null}
           </div>
+
+          {(runningInsert || progressRowsInserted > 0) ? (
+            <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-foreground/90">
+                  {runningInsert ? 'Generating sample data...' : 'Last generation progress'}
+                </span>
+                <span className="font-mono text-foreground/80">{progressPercent}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-sm bg-secondary/80">
+                <div
+                  className="h-full bg-primary transition-[width] duration-150"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                <span>
+                  Rows: {progressRowsInserted.toLocaleString()} / {progressTotalRows.toLocaleString()}
+                </span>
+                <span>
+                  Batches: {progressCompletedBatches} / {progressTotalBatches}
+                </span>
+              </div>
+              {runningInsert && cancelRequested ? (
+                <div className="text-[11px] text-warning">
+                  Cancel requested. VibeDB will stop after the current batch completes.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="flex items-start gap-3 rounded-md border border-warning/20 bg-warning/10 p-3">
             <Checkbox
               checked={confirmInsert}
               onCheckedChange={(checked) => setConfirmInsert(checked === true)}
+              disabled={runningInsert}
             />
             <span className="text-xs leading-relaxed text-muted-foreground">
               I understand this writes synthetic rows into the selected table on the active
@@ -252,14 +351,26 @@ export function DeveloperSettings() {
             </span>
           </label>
 
-          <Button onClick={() => void handleGenerate()} disabled={!canGenerate} className="w-full sm:w-auto">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => void handleGenerate()} disabled={!canGenerate} className="w-full sm:w-auto">
+              {runningInsert ? (
+                <Loader2 size={14} className="mr-2 animate-spin" />
+              ) : (
+                <FlaskConical size={14} className="mr-2" />
+              )}
+              {runningInsert ? 'Generating...' : 'Generate Sample Data'}
+            </Button>
             {runningInsert ? (
-              <Loader2 size={14} className="mr-2 animate-spin" />
-            ) : (
-              <FlaskConical size={14} className="mr-2" />
-            )}
-            Generate Sample Data
-          </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCancelGenerate}
+                disabled={cancelRequested}
+                className="w-full sm:w-auto"
+              >
+                {cancelRequested ? 'Cancelling...' : 'Cancel Generation'}
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
