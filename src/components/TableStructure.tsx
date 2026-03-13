@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore, type TableStructureData } from '../store/useAppStore';
 import { getTableStructure } from '../lib/db';
+import { isSchemaFlagEnabled } from '../lib/schemaFlags';
 import { formatColumnTypeDisplay } from '../lib/typeDisplay';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Key, Link2, Hash } from 'lucide-react';
@@ -93,7 +94,7 @@ export default function TableStructure({ tableName, tabId }: Props) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {col.notnull === 1 && (
+                    {isSchemaFlagEnabled(col.notnull) && (
                       <span className="px-2 py-0.5 rounded-sm bg-muted/30 text-[9px] font-bold text-muted-foreground border border-border tracking-wider uppercase">
                         Required
                       </span>
@@ -103,7 +104,7 @@ export default function TableStructure({ tableName, tabId }: Props) {
                     {col.dflt_value ?? <span className="text-muted-foreground/30 italic">NULL</span>}
                   </TableCell>
                   <TableCell className="text-center pr-4">
-                    {col.pk === 1 && (
+                    {isSchemaFlagEnabled(col.pk) && (
                       <span className="inline-flex items-center justify-center w-7 h-7 rounded-sm bg-primary/10 text-primary border border-primary/20 mx-auto" title="Primary Key">
                         <Key size={12} />
                       </span>

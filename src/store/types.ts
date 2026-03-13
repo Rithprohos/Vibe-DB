@@ -29,9 +29,9 @@ export interface ColumnInfo {
   cid: number;
   name: string;
   col_type: string;
-  notnull: number;
+  notnull: boolean | number;
   dflt_value: string | null;
-  pk: number;
+  pk: boolean | number;
 }
 
 export interface IndexInfo {
@@ -91,6 +91,17 @@ export interface TableViewState {
   selectedRowIndex: number | null;
 }
 
+export interface VisualizationPoint {
+  x: number;
+  y: number;
+}
+
+export interface VisualizationState {
+  pan: VisualizationPoint;
+  zoom: number;
+  positionsByTable: Record<string, VisualizationPoint>;
+}
+
 export interface SqlLog {
   id: string;
   sql: string;
@@ -124,6 +135,7 @@ export interface QuickSearchRecentItem {
 export type TabType =
   | "data"
   | "structure"
+  | "visualize"
   | "query"
   | "create-table"
   | "edit-table"
@@ -168,6 +180,8 @@ export interface Tab {
   type: TabType;
   title: string;
   tableName?: string;
+  schemaName?: string | null;
+  visualizeSourceTable?: string | null;
   query?: string;
   result?: QueryResult | null;
   error?: string;
@@ -191,6 +205,7 @@ export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   tableViewStateByTabId: Record<string, TableViewState>;
+  visualizationStateByTabId: Record<string, VisualizationState>;
 
   // Logs
   logs: SqlLog[];
@@ -270,6 +285,20 @@ export interface AppState {
     connectionId: string,
     tableName: string,
     type: TabType,
+  ) => void;
+  openVisualizationTab: (input: {
+    connectionId: string;
+    schemaName?: string | null;
+    sourceTable?: string | null;
+  }) => void;
+  updateVisualizationState: (
+    tabId: string,
+    updates: Partial<VisualizationState>,
+  ) => void;
+  setVisualizationTablePosition: (
+    tabId: string,
+    tableName: string,
+    position: VisualizationPoint,
   ) => void;
 
   // Log actions

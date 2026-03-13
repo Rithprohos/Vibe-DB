@@ -1,5 +1,10 @@
 import { DEFAULT_TABLE_PAGE_SIZE } from "./constants";
-import type { Tab, TabType, TableViewState } from "./types";
+import type {
+  Tab,
+  TabType,
+  TableViewState,
+  VisualizationState,
+} from "./types";
 
 function isDataBearingTab(type: TabType): boolean {
   return type === "data" || type === "structure" || type === "edit-table";
@@ -29,6 +34,14 @@ export function createDefaultTableViewState(): TableViewState {
   };
 }
 
+export function createDefaultVisualizationState(): VisualizationState {
+  return {
+    pan: { x: 80, y: 80 },
+    zoom: 1,
+    positionsByTable: {},
+  };
+}
+
 export function pruneTableViewStateByTabs(
   tableViewStateByTabId: Record<string, TableViewState>,
   tabs: Tab[],
@@ -40,5 +53,19 @@ export function pruneTableViewStateByTabs(
   const activeIds = new Set(tabs.map((tab) => tab.id));
   return Object.fromEntries(
     Object.entries(tableViewStateByTabId).filter(([tabId]) => activeIds.has(tabId)),
+  );
+}
+
+export function pruneVisualizationStateByTabs(
+  visualizationStateByTabId: Record<string, VisualizationState>,
+  tabs: Tab[],
+): Record<string, VisualizationState> {
+  if (tabs.length === 0) {
+    return {};
+  }
+
+  const activeIds = new Set(tabs.map((tab) => tab.id));
+  return Object.fromEntries(
+    Object.entries(visualizationStateByTabId).filter(([tabId]) => activeIds.has(tabId)),
   );
 }

@@ -11,6 +11,7 @@ const CreateTable = lazy(() => import('../CreateTable'));
 const CreateView = lazy(() => import('../CreateView'));
 const EditTable = lazy(() => import('../EditTable'));
 const TableStructure = lazy(() => import('../TableStructure'));
+const SchemaVisualization = lazy(() => import('../SchemaVisualization'));
 
 const selectIsConnected = (state: AppState) => state.isConnected;
 
@@ -77,6 +78,8 @@ export default function ActiveTabContent({
             <TableStructure key={activeTab.id} tableName={activeTab.tableName} tabId={activeTab.id} />,
           )
         : <EmptyTabScreen />;
+    case 'visualize':
+      return renderLazyView(<SchemaVisualization key={activeTab.id} tabId={activeTab.id} />);
     case 'query':
       return renderLazyView(<QueryEditor key={activeTab.id} tabId={activeTab.id} />);
     case 'create-table':

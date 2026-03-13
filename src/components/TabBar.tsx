@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Database, Wrench, Zap, FileText, Plus, X, Table as TableIcon, Eye } from 'lucide-react';
+import { Database, Wrench, Zap, FileText, Plus, X, Table as TableIcon, Eye, Orbit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ContextMenu,
@@ -40,6 +40,8 @@ export default function TabBar() {
         return <Wrench size={14} className="text-muted-foreground" />;
       case 'query':
         return <Zap size={14} className="text-accent-secondary" />;
+      case 'visualize':
+        return <Orbit size={14} className="text-primary" />;
       case 'create-table':
         return <TableIcon size={14} className="text-emerald-500" />;
       case 'edit-table':

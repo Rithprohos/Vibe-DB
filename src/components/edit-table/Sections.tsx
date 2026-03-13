@@ -1,5 +1,6 @@
 import type { SqliteType, TypeParams } from '../../lib/createTableConstants';
 import { getSqliteTypeColor, supportsTypeParams } from '../../lib/createTableConstants';
+import { isSchemaFlagEnabled } from '../../lib/schemaFlags';
 import type { ColumnInfo, IndexInfo } from '../../store/useAppStore';
 import { TypeParameterFields } from '../TypeParameterFields';
 import { formatColumnTypeDisplay } from '../../lib/typeDisplay';
@@ -91,13 +92,13 @@ export function EditTableHeader({
         <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
           <div className="text-muted-foreground">Primary Keys</div>
           <div className="mt-1 font-mono text-foreground">
-            {columns.filter((column) => column.pk === 1).length}
+            {columns.filter((column) => isSchemaFlagEnabled(column.pk)).length}
           </div>
         </div>
         <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
           <div className="text-muted-foreground">Required</div>
           <div className="mt-1 font-mono text-foreground">
-            {columns.filter((column) => column.notnull === 1).length}
+            {columns.filter((column) => isSchemaFlagEnabled(column.notnull)).length}
           </div>
         </div>
         <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">

@@ -33,6 +33,7 @@ export function validateIndexName(value: string): string | null {
 export function getTableTabTitle(type: Tab['type'], tableName: string): string {
   if (type === 'data') return `${tableName} (Data)`;
   if (type === 'structure') return `${tableName} (Structure)`;
+  if (type === 'visualize') return `${tableName} (Visualize)`;
   if (type === 'edit-table') return `${tableName} (Edit)`;
   return tableName;
 }
