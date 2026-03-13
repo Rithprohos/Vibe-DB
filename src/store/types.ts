@@ -118,6 +118,12 @@ export interface SavedQuery {
   updatedAt: number;
 }
 
+export interface QuickSearchRecentItem {
+  connectionId: string;
+  tableName: string;
+  openedAt: number;
+}
+
 export type TabType =
   | "data"
   | "structure"
@@ -198,9 +204,11 @@ export interface AppState {
 
   // Saved queries
   savedQueries: SavedQuery[];
+  quickSearchRecentItems: QuickSearchRecentItem[];
 
   // Settings Modal
   showSettingsModal: boolean;
+  isQuickSearchOpen: boolean;
 
   // Alert Modal
   alertOptions: AlertOptions | null;
@@ -272,6 +280,7 @@ export interface AppState {
   clearLogs: () => void;
   setShowLogDrawer: (val: BooleanSetter) => void;
   setShowSettingsModal: (val: boolean) => void;
+  setIsQuickSearchOpen: (val: BooleanSetter) => void;
   saveQuery: (input: {
     id?: string;
     name: string;

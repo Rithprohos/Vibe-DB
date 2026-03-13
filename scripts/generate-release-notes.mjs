@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
+import { access, readFile } from "node:fs/promises";
+import path from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -45,6 +47,34 @@ const RELEASE_NOTES_USER_PROMPT_PREFIX = [
   "Prefer 3-10 bullets total.",
 ].join("\n");
 
+const CHANGELOG_SUMMARY_SYSTEM_PROMPT = [
+  "You are a solo indie developer writing GitHub release notes in Markdown.",
+  "Use only the provided changelog content.",
+  "Summarize concrete shipped work only.",
+  "Do not invent features, fixes, improvements, or breaking changes.",
+  "Write like one person shipping fast, slightly unserious, but still clear.",
+  "Sound human, casual, and a little scrappy, not corporate.",
+  "Keep the wording concise and factual enough that users can still understand what changed.",
+  "Style requirements:",
+  "- Use clear section headings with emojis.",
+  "- Use short bullet points with concrete outcomes.",
+  "- A little personality is good; fluff is not.",
+  "- No code fences, no tables, no corporate marketing tone.",
+].join("\n");
+
+const CHANGELOG_SUMMARY_USER_PROMPT_PREFIX = [
+  "Summarize this release changelog into polished GitHub release notes.",
+  "Return Markdown only.",
+  "Use these sections in order and omit empty ones:",
+  "## ✨ Features",
+  "## 🐛 Fixes",
+  "## ♻️ Improvements",
+  "## 💥 Breaking Changes (only if explicitly present)",
+  "Map the changelog into the most appropriate section based on the actual shipped work.",
+  "Keep it under 220 words.",
+  "Prefer 3-10 bullets total.",
+].join("\n");
+
 function trimTrailingSlashes(value) {
   return value.replace(/\/+$/, "");
 }
@@ -58,6 +88,44 @@ function buildChatCompletionsUrl(baseUrl) {
     return `${trimmed}/chat/completions`;
   }
   return `${trimmed}/v1/chat/completions`;
+}
+
+async function fileExists(filePath) {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getTagCandidates(tag) {
+  const normalized = tag.trim();
+  if (!normalized) {
+    return [];
+  }
+
+  if (normalized.startsWith("v")) {
+    return [normalized, normalized.slice(1)].filter(Boolean);
+  }
+
+  return [normalized, `v${normalized}`];
+}
+
+async function findMatchingChangelog(tag) {
+  for (const candidate of getTagCandidates(tag)) {
+    const changelogPath = path.join(process.cwd(), "changelog", `${candidate}.md`);
+    if (await fileExists(changelogPath)) {
+      const content = await readFile(changelogPath, "utf8");
+      return {
+        version: candidate,
+        path: changelogPath,
+        content,
+      };
+    }
+  }
+
+  return null;
 }
 
 async function runGit(args) {
@@ -261,6 +329,57 @@ function buildFallbackBody(tag, previousTag, commits) {
   ].join("\n");
 }
 
+function extractChangelogHighlights(content) {
+  const lines = content.split("\n");
+  const highlights = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    const checkedMatch = line.match(/^[-*]\s+\[x\]\s+(.+)$/i);
+    if (checkedMatch) {
+      highlights.push(checkedMatch[1].trim());
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      highlights.push(bulletMatch[1].trim());
+    }
+  }
+
+  return highlights
+    .filter(Boolean)
+    .filter((item, index, array) => array.indexOf(item) === index)
+    .slice(0, 8);
+}
+
+function buildChangelogFallbackBody(tag, changelog) {
+  const highlights = extractChangelogHighlights(changelog.content);
+  const summary = highlights.length > 0
+    ? [
+        "## ✨ Highlights",
+        ...highlights.map((item) => `- ${item}`),
+        "",
+      ].join("\n")
+    : [
+        "## ✨ Highlights",
+        "- A matching changelog file was found, but it did not include checklist or bullet items to summarize.",
+        "",
+      ].join("\n");
+
+  return [
+    `# VibeDB ${tag}`,
+    "",
+    `_Source: changelog/${changelog.version}.md_`,
+    "",
+    summary,
+  ].join("\n");
+}
+
 async function summarizeWithPollinations({ tag, previousTag, commits }) {
   const baseUrl = process.env.POLLINATIONS_BASE_URL ?? DEFAULT_BASE_URL;
   const model = process.env.POLLINATIONS_MODEL ?? DEFAULT_MODEL;
@@ -351,6 +470,62 @@ async function summarizeWithPollinations({ tag, previousTag, commits }) {
   }
 
   throw new Error("Pollinations returned an empty summary.");
+}
+
+async function summarizeChangelogWithPollinations({ tag, changelog }) {
+  const baseUrl = process.env.POLLINATIONS_BASE_URL ?? DEFAULT_BASE_URL;
+  const model = process.env.POLLINATIONS_MODEL ?? DEFAULT_MODEL;
+  const apiKey = (process.env.POLLINATIONS_API_KEY ?? "").trim();
+  const url = buildChatCompletionsUrl(baseUrl);
+
+  const payload = {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: CHANGELOG_SUMMARY_SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: [
+          `Version tag: ${tag}`,
+          CHANGELOG_SUMMARY_USER_PROMPT_PREFIX,
+          "",
+          "Changelog content:",
+          changelog.content.slice(0, Math.max(1000, MAX_PROMPT_CHARS)),
+        ].join("\n"),
+      },
+    ],
+    temperature: 0.2,
+    max_tokens: 700,
+    stream: false,
+  };
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const details = (await response.text()).slice(0, 300);
+    throw new Error(`Pollinations call failed ${response.status}: ${details}`);
+  }
+
+  const data = await response.json();
+  const summary = extractSummaryFromCompletion(data);
+  if (!summary || isLikelyNonReleaseSummary(summary)) {
+    throw new Error("Pollinations returned an empty summary.");
+  }
+
+  return summary;
 }
 
 function extractSummaryFromCompletion(data) {
@@ -469,6 +644,35 @@ async function main() {
   if (!tag) {
     console.error("Usage: bun scripts/generate-release-notes.mjs <tag>");
     process.exit(1);
+  }
+
+  const changelog = await findMatchingChangelog(tag);
+  if (changelog) {
+    let body;
+    try {
+      const summary = await summarizeChangelogWithPollinations({
+        tag,
+        changelog,
+      });
+      body = [
+        `# VibeDB ${tag}`,
+        "",
+        `_Source: changelog/${changelog.version}.md_`,
+        "",
+        summary,
+        "",
+      ].join("\n");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `::warning::Pollinations summary failed for ${tag}. Falling back to changelog summary.`,
+      );
+      console.error(message);
+      body = buildChangelogFallbackBody(tag, changelog);
+    }
+
+    process.stdout.write(body);
+    return;
   }
 
   const { previousTag, commits } = await getReleaseCommits(tag);

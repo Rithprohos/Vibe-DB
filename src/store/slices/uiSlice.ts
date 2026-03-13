@@ -7,6 +7,7 @@ type UiSlice = Pick<
   | "showLogDrawer"
   | "toasts"
   | "showSettingsModal"
+  | "isQuickSearchOpen"
   | "alertOptions"
   | "theme"
   | "developerToolsEnabled"
@@ -18,6 +19,7 @@ type UiSlice = Pick<
   | "clearLogs"
   | "setShowLogDrawer"
   | "setShowSettingsModal"
+  | "setIsQuickSearchOpen"
   | "showToast"
   | "dismissToast"
   | "showAlert"
@@ -30,6 +32,7 @@ export function createUiSlice(set: AppSet): UiSlice {
     showLogDrawer: false,
     toasts: [],
     showSettingsModal: false,
+    isQuickSearchOpen: false,
     alertOptions: null,
     theme: "dark",
     developerToolsEnabled: false,
@@ -57,6 +60,11 @@ export function createUiSlice(set: AppSet): UiSlice {
         showLogDrawer: typeof val === "function" ? val(state.showLogDrawer) : val,
       })),
     setShowSettingsModal: (val) => set({ showSettingsModal: val }),
+    setIsQuickSearchOpen: (val) =>
+      set((state) => ({
+        isQuickSearchOpen:
+          typeof val === "function" ? val(state.isQuickSearchOpen) : val,
+      })),
     showToast: (toast) =>
       set((state) => ({
         toasts: [
