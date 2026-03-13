@@ -28,6 +28,7 @@ opencode.json
 .tauri-keys*
 .env
 
-AGENT.md
 AGENT_CONTEXT.md
 CLAUDE.md
+AGENTS.md
+AI_CO_AUTHORS.md
