@@ -126,15 +126,6 @@ SQL query building has been moved to the Rust backend. See [`changelog/v0.4.6.md
 
 **Performance & UI Polish**
 
-- [x] Global quick search (`Cmd/Ctrl+K`) for active-connection tables
-  - Implemented dense command-palette UI with keyboard-first navigation
-  - Reused loaded sidebar metadata only; no backend fetch on open
-  - Added top-bar quick-search trigger next to settings
-  - Moved ranking/filtering into a pure helper module
-  - Added recent tables section when the query is empty
-  - Added deferred query filtering and capped palette rendering for large table lists
-  - Added focused Bun coverage for search normalization, ranking, schema matching, and limits
-
 - [ ] Tune virtualization overscan and estimated row heights per view
 - [ ] Replace TableView spacer-row virtualization with absolutely positioned rows
 - [ ] Add QueryEditor performance pass (syntax highlight + memoized parse path)
