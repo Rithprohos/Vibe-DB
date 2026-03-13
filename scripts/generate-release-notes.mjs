@@ -15,9 +15,12 @@ const MAX_PROMPT_CHARS = Number.parseInt(
 const RELEASE_NOTES_SYSTEM_PROMPT = [
   "You are a solo indie developer writing GitHub release notes in Markdown.",
   "Use only the provided commit messages.",
-  "Summarize changes from feat, fix, and refactor commits only.",
-  "Ignore chore, docs, style, test, ci, build, perf, and merge commits unless a provided commit is explicitly typed as feat, fix, or refactor.",
+  "Summarize changes from feat, fix, refactor, perf, and improvement-style commits only.",
+  "Talk about improvements as well as features and fixes.",
+  "Treat refactor, perf, and improvement-style commits as product or developer-facing improvements when they result in clearer UX, better behavior, better performance, cleaner flows, or other meaningful upgrades.",
+  "Ignore chore, docs, style, test, ci, build, and merge commits unless a provided commit is explicitly typed as feat, fix, refactor, perf, or improvement.",
   "Do not invent features, fixes, or breaking changes.",
+  "Do not call something an improvement unless it is supported by the provided commits.",
   "Write like one person shipping fast, slightly unserious, but still clear.",
   "Sound human, casual, and a little scrappy, not corporate.",
   "Keep the wording concise and factual enough that users can still understand what changed.",
@@ -34,9 +37,10 @@ const RELEASE_NOTES_USER_PROMPT_PREFIX = [
   "Use these sections in order and omit empty ones:",
   "## ✨ Features",
   "## 🐛 Fixes",
-  "## ♻️ Refactors",
+  "## ♻️ Improvements",
   "## 💥 Breaking Changes (only if explicitly present with ! or BREAKING CHANGE)",
-  "Use only feat, fix, and refactor commits from the provided list.",
+  "Use only feat, fix, refactor, perf, and improvement-style commits from the provided list.",
+  "Map refactor, perf, and improvement-style commits into Improvements when they describe meaningful user-facing or workflow-facing polish.",
   "Keep it under 220 words.",
   "Prefer 3-10 bullets total.",
 ].join("\n");
@@ -89,25 +93,49 @@ function parseCommitSubject(subject) {
   }
 
   const conventionalMatch = trimmed.match(
-    /^(feat|fix|refactor)(\([^)]+\))?(!)?:\s+(.+)$/i,
+    /^(feat|fix|refactor|perf|improve|improvement)(\([^)]+\))?(!)?:\s+(.+)$/i,
   );
 
-  if (!conventionalMatch) {
+  if (conventionalMatch) {
+    const [, rawType, scope = "", bang = "", description] = conventionalMatch;
+    const normalizedDescription = description.trim().replace(/\s+/g, " ");
+    if (!normalizedDescription) {
+      return null;
+    }
+
+    const type = rawType.toLowerCase() === "feat"
+      ? "feat"
+      : rawType.toLowerCase() === "fix"
+        ? "fix"
+        : "improvement";
+
+    return {
+      type,
+      scope,
+      description: normalizedDescription,
+      breaking: bang === "" ? /breaking change/i.test(trimmed) : true,
+    };
+  }
+
+  const improvementMatch = trimmed.match(
+    /^(improve|improves|improved|improvement|improvements)\s+(.+)$/i,
+  );
+
+  if (!improvementMatch) {
     return null;
   }
 
-  const [, rawType, scope = "", bang = "", description] = conventionalMatch;
-  const type = rawType.toLowerCase();
+  const [, , description] = improvementMatch;
   const normalizedDescription = description.trim().replace(/\s+/g, " ");
   if (!normalizedDescription) {
     return null;
   }
 
   return {
-    type,
-    scope,
+    type: "improvement",
+    scope: "",
     description: normalizedDescription,
-    breaking: bang === "" ? /breaking change/i.test(trimmed) : true,
+    breaking: /breaking change/i.test(trimmed),
   };
 }
 
@@ -180,7 +208,7 @@ function buildLocalSummaryMarkdown(commits) {
   const sections = [
     { key: "feat", title: "## ✨ Features" },
     { key: "fix", title: "## 🐛 Fixes" },
-    { key: "refactor", title: "## ♻️ Refactors" },
+    { key: "improvement", title: "## ♻️ Improvements" },
   ];
 
   const lines = [];
@@ -213,7 +241,7 @@ function buildLocalSummaryMarkdown(commits) {
   if (totalBullets === 0) {
     return [
       "## ✨ Features",
-      "- No user-facing feat, fix, or refactor commits were found in this release range.",
+      "- No user-facing feature, fix, or improvement commits were found in this release range.",
       "",
     ].join("\n");
   }
@@ -304,8 +332,8 @@ async function summarizeWithPollinations({ tag, previousTag, commits }) {
         content: [
           `Version tag: ${tag}`,
           "Write short GitHub release notes in Markdown from these commit messages.",
-          "Use only feat, fix, and refactor entries.",
-          "Use: ## ✨ Features, ## 🐛 Fixes, ## ♻️ Refactors.",
+          "Use only feat, fix, refactor, perf, and improvement-style entries.",
+          "Use: ## ✨ Features, ## 🐛 Fixes, ## ♻️ Improvements.",
           "If a section is empty, omit it.",
           "Keep under 180 words.",
           "",
