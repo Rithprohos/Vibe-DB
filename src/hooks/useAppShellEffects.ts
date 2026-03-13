@@ -3,6 +3,8 @@ import { listen } from '@tauri-apps/api/event';
 import { useAppStore, type AppState, type Connection, type Theme } from '../store/useAppStore';
 import type { ConnectSource } from './useAppConnectionManager';
 
+const IS_PROD = import.meta.env.PROD;
+
 interface SqlLogEvent {
   sql: string;
   status: 'success' | 'error';
@@ -17,6 +19,34 @@ export function useThemeSync(theme: Theme): void {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+}
+
+function shouldAllowNativeContextMenu(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    target.closest('input, textarea, [contenteditable="true"], [role="textbox"], .cm-editor, .cm-content') !== null
+  );
+}
+
+export function useProductionContextMenuGuard(): void {
+  useEffect(() => {
+    if (!IS_PROD) {
+      return;
+    }
+
+    const handleContextMenu = (event: MouseEvent) => {
+      if (shouldAllowNativeContextMenu(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu, true);
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu, true);
+    };
+  }, []);
 }
 
 export function useConnectEventListener(

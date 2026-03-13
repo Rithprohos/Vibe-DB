@@ -6,6 +6,7 @@ import {
   saveStoredConnectionAuthToken,
   saveStoredConnectionPassword,
 } from '../lib/connectionTokenStore';
+import { flushStorage } from '../store/storage';
 import { useAppStore, type AppState, type Connection } from '../store/useAppStore';
 
 export type ConnectSource = 'manual' | 'restore';
@@ -194,6 +195,8 @@ export function useAppConnectionManager() {
               '-- Welcome to VibeDB! 🚀\n-- This is a fresh database. Create your first table:\n\nCREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  email TEXT UNIQUE,\n  created_at DATETIME DEFAULT CURRENT_TIMESTAMP\n);\n',
           });
         }
+
+        await flushStorage();
       } catch (error: unknown) {
         console.error('Failed to connect:', error);
 

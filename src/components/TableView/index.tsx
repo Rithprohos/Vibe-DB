@@ -47,6 +47,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
   );
   const updateTableViewState = useAppStore((s) => s.updateTableViewState);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [commitFlash, setCommitFlash] = useState(false);
   const [isInspectorOpen, setIsInspectorOpen] = useState(
     () => cachedState?.isInspectorOpen ?? false,
@@ -113,6 +114,11 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       window.clearTimeout(metadataRefreshTimerRef.current);
       metadataRefreshTimerRef.current = null;
     }
+  }, []);
+
+  const handleTableScrollRef = useCallback((node: HTMLDivElement | null) => {
+    tableScrollRef.current = node;
+    setScrollElement((current) => (current === node ? current : node));
   }, []);
 
   const refreshVisibleData = useCallback(
@@ -833,7 +839,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       {/* Main Table Content */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <div
-          ref={tableScrollRef}
+          ref={handleTableScrollRef}
           className="flex-1 relative overflow-auto custom-scrollbar bg-grid-white/[0.02]"
           style={{ contain: 'strict', transform: 'translateZ(0)' }}
         >
@@ -943,7 +949,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
                   gridCols={gridCols}
                   columnCount={columns.length}
                   columnInfoByName={columnInfoByName}
-                  scrollElement={tableScrollRef.current}
+                  scrollElement={scrollElement}
                   selectedRowIndex={selectedRowIndex}
                   checkedRowIndices={checkedRowIndices}
                   editingCell={editingCell}

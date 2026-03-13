@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useMemo, useCallback, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CheckedState } from '@radix-ui/react-checkbox';
 import { formatCellValue } from '@/lib/formatters';
@@ -286,6 +286,10 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
     overscan: 4,
     getItemKey,
   });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, scrollElement, tableData.length]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
