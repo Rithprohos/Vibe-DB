@@ -35,12 +35,13 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction. All row inserts, updates, and deletes are built and executed in Rust.
 - **🌍 Multi-Engine Ready** — SQLite, Turso (libSQL), and PostgreSQL supported. MySQL coming soon.
 - **🏗️ Visual Table & View Builder** — Create tables and views with a polished GUI including real-time, syntax-highlighted SQL preview.
+- **🕸️ Schema Visualization Canvas** — Explore table relationships on an interactive schema canvas with pan/zoom and draggable cards.
 - **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions, plus click-to-sort columns and drag-to-resize headers.
 - **🔎 Row Inspector** — Side panel for detailed row viewing and in-place field editing with save/cancel flow and JSON-aware helpers.
 - **🗑️ Safe Row Deletion** — Multi-select rows and delete with a production-environment confirmation guard to prevent accidental data loss.
 - **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
-- **✨ Pollinations AI** — Intelligent SQL assistance built right into the query editor.
-- **🎨 Premium Themes** — Switch between **Dark**, **Light**, and **Purple Solarized** modes.
+- **✨ AI SQL Assistant** — Intelligent SQL assistance built into the query editor, with Pollinations by default and support for custom/OpenAI profiles.
+- **🎨 Premium Themes** — Switch between **Dark**, **Dark Modern**, **Light**, and **Purple Solarized** modes.
 - **⌨️ Workflow Mastery** — Multi-tab interface, persistent state, and keyboard-first design (`⌘N`, `⌘T`, `⌘↵`).
 
 ## 🚀 Getting Started
