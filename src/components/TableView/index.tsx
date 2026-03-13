@@ -186,7 +186,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     appliedFilters,
     clearDataRefreshTimer,
     fetchData,
-    hasLoadedData,
     page,
     pageSize,
     sortCol,
@@ -227,8 +226,6 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     clearMetadataRefreshTimer,
     fetchRowCount,
     fetchStructure,
-    hasLoadedRowCount,
-    hasLoadedStructure,
     tableContextKey,
   ]);
 
