@@ -9,6 +9,7 @@ import ActiveTabContent from './components/app/ActiveTabContent';
 import {
   useConnectEventListener,
   useLogDrawerPreload,
+  useProductionContextMenuGuard,
   useSqlLogListener,
   useThemeSync,
 } from './hooks/useAppShellEffects';
@@ -40,6 +41,7 @@ export default function App() {
   const hasLoadedLogDrawer = useLogDrawerPreload();
 
   useThemeSync(theme);
+  useProductionContextMenuGuard();
   useDatabaseVersionSync();
   useConnectEventListener(handleConnect);
   useSqlLogListener();
