@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
 import { deleteRows, type RowIdentifierInput } from "@/lib/db";
-import { useAppStore } from "@/store/useAppStore";
+import { getGuidedMutationPolicy } from "@/lib/queryGuard";
+import { useAppStore, type Connection } from "@/store/useAppStore";
 
 interface UseDeleteRowsOptions {
   tableName: string;
   tableData: Record<string, unknown>[];
-  activeConnection: { connId?: string; tag?: string } | null | undefined;
+  activeConnection: Pick<Connection, "connId" | "tag"> | null | undefined;
   checkedRowIndices: Set<number>;
   onClearChecked: () => void;
   onRefresh: (deletedRows: number) => Promise<void> | void;
@@ -36,7 +37,10 @@ export const useDeleteRows = ({
 
   const selectedCount = selectedRows.length;
   const hasSelection = selectedCount > 0;
-  const isProduction = activeConnection?.tag === "production";
+  const deletePolicy = useMemo(
+    () => getGuidedMutationPolicy(activeConnection?.tag, "delete-rows"),
+    [activeConnection?.tag],
+  );
 
   const performDelete = useCallback(async (): Promise<boolean> => {
     if (!connId || selectedRows.length === 0) return false;
@@ -82,13 +86,13 @@ export const useDeleteRows = ({
   const handleDeleteClick = useCallback(() => {
     if (!hasSelection) return;
 
-    if (isProduction) {
+    if (deletePolicy.requiresConfirmation) {
       setShowConfirmDialog(true);
       return;
     }
 
     void performDelete();
-  }, [hasSelection, isProduction, performDelete]);
+  }, [deletePolicy.requiresConfirmation, hasSelection, performDelete]);
 
   const handleConfirmDelete = useCallback(() => {
     setShowConfirmDialog(false);
@@ -104,7 +108,7 @@ export const useDeleteRows = ({
     showConfirmDialog,
     selectedCount,
     hasSelection,
-    isProduction,
+    deletePolicy,
     error,
     handleDeleteClick,
     handleConfirmDelete,

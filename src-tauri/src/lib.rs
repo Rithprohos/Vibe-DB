@@ -4,6 +4,7 @@ pub mod engines;
 mod app_state;
 mod commands;
 mod menu;
+mod query_guard;
 mod sql_helpers;
 mod sql_logging;
 

@@ -2,11 +2,26 @@ import { useState, useRef, useEffect, useMemo, memo, useCallback, type PointerEv
 import { EditorView, keymap } from '@codemirror/view';
 import { Prec } from '@codemirror/state';
 import { sql } from '@codemirror/lang-sql';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 
 import { executeQuery, listTables } from '../lib/db';
+import {
+  analyzeQueryExecutionPolicy,
+  getBlockedQueryEditorMessage,
+  type QueryExecutionPolicy,
+} from '@/lib/queryGuard';
 import { buildSavedQueryDefaultName } from '@/lib/savedQueries';
 import { useDevRenderCounter } from '@/lib/dev-performance';
 import { useAppStore, MAX_RESULT_ROWS } from '../store/useAppStore';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 import { QueryEditorPane } from './query-editor/EditorPane';
 import { QueryResultsPane } from './query-editor/ResultsPane';
@@ -25,6 +40,11 @@ interface SaveDialogState {
   open: boolean;
   mode: SavedQueryDialogMode;
   initialName: string;
+}
+
+interface PendingConfirmationState {
+  query: string;
+  policy: QueryExecutionPolicy;
 }
 
 const BASIC_SETUP = {
@@ -80,6 +100,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     mode: 'create',
     initialName: '',
   });
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmationState | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
@@ -106,8 +127,31 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
 
   const activeConnectionId = activeConnection?.id;
   const activeConnectionConnId = activeConnection?.connId;
+  const isProductionConnection = activeConnection?.tag === 'production';
   const saveButtonLabel = linkedSavedQuery ? 'Update' : 'Save';
   const canSave = !running;
+
+  const getQueryToRun = useCallback((editorView?: EditorViewLike) => {
+    const store = useAppStore.getState();
+    const currentTab = store.tabs.find(t => t.id === tabId);
+    let queryToRun = (currentTab?.query || '').trim();
+
+    const refView = editorRef.current?.view;
+    const view = isEditorViewLike(editorView)
+      ? editorView
+      : isEditorViewLike(refView)
+        ? refView
+        : null;
+
+    if (view) {
+      const selection = view.state.selection.main;
+      if (!selection.empty) {
+        queryToRun = view.state.sliceDoc(selection.from, selection.to).trim();
+      }
+    }
+
+    return queryToRun;
+  }, [tabId]);
 
   const openSaveDialog = useCallback((mode: SavedQueryDialogMode) => {
     const store = useAppStore.getState();
@@ -273,33 +317,17 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     setSelectedCell(null);
   }, [error, result]);
 
-  const handleRun = useCallback(async (editorView?: EditorViewLike) => {
+  const runQuery = useCallback(async (queryToRun: string, policy?: QueryExecutionPolicy) => {
     const store = useAppStore.getState();
-    const currentTab = store.tabs.find(t => t.id === tabId);
-    let queryToRun = (currentTab?.query || '').trim();
-
-    const refView = editorRef.current?.view;
-    const view = isEditorViewLike(editorView)
-      ? editorView
-      : isEditorViewLike(refView)
-        ? refView
-        : null;
-
-    if (view) {
-      const selection = view.state.selection.main;
-      if (!selection.empty) {
-        queryToRun = view.state.sliceDoc(selection.from, selection.to).trim();
-      }
-    }
-
     if (!activeConnectionConnId || !queryToRun) return;
 
     setRunning(true);
+    setPendingConfirmation(null);
     store.updateTab(tabId, { error: '', result: null });
     const start = performance.now();
 
     try {
-      const nextResult = await executeQuery(queryToRun, activeConnectionConnId);
+      const nextResult = await executeQuery(queryToRun, activeConnectionConnId, 'query-editor');
       setDuration(performance.now() - start);
 
       const truncated = nextResult.rows.length > MAX_RESULT_ROWS;
@@ -309,8 +337,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
 
       store.updateTab(tabId, { result: resultToStore, error: '' });
 
-      const upper = queryToRun.toUpperCase();
-      if ((upper.startsWith('CREATE') || upper.startsWith('DROP') || upper.startsWith('ALTER')) && activeConnectionId) {
+      if ((policy?.shouldRefreshSchema ?? false) && activeConnectionId) {
         const tablesList = await listTables(activeConnectionConnId);
         store.setTables(activeConnectionId, tablesList);
       }
@@ -321,6 +348,31 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
       setRunning(false);
     }
   }, [activeConnectionConnId, activeConnectionId, tabId]);
+
+  const handleRun = useCallback(async (editorView?: EditorViewLike) => {
+    const queryToRun = getQueryToRun(editorView);
+    if (!queryToRun) return;
+
+    const policy = analyzeQueryExecutionPolicy(queryToRun, {
+      connectionTag: activeConnection?.tag,
+      surface: 'query-editor',
+    });
+
+    if (policy.blockedStatements.length > 0) {
+      useAppStore.getState().updateTab(tabId, {
+        error: getBlockedQueryEditorMessage(policy.blockedStatements),
+        result: null,
+      });
+      return;
+    }
+
+    if (policy.requiresConfirmation) {
+      setPendingConfirmation({ query: queryToRun, policy });
+      return;
+    }
+
+    await runQuery(queryToRun, policy);
+  }, [activeConnection?.tag, getQueryToRun, runQuery, tabId]);
 
   const handleRunRef = useRef(handleRun);
   handleRunRef.current = handleRun;
@@ -367,6 +419,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   );
 
   const canRun = Boolean(activeConnectionConnId) && !running;
+  const confirmationStatements = pendingConfirmation?.policy.confirmStatements.join(', ') ?? '';
 
   return (
     <div ref={rootRef} className="flex flex-col h-full w-full bg-background relative z-0">
@@ -382,6 +435,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         query={query}
         editorExtensions={editorExtensions}
         wrapEditor={wrapEditor}
+        isProductionConnection={isProductionConnection}
         basicSetup={BASIC_SETUP}
         onRun={() => void handleRun()}
         onSave={handleSave}
@@ -411,6 +465,49 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         onOpenChange={(open) => setSaveDialogState((current) => ({ ...current, open }))}
         onSubmit={handleSubmitSaveDialog}
       />
+
+      <Dialog
+        open={pendingConfirmation !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingConfirmation(null);
+        }}
+      >
+        <DialogContent className="max-w-md border-warning/30 bg-card shadow-2xl shadow-black/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-warning">
+              <ShieldAlert className="h-5 w-5" />
+              Confirm Production Query
+            </DialogTitle>
+            <DialogDescription>
+              This connection is tagged as <strong>PRODUCTION</strong>. The query editor requires
+              confirmation before running write or schema statements.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-sm border border-warning/30 bg-warning/10 px-3 py-3 text-sm text-warning/90">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                About to run: <strong>{confirmationStatements}</strong>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingConfirmation(null)} disabled={running}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pendingConfirmation) return;
+                void runQuery(pendingConfirmation.query, pendingConfirmation.policy);
+              }}
+              disabled={running}
+              className="bg-warning text-black hover:bg-warning/90"
+            >
+              Run Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

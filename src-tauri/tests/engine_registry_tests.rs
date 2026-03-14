@@ -90,6 +90,7 @@ async fn test_engine_registry_connect_unsupported_engine() {
         database: None,
         auth_token: None,
         ssl_mode: None,
+        tag: None,
     };
 
     let result: EngineResult<String> = registry.connect(config).await;

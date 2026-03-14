@@ -480,7 +480,7 @@ export default function CreateTable({ tabId }: Props) {
         foreignKeys,
         checkConstraints,
       );
-      await executeQuery(sqlToRun, connId);
+      await executeQuery(sqlToRun, connId, 'guided');
 
       const tables = await listTables(connId);
       if (activeConnection) {

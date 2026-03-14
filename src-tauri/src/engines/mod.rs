@@ -11,8 +11,8 @@ pub use sqlite::SqliteEngine;
 pub use traits::DatabaseEngine;
 pub use turso::TursoEngine;
 pub use types::{
-    ColumnInfo, ConnectionConfig, EngineType, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo,
-    TableStructure,
+    ColumnInfo, ConnectionConfig, ConnectionTag, EngineType, ForeignKeyInfo, IndexInfo,
+    QueryResult, TableInfo, TableStructure,
 };
 
 use std::collections::HashMap;
@@ -50,6 +50,7 @@ pub type EngineResult<T> = Result<T, EngineError>;
 struct ConnectionEntry {
     engine: Arc<dyn DatabaseEngine>,
     engine_type: EngineType,
+    tag: Option<ConnectionTag>,
 }
 
 pub struct EngineRegistry {
@@ -85,6 +86,7 @@ impl EngineRegistry {
         let entry = ConnectionEntry {
             engine,
             engine_type,
+            tag: config.tag,
         };
         let mut connections = self.connections.write().await;
         connections.insert(conn_id.clone(), entry);
@@ -121,6 +123,20 @@ impl EngineRegistry {
         connections
             .get(conn_id)
             .map(|entry| entry.engine_type)
+            .ok_or_else(|| {
+                EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
+            })
+    }
+
+    /// Gets the user-assigned environment tag for a connection by ID.
+    pub async fn get_connection_tag(
+        &self,
+        conn_id: &str,
+    ) -> EngineResult<Option<ConnectionTag>> {
+        let connections = self.connections.read().await;
+        connections
+            .get(conn_id)
+            .map(|entry| entry.tag)
             .ok_or_else(|| {
                 EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
             })
