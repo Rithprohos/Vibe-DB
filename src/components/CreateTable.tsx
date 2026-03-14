@@ -35,6 +35,7 @@ import {
   getLiveColumnNameErrors,
   getLiveConstraintError,
 } from './create-table/validation';
+import { getQualifiedTableName } from '@/lib/databaseObjects';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,6 +44,11 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   tabId: string;
+}
+
+interface ReferenceTableOption {
+  value: string;
+  label: string;
 }
 
 const DEFAULT_EXPANDED_SECTIONS: ExpandedConstraintSections = {
@@ -89,19 +95,31 @@ export default function CreateTable({ tabId }: Props) {
       return [];
     }
 
-    const seenNames = new Set<string>();
-    return (tablesByConnection[activeConnection.id] ?? [])
-      .filter((table) => table.table_type === 'table')
-      .map((table) => table.name.trim())
-      .filter((name) => {
-        if (!name || seenNames.has(name)) {
-          return false;
-        }
-        seenNames.add(name);
-        return true;
-      })
-      .sort((left, right) => left.localeCompare(right));
-  }, [activeConnection, tablesByConnection]);
+    const optionsByValue = new Map<string, ReferenceTableOption>();
+    const isPostgres = engineType === 'postgres';
+
+    for (const table of tablesByConnection[activeConnection.id] ?? []) {
+      if (table.table_type !== 'table') {
+        continue;
+      }
+      const tableName = table.name.trim();
+      if (!tableName) {
+        continue;
+      }
+
+      const qualifiedName = isPostgres ? getQualifiedTableName(table) : tableName;
+      if (!optionsByValue.has(qualifiedName)) {
+        optionsByValue.set(qualifiedName, {
+          value: qualifiedName,
+          label: qualifiedName,
+        });
+      }
+    }
+
+    return Array.from(optionsByValue.values()).sort((left, right) =>
+      left.label.localeCompare(right.label),
+    );
+  }, [activeConnection, engineType, tablesByConnection]);
 
   const validColumnCount = useMemo(
     () => columns.filter((column) => column.name.trim()).length,

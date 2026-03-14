@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashSet;
 
-use super::identifiers::{quote_identifier, validate_identifier};
+use super::identifiers::{quote_identifier, quote_qualified_identifier, validate_identifier};
 
 #[derive(Debug, Clone, Copy, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -100,6 +100,22 @@ fn format_fk_action(action: Option<&str>, prefix: &str) -> String {
         }
         None => String::new(),
     }
+}
+
+fn validate_qualified_identifier(name: &str, label: &str) -> Result<(), String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(format!("{label} name is required"));
+    }
+    if trimmed.split('.').any(|part| part.trim().is_empty()) {
+        return Err(format!("{label} name contains an empty identifier segment"));
+    }
+
+    for segment in trimmed.split('.') {
+        validate_identifier(segment.trim(), label)?;
+    }
+
+    Ok(())
 }
 
 /// Builds a validated CREATE TABLE SQL statement from structured column definitions.
@@ -223,8 +239,17 @@ pub fn build_create_table_sql(
         }
 
         validate_identifier(col_name, "Foreign key column")?;
-        validate_identifier(ref_table, "Referenced table")?;
+        if matches!(dialect, CreateTableDialect::Postgres) {
+            validate_qualified_identifier(ref_table, "Referenced table")?;
+        } else {
+            validate_identifier(ref_table, "Referenced table")?;
+        }
         validate_identifier(ref_col, "Referenced column")?;
+        let quoted_ref_table = if matches!(dialect, CreateTableDialect::Postgres) {
+            quote_qualified_identifier(ref_table)
+        } else {
+            quote_identifier(ref_table)
+        };
 
         let on_delete = format_fk_action(fk.on_delete.as_deref(), "ON DELETE");
         let on_update = format_fk_action(fk.on_update.as_deref(), "ON UPDATE");
@@ -232,7 +257,7 @@ pub fn build_create_table_sql(
         let fk_sql = format!(
             "  FOREIGN KEY ({}) REFERENCES {} ({}){}{}",
             quote_identifier(col_name),
-            quote_identifier(ref_table),
+            quoted_ref_table,
             quote_identifier(ref_col),
             on_delete,
             on_update

@@ -339,6 +339,29 @@ export function validateConstraintIdentifier(
   return null;
 }
 
+export function validateQualifiedConstraintIdentifier(
+  value: string,
+  label: string,
+): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return `${label} is required`;
+  }
+
+  const segments = trimmed
+    .split('.')
+    .map((segment) => segment.trim());
+  if (segments.some((segment) => !segment)) {
+    return `${label} contains an empty identifier segment`;
+  }
+
+  if (!segments.every((segment) => IDENTIFIER_PATTERN.test(segment))) {
+    return `${label} must use valid identifiers separated by dots`;
+  }
+
+  return null;
+}
+
 /** Common SQLite default value presets */
 export const DEFAULT_OPTIONS: DefaultOption[] = [
   { value: "none", label: "None" },

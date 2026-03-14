@@ -3,6 +3,7 @@ import {
   buildCheckConstraintExpression,
   FK_ACTION_OPTIONS,
   validateConstraintIdentifier,
+  validateQualifiedConstraintIdentifier,
   validateTypeParams,
   type CheckConstraint,
   type ColumnDef,
@@ -84,10 +85,15 @@ export function getLiveConstraintError({
       return `Foreign key #${index + 1} references unknown local column "${columnName}"`;
     }
 
-    const referencedTableError = validateConstraintIdentifier(
-      referencedTable,
-      'Referenced table name',
-    );
+    const referencedTableError = engineType === 'postgres'
+      ? validateQualifiedConstraintIdentifier(
+          referencedTable,
+          'Referenced table name',
+        )
+      : validateConstraintIdentifier(
+          referencedTable,
+          'Referenced table name',
+        );
     if (referencedTableError) {
       return `Foreign key #${index + 1}: ${referencedTableError}`;
     }

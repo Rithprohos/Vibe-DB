@@ -451,6 +451,57 @@ fn build_create_table_sql_includes_foreign_key_actions() {
 }
 
 #[test]
+fn build_create_table_sql_postgres_supports_schema_qualified_foreign_key_table() {
+    let columns = vec![
+        CreateTableColumnInput {
+            name: "id".to_string(),
+            col_type: "INTEGER".to_string(),
+            type_params: None,
+            primary_key: true,
+            auto_increment: true,
+            not_null: false,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        },
+        CreateTableColumnInput {
+            name: "user_id".to_string(),
+            col_type: "INTEGER".to_string(),
+            type_params: None,
+            primary_key: false,
+            auto_increment: false,
+            not_null: true,
+            unique: false,
+            default_option: "none".to_string(),
+            default_value: "".to_string(),
+        },
+    ];
+    let foreign_keys = vec![ForeignKeyConstraintInput {
+        column_name: "user_id".to_string(),
+        referenced_table: "auth.users".to_string(),
+        referenced_column: "id".to_string(),
+        on_delete: Some("cascade".to_string()),
+        on_update: None,
+    }];
+
+    let sql = build_create_table_sql(
+        "orders".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        Some(foreign_keys),
+        None,
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("FOREIGN KEY (\"user_id\") REFERENCES \"auth\".\"users\" (\"id\") ON DELETE CASCADE"),
+        "Expected schema-qualified FK reference. Got: {}",
+        sql
+    );
+}
+
+#[test]
 fn build_create_table_sql_rejects_partial_foreign_key_constraint() {
     let columns = vec![CreateTableColumnInput {
         name: "user_id".to_string(),

@@ -33,13 +33,18 @@ export interface ExpandedConstraintSections {
   checkConstraints: boolean;
 }
 
+interface ReferenceTableOption {
+  value: string;
+  label: string;
+}
+
 interface ConstraintsSectionProps {
   tableName: string;
   engineType: SupportedEngine;
   columns: ColumnDef[];
   foreignKeys: ForeignKeyConstraint[];
   checkConstraints: CheckConstraint[];
-  referenceTableOptions: string[];
+  referenceTableOptions: ReferenceTableOption[];
   referenceColumnsByTable: Record<string, string[]>;
   loadingReferenceColumnsByTable: Record<string, boolean>;
   expandedSections: ExpandedConstraintSections;
@@ -183,9 +188,9 @@ export function ConstraintsSection({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={UNSET_SELECT_VALUE}>Select table</SelectItem>
-                          {referenceTableOptions.map((tableName) => (
-                            <SelectItem key={tableName} value={tableName}>
-                              {tableName}
+                          {referenceTableOptions.map((tableOption) => (
+                            <SelectItem key={tableOption.value} value={tableOption.value}>
+                              {tableOption.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
