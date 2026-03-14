@@ -14,7 +14,7 @@ use commands::{
     connect_database, create_database, delete_rows, disconnect_database, execute_query,
     execute_transaction, get_database_version, get_filtered_row_count, get_table_data,
     get_table_row_count, get_table_structure, insert_rows, list_tables, set_active_connection,
-    update_rows,
+    truncate_table, update_rows,
 };
 use menu::setup_menu;
 use sql_helpers::{build_create_table_sql, build_create_view_sql};
@@ -29,7 +29,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_stronghold::Builder::new(|password| {
-                use argon2::{hash_raw, Config, Variant, Version};
+                use argon2::{Config, Variant, Version, hash_raw};
                 let config = Config {
                     lanes: 1,
                     mem_cost: 1024,
@@ -67,6 +67,7 @@ pub fn run() {
             delete_rows,
             insert_rows,
             update_rows,
+            truncate_table,
             get_default_ai_provider_config,
             ping_ai_provider,
             generate_sql

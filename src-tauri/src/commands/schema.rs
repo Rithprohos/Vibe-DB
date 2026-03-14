@@ -2,13 +2,26 @@ use crate::app_state::AppState;
 use crate::commands::get_connection_id;
 use crate::engines::{TableInfo, TableStructure};
 use crate::sql_helpers::{
-    build_where_clause, extract_count, normalize_order_dir, quote_identifier,
-    quote_qualified_identifier, FilterConditionInput,
+    FilterConditionInput, build_where_clause, extract_count, normalize_order_dir, quote_identifier,
+    quote_qualified_identifier,
 };
 use crate::sql_logging::emit_sql_log;
+use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
+
+/// Options for truncating a table.
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TruncateTableOptions {
+    /// Whether to restart identity sequences (auto-increment counters).
+    #[serde(default)]
+    pub restart_identity: bool,
+    /// Whether to cascade to foreign key references (PostgreSQL only).
+    #[serde(default)]
+    pub cascade: bool,
+}
 
 /// Lists all tables in the database.
 #[tauri::command]
@@ -225,6 +238,89 @@ pub async fn get_table_data(
             emit_sql_log(
                 &app,
                 query,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
+}
+
+/// Truncates a table, removing all rows.
+///
+/// Uses DELETE FROM for SQLite (since TRUNCATE is not supported),
+/// and TRUNCATE TABLE for PostgreSQL with optional RESTART IDENTITY and CASCADE.
+#[tauri::command]
+pub async fn truncate_table(
+    app: AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+    table_name: String,
+    options: Option<TruncateTableOptions>,
+) -> Result<crate::engines::QueryResult, String> {
+    let start = Instant::now();
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let opts = options.unwrap_or_default();
+    let trimmed_table_name = table_name.trim();
+
+    // Resolve SQL text for logging based on engine type.
+    let engine_type = state
+        .registry
+        .get_connection_type(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let sql = match engine_type {
+        crate::engines::EngineType::Postgres => {
+            let mut sql = format!(
+                "TRUNCATE TABLE {}",
+                quote_qualified_identifier(trimmed_table_name)
+            );
+            if opts.restart_identity {
+                sql.push_str(" RESTART IDENTITY");
+            }
+            if opts.cascade {
+                sql.push_str(" CASCADE");
+            }
+            sql
+        }
+        _ => {
+            // SQLite and Turso: use DELETE FROM
+            // Note: SQLite has no native TRUNCATE, DELETE FROM is the standard approach
+            format!(
+                "DELETE FROM {}",
+                quote_qualified_identifier(trimmed_table_name)
+            )
+        }
+    };
+
+    match engine
+        .truncate_table(trimmed_table_name, opts.restart_identity, opts.cascade)
+        .await
+    {
+        Ok(result) => {
+            let message = format!("Table '{trimmed_table_name}' truncated");
+            emit_sql_log(
+                &app,
+                sql,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message,
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                sql,
                 "error",
                 start.elapsed().as_secs_f64() * 1000.0,
                 message.clone(),

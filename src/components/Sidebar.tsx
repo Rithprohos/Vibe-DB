@@ -23,6 +23,7 @@ import {
 } from '@/lib/databaseObjects';
 import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
 import { ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
+import TruncateTableDialog from './TruncateTableDialog';
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -51,6 +52,8 @@ export default function Sidebar() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedSchema, setSelectedSchema] = useState(ALL_SCHEMAS_VALUE);
+  const [truncateDialogOpen, setTruncateDialogOpen] = useState(false);
+  const [truncateTableName, setTruncateTableName] = useState('');
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -244,6 +247,12 @@ export default function Sidebar() {
     if (!activeConnection) return;
     openTableTab(activeConnection.id, tableName, 'edit-table');
   }, [activeConnection, openTableTab]);
+
+  const handleTruncateTable = useCallback((tableName: string) => {
+    if (!activeConnection) return;
+    setTruncateTableName(tableName);
+    setTruncateDialogOpen(true);
+  }, [activeConnection]);
 
   const handleOpenVisualize = useCallback((tableName: string) => {
     if (!activeConnection) return;
@@ -520,6 +529,13 @@ export default function Sidebar() {
                     <ContextMenuItem onClick={() => handleEditTable(qualifiedName)}>
                       Edit Table
                     </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onClick={() => handleTruncateTable(qualifiedName)}
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                    >
+                      Truncate Table
+                    </ContextMenuItem>
                   </>
                 )}
               />
@@ -547,7 +563,7 @@ export default function Sidebar() {
       )}
 
       {/* Resizer handle */}
-      <div 
+      <div
         className={cn(
           "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary active:bg-primary z-10",
           !isResizing && "transition-colors",
@@ -555,6 +571,21 @@ export default function Sidebar() {
         )}
         onMouseDown={startResizing}
       />
+
+      {/* Truncate Table Dialog */}
+      {activeConnection && (
+        <TruncateTableDialog
+          open={truncateDialogOpen}
+          onOpenChange={setTruncateDialogOpen}
+          tableName={truncateTableName}
+          connectionId={activeConnection.id}
+          engineType={activeConnection.type}
+          onSuccess={() => {
+            // Refresh tables after truncation to update row counts
+            void handleRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }

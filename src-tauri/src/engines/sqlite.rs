@@ -65,6 +65,15 @@ impl SqliteEngine {
         format!("\"{}\"", identifier.replace('\"', "\"\""))
     }
 
+    fn quote_qualified_identifier(identifier: &str) -> String {
+        identifier
+            .split('.')
+            .map(str::trim)
+            .map(Self::quote_identifier)
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
     /// Detects dangerous query patterns like DELETE/UPDATE with tautological WHERE clauses.
     /// Returns an error if the query appears unsafe.
     pub fn validate_query_safety(query: &str) -> EngineResult<()> {
@@ -393,6 +402,39 @@ impl DatabaseEngine for SqliteEngine {
                 "Committed {} statement(s), {} row(s) affected",
                 statements_executed, rows_affected_total
             ),
+        })
+    }
+
+    async fn truncate_table(
+        &self,
+        table_name: &str,
+        _restart_identity: bool,
+        _cascade: bool,
+    ) -> EngineResult<QueryResult> {
+        Self::validate_table_name(table_name)?;
+
+        let pool = self.pool.read().await;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
+
+        let trimmed_table = table_name.trim();
+        let sql = format!(
+            "DELETE FROM {}",
+            Self::quote_qualified_identifier(trimmed_table)
+        );
+
+        let result = sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        let rows_affected = result.rows_affected();
+
+        Ok(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            rows_affected,
+            message: format!("{rows_affected} row(s) affected"),
         })
     }
 

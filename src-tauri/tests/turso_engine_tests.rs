@@ -128,3 +128,35 @@ async fn test_turso_execute_transaction_rolls_back_when_validation_fails() {
     engine.disconnect().await;
     cleanup_temp_db(&db_path);
 }
+
+#[tokio::test]
+async fn test_turso_truncate_table_removes_all_rows() {
+    let db_path = create_temp_db_path("test_vibedb_turso_truncate");
+    let engine = TursoEngine::new();
+    let config = create_turso_local_config(&db_path.to_string_lossy());
+
+    let connected: EngineResult<()> = engine.connect(&config).await;
+    assert!(connected.is_ok());
+
+    let created = engine
+        .execute_query("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+        .await;
+    assert!(created.is_ok());
+
+    let inserted = engine
+        .execute_query("INSERT INTO items (name) VALUES ('a'), ('b'), ('c')")
+        .await;
+    assert!(inserted.is_ok());
+
+    let truncated = engine.truncate_table("items", false, false).await.unwrap();
+    assert_eq!(truncated.rows_affected, 3);
+
+    let count_result = engine
+        .execute_query("SELECT COUNT(*) AS count FROM items")
+        .await
+        .unwrap();
+    assert_eq!(extract_first_count(&count_result), 0);
+
+    engine.disconnect().await;
+    cleanup_temp_db(&db_path);
+}

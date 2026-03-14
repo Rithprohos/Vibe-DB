@@ -314,3 +314,18 @@ export async function clearCustomAiApiKey(profileId?: string): Promise<void> {
     clearStoredAiApiKey(profileId),
   );
 }
+
+export interface TruncateTableOptions {
+  restartIdentity?: boolean;
+  cascade?: boolean;
+}
+
+export async function truncateTable(
+  tableName: string,
+  options?: TruncateTableOptions,
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("truncate_table", () =>
+    invoke<QueryResult>("truncate_table", { tableName, options, connId }),
+  );
+}

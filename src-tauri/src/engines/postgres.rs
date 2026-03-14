@@ -89,6 +89,15 @@ impl PostgresEngine {
         format!("\"{}\"", identifier.replace('"', "\"\""))
     }
 
+    fn quote_qualified_identifier(identifier: &str) -> String {
+        identifier
+            .split('.')
+            .map(str::trim)
+            .map(Self::quote_identifier)
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
     /// Builds a connection string from the configuration.
     fn build_connection_string(config: &ConnectionConfig) -> EngineResult<String> {
         let host = config.host.as_ref().ok_or_else(|| {
@@ -705,6 +714,45 @@ impl DatabaseEngine for PostgresEngine {
                 "Committed {} statement(s), {} row(s) affected",
                 statements_executed, rows_affected_total
             ),
+        })
+    }
+
+    async fn truncate_table(
+        &self,
+        table_name: &str,
+        restart_identity: bool,
+        cascade: bool,
+    ) -> EngineResult<QueryResult> {
+        Self::validate_table_name(table_name)?;
+
+        let pool = self.pool.read().await;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
+
+        let trimmed_table = table_name.trim();
+        let mut sql = format!(
+            "TRUNCATE TABLE {}",
+            Self::quote_qualified_identifier(trimmed_table)
+        );
+        if restart_identity {
+            sql.push_str(" RESTART IDENTITY");
+        }
+        if cascade {
+            sql.push_str(" CASCADE");
+        }
+
+        let result = sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        let rows_affected = result.rows_affected();
+
+        Ok(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            rows_affected,
+            message: format!("{rows_affected} row(s) affected"),
         })
     }
 
