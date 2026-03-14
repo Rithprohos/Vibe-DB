@@ -49,6 +49,15 @@ impl TursoEngine {
         format!("\"{}\"", identifier.replace('"', "\"\""))
     }
 
+    fn quote_qualified_identifier(identifier: &str) -> String {
+        identifier
+            .split('.')
+            .map(str::trim)
+            .map(Self::quote_identifier)
+            .collect::<Vec<_>>()
+            .join(".")
+    }
+
     /// Detects dangerous query patterns like DELETE/UPDATE with tautological WHERE clauses.
     pub fn validate_query_safety(query: &str) -> EngineResult<()> {
         safety::validate_query_safety(query)
@@ -114,6 +123,10 @@ impl DatabaseEngine for TursoEngine {
             db.connect()
                 .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?
         };
+
+        conn.execute("PRAGMA foreign_keys = ON", ())
+            .await
+            .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
 
         let mut connection = self.connection.write().await;
         *connection = Some(conn);
@@ -505,6 +518,37 @@ impl DatabaseEngine for TursoEngine {
                 "Committed {} statement(s), {} row(s) affected",
                 statements_executed, rows_affected_total
             ),
+        })
+    }
+
+    async fn truncate_table(
+        &self,
+        table_name: &str,
+        _restart_identity: bool,
+        _cascade: bool,
+    ) -> EngineResult<QueryResult> {
+        Self::validate_table_name(table_name)?;
+
+        let connection = self.connection.read().await;
+        let conn = connection.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
+
+        let trimmed_table = table_name.trim();
+        let sql = format!(
+            "DELETE FROM {}",
+            Self::quote_qualified_identifier(trimmed_table)
+        );
+        let result = conn
+            .execute(&sql, ())
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        Ok(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            rows_affected: result as u64,
+            message: format!("{result} row(s) affected"),
         })
     }
 

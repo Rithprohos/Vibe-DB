@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ColumnDef } from "./createTableConstants";
+import type { ColumnDef, ForeignKeyConstraint, CheckConstraint } from "./createTableConstants";
 import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
 import {
@@ -223,13 +223,22 @@ export async function buildCreateTableSQL(
   columns: ColumnDef[],
   ifNotExists: boolean,
   engineType: 'sqlite' | 'turso' | 'postgres' = 'sqlite',
+  foreignKeys: ForeignKeyConstraint[] = [],
+  checkConstraints: CheckConstraint[] = [],
 ): Promise<string> {
+  const serializedCheckConstraints = checkConstraints.map((constraint) => ({
+    name: constraint.name,
+    expression: constraint.expression,
+  }));
+
   return measureDevFetch("build_create_table_sql", () =>
     invoke<string>("build_create_table_sql", {
       tableName,
       columns,
       ifNotExists,
       engineType,
+      foreignKeys,
+      checkConstraints: serializedCheckConstraints,
     }),
   );
 }
@@ -303,5 +312,20 @@ export async function saveCustomAiApiKey(
 export async function clearCustomAiApiKey(profileId?: string): Promise<void> {
   return measureDevFetch("clear_custom_ai_api_key", () =>
     clearStoredAiApiKey(profileId),
+  );
+}
+
+export interface TruncateTableOptions {
+  restartIdentity?: boolean;
+  cascade?: boolean;
+}
+
+export async function truncateTable(
+  tableName: string,
+  options?: TruncateTableOptions,
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("truncate_table", () =>
+    invoke<QueryResult>("truncate_table", { tableName, options, connId }),
   );
 }

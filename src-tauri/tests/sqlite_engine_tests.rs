@@ -34,10 +34,12 @@ fn test_validate_table_name_invalid() {
 
     let result = SqliteEngine::validate_table_name("users; DROP TABLE users;");
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Invalid table name"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid table name")
+    );
 
     let result = SqliteEngine::validate_table_name("table-name");
     assert!(result.is_err());
@@ -251,6 +253,34 @@ async fn test_sqlite_engine_get_table_row_count() {
 
     let count: i64 = engine.get_table_row_count("count_test").await.unwrap();
     assert_eq!(count, 5);
+
+    engine.disconnect().await;
+    let _ = std::fs::remove_file(&temp_path);
+}
+
+#[tokio::test]
+async fn test_sqlite_engine_truncate_table_removes_all_rows() {
+    let engine = SqliteEngine::new();
+    let temp_path = std::env::temp_dir().join("test_vibedb_truncate.db");
+    let config = create_test_config(&temp_path.to_string_lossy());
+
+    let _: EngineResult<()> = engine.connect(&config).await;
+
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE truncate_test (id INTEGER PRIMARY KEY)")
+        .await;
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("INSERT INTO truncate_test VALUES (1), (2), (3)")
+        .await;
+
+    let truncate_result = engine
+        .truncate_table("truncate_test", false, false)
+        .await
+        .unwrap();
+    assert_eq!(truncate_result.rows_affected, 3);
+
+    let count: i64 = engine.get_table_row_count("truncate_test").await.unwrap();
+    assert_eq!(count, 0);
 
     engine.disconnect().await;
     let _ = std::fs::remove_file(&temp_path);

@@ -28,6 +28,48 @@ export interface ColumnDef {
   defaultValue: string;
 }
 
+/** Foreign key constraint definition */
+export interface ForeignKeyConstraint {
+  id: string;
+  columnName: string;
+  referencedTable: string;
+  referencedColumn: string;
+  onDelete?: 'cascade' | 'set_null' | 'set_default' | 'restrict' | 'no_action';
+  onUpdate?: 'cascade' | 'set_null' | 'set_default' | 'restrict' | 'no_action';
+}
+
+export type CheckConstraintMode = 'builder' | 'custom';
+export type CheckConstraintScope = 'column' | 'table';
+
+export type CheckConstraintOperator =
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'eq'
+  | 'neq'
+  | 'like'
+  | 'regex';
+
+/** Check constraint definition */
+export interface CheckConstraint {
+  id: string;
+  name: string;
+  expression: string;
+  mode: CheckConstraintMode;
+  scope: CheckConstraintScope;
+  field: string;
+  compareField: string;
+  operator: CheckConstraintOperator;
+  value: string;
+}
+
+/** Table constraint definitions */
+export interface TableConstraints {
+  foreignKeys: ForeignKeyConstraint[];
+  checks: CheckConstraint[];
+}
+
 export interface SqliteType {
   value: string;
   label: string;
@@ -38,10 +80,202 @@ export interface SqliteType {
 
 export type SupportedEngine = "sqlite" | "turso" | "postgres";
 
+interface CheckConstraintOperatorConfig {
+  label: string;
+  requiresValue: boolean;
+  valuePlaceholder: string;
+}
+
+export interface CheckConstraintOperatorOption {
+  value: CheckConstraintOperator;
+  label: string;
+  disabled?: boolean;
+}
+
+const CHECK_CONSTRAINT_OPERATOR_CONFIG: Record<
+  CheckConstraintOperator,
+  CheckConstraintOperatorConfig
+> = {
+  gt: {
+    label: 'Greater than (>)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  gte: {
+    label: 'Greater than or equal (>=)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  lt: {
+    label: 'Less than (<)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  lte: {
+    label: 'Less than or equal (<=)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  eq: {
+    label: 'Equals (=)',
+    requiresValue: true,
+    valuePlaceholder: '1 or active',
+  },
+  neq: {
+    label: 'Not equals (!=)',
+    requiresValue: true,
+    valuePlaceholder: '0 or archived',
+  },
+  like: {
+    label: 'LIKE pattern',
+    requiresValue: true,
+    valuePlaceholder: '%admin%',
+  },
+  regex: {
+    label: 'Regex match',
+    requiresValue: true,
+    valuePlaceholder: '^[A-Za-z0-9_]+$',
+  },
+};
+
+const CHECK_CONSTRAINT_OPERATOR_OPTIONS: {
+  value: CheckConstraintOperator;
+  label: string;
+}[] = (Object.entries(CHECK_CONSTRAINT_OPERATOR_CONFIG) as Array<
+  [CheckConstraintOperator, CheckConstraintOperatorConfig]
+>).map(([value, config]) => ({
+  value,
+  label: config.label,
+}));
+
+export function isCheckConstraintOperatorSupported(
+  operator: CheckConstraintOperator,
+  engine: SupportedEngine,
+): boolean {
+  return operator !== 'regex' || engine === 'postgres';
+}
+
+export function getCheckConstraintOperatorOptions(
+  engine: SupportedEngine,
+): CheckConstraintOperatorOption[] {
+  return CHECK_CONSTRAINT_OPERATOR_OPTIONS.map((option) =>
+    isCheckConstraintOperatorSupported(option.value, engine)
+      ? option
+      : {
+          ...option,
+          label: `${option.label} (PostgreSQL only)`,
+          disabled: true,
+        },
+  );
+}
+
+export const CHECK_CONSTRAINT_SCOPE_OPTIONS: {
+  value: CheckConstraintScope;
+  label: string;
+}[] = [
+  { value: 'column', label: 'Column-level' },
+  { value: 'table', label: 'Table-level' },
+];
+
+const SQL_LITERAL_NUMBER_PATTERN = /^-?(?:\d+|\d*\.\d+)$/;
+const SQL_LITERAL_BOOLEAN_OR_NULL_PATTERN = /^(?:true|false|null)$/i;
+const SQL_SINGLE_QUOTED_PATTERN = /^'(?:[^']|'')*'$/;
+const SQL_DOUBLE_QUOTED_PATTERN = /^"(?:[^"]|"")*"$/;
+
+function quoteExpressionIdentifier(identifier: string): string {
+  return `"${identifier.split('"').join('""')}"`;
+}
+
+function asSqlValueLiteral(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (
+    SQL_LITERAL_NUMBER_PATTERN.test(trimmed) ||
+    SQL_LITERAL_BOOLEAN_OR_NULL_PATTERN.test(trimmed) ||
+    SQL_SINGLE_QUOTED_PATTERN.test(trimmed) ||
+    SQL_DOUBLE_QUOTED_PATTERN.test(trimmed)
+  ) {
+    return trimmed;
+  }
+
+  return `'${trimmed.split("'").join("''")}'`;
+}
+
+export function getCheckConstraintValuePlaceholder(
+  operator: CheckConstraintOperator,
+): string {
+  return CHECK_CONSTRAINT_OPERATOR_CONFIG[operator].valuePlaceholder;
+}
+
+export function buildCheckConstraintExpression(
+  constraint: CheckConstraint,
+  engine: SupportedEngine,
+): string {
+  if (constraint.mode === 'custom') {
+    return constraint.expression.trim();
+  }
+
+  if (!isCheckConstraintOperatorSupported(constraint.operator, engine)) {
+    return '';
+  }
+
+  const scope = constraint.scope;
+  const leftField = constraint.field.trim();
+  if (!leftField) {
+    return '';
+  }
+
+  const operatorSql: Record<CheckConstraintOperator, string> = {
+    gt: '>',
+    gte: '>=',
+    lt: '<',
+    lte: '<=',
+    eq: '=',
+    neq: '!=',
+    like: 'LIKE',
+    regex: engine === 'postgres' ? '~' : 'REGEXP',
+  };
+
+  if (scope === 'table') {
+    const rightField = constraint.compareField.trim();
+    if (!rightField) {
+      return '';
+    }
+    return `${quoteExpressionIdentifier(leftField)} ${operatorSql[constraint.operator]} ${quoteExpressionIdentifier(rightField)}`;
+  }
+
+  const config = CHECK_CONSTRAINT_OPERATOR_CONFIG[constraint.operator];
+  const rawValue = constraint.value.trim();
+  if (config.requiresValue && !rawValue) {
+    return '';
+  }
+  const sqlValue = asSqlValueLiteral(rawValue);
+  if (config.requiresValue && !sqlValue) {
+    return '';
+  }
+
+  return `${quoteExpressionIdentifier(leftField)} ${operatorSql[constraint.operator]} ${sqlValue}`.trim();
+}
+
 export interface DefaultOption {
   value: string;
   label: string;
 }
+
+const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SQLITE_AUTOINCREMENT_TYPES = new Set(["INTEGER"]);
+const POSTGRES_AUTOINCREMENT_TYPES = new Set([
+  "SMALLINT",
+  "SMALLSERIAL",
+  "INTEGER",
+  "INT",
+  "SERIAL",
+  "BIGINT",
+  "BIGSERIAL",
+]);
 
 /** SQLite data types – covering the main affinities + common aliases */
 interface DataTypeOption extends SqliteType {
@@ -109,6 +343,54 @@ export function getEngineTypeLabel(engine: SupportedEngine): string {
   if (engine === "turso") return "Turso types";
   if (engine === "postgres") return "PostgreSQL types";
   return "Types";
+}
+
+export function canUseAutoIncrement(
+  engine: SupportedEngine,
+  typeValue: string,
+): boolean {
+  const normalized = typeValue.trim().toUpperCase();
+  if (engine === "postgres") {
+    return POSTGRES_AUTOINCREMENT_TYPES.has(normalized);
+  }
+  return SQLITE_AUTOINCREMENT_TYPES.has(normalized);
+}
+
+export function validateConstraintIdentifier(
+  value: string,
+  label: string,
+): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return `${label} is required`;
+  }
+  if (!IDENTIFIER_PATTERN.test(trimmed)) {
+    return `${label} must start with a letter/underscore and contain only letters, numbers, and underscores`;
+  }
+  return null;
+}
+
+export function validateQualifiedConstraintIdentifier(
+  value: string,
+  label: string,
+): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return `${label} is required`;
+  }
+
+  const segments = trimmed
+    .split('.')
+    .map((segment) => segment.trim());
+  if (segments.some((segment) => !segment)) {
+    return `${label} contains an empty identifier segment`;
+  }
+
+  if (!segments.every((segment) => IDENTIFIER_PATTERN.test(segment))) {
+    return `${label} must use valid identifiers separated by dots`;
+  }
+
+  return null;
 }
 
 /** Common SQLite default value presets */
@@ -226,6 +508,43 @@ export function formatTypeWithParams(typeValue: string, params?: TypeParams): st
   }
   return typeValue;
 }
+
+/** Create a new empty foreign key constraint */
+export function createEmptyForeignKey(): ForeignKeyConstraint {
+  return {
+    id: `fk-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    columnName: '',
+    referencedTable: '',
+    referencedColumn: '',
+    onDelete: undefined,
+    onUpdate: undefined,
+  };
+}
+
+/** Create a new empty check constraint */
+export function createEmptyCheckConstraint(): CheckConstraint {
+  return {
+    id: `chk-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    name: '',
+    mode: 'builder',
+    scope: 'column',
+    field: '',
+    compareField: '',
+    operator: 'gt',
+    value: '',
+    expression: '',
+  };
+}
+
+/** Foreign key action options */
+export const FK_ACTION_OPTIONS: { value: ForeignKeyConstraint['onDelete']; label: string }[] = [
+  { value: undefined, label: 'No Action' },
+  { value: 'cascade', label: 'CASCADE' },
+  { value: 'set_null', label: 'SET NULL' },
+  { value: 'set_default', label: 'SET DEFAULT' },
+  { value: 'restrict', label: 'RESTRICT' },
+  { value: 'no_action', label: 'NO ACTION' },
+];
 
 /** Validate type parameters. */
 export function validateTypeParams(typeValue: string, params?: TypeParams): string | null {

@@ -1,5 +1,5 @@
-use super::types::{ConnectionConfig, QueryResult, TableInfo, TableStructure};
 use super::EngineResult;
+use super::types::{ConnectionConfig, QueryResult, TableInfo, TableStructure};
 use async_trait::async_trait;
 
 /// Trait for database engine implementations.
@@ -40,6 +40,17 @@ pub trait DatabaseEngine: Send + Sync {
     ///
     /// The implementation must commit only if all statements succeed.
     async fn execute_transaction(&self, queries: &[String]) -> EngineResult<QueryResult>;
+
+    /// Truncates a table by deleting all rows.
+    ///
+    /// `restart_identity` and `cascade` are honored by engines that support them
+    /// (e.g. PostgreSQL) and ignored by engines that do not.
+    async fn truncate_table(
+        &self,
+        table_name: &str,
+        restart_identity: bool,
+        cascade: bool,
+    ) -> EngineResult<QueryResult>;
 
     /// Gets the total number of rows in a table.
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64>;

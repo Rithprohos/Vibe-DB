@@ -11,4 +11,5 @@ pub use query::{execute_query, execute_transaction};
 pub use rows::{delete_rows, insert_rows, update_rows};
 pub use schema::{
     get_filtered_row_count, get_table_data, get_table_row_count, get_table_structure, list_tables,
+    truncate_table,
 };

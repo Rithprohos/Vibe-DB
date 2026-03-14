@@ -95,11 +95,11 @@ export default function SidebarObjectSection({
 
         <div
           className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-200 ease-out',
+            'grid min-h-0 flex-1 transition-[grid-template-rows,opacity] duration-200 ease-out',
             open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
           )}
         >
-          <div className="min-h-0 overflow-hidden">
+          <div className="flex min-h-0 flex-1 overflow-hidden">
             <div
               ref={listRef}
               className={cn(listClassName, !open && 'pointer-events-none')}

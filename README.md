@@ -16,7 +16,7 @@
 
 A modern, high-performance database manager built with Tauri v2 and React. Supports SQLite, Turso (libSQL), and PostgreSQL. Engineered for speed, security, and a premium developer experience.
 
-![VibeDB](https://img.shields.io/badge/version-0.4.2-blue?style=for-the-badge)
+![VibeDB](https://img.shields.io/badge/version-0.4.10-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=for-the-badge)
 [![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet?style=for-the-badge)](./ROADMAP.md)
@@ -35,12 +35,14 @@ Paid database tools made sense before AI. Now a solo dev with agents can build t
 - **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction. All row inserts, updates, and deletes are built and executed in Rust.
 - **🌍 Multi-Engine Ready** — SQLite, Turso (libSQL), and PostgreSQL supported. MySQL coming soon.
 - **🏗️ Visual Table & View Builder** — Create tables and views with a polished GUI including real-time, syntax-highlighted SQL preview.
+- **🕸️ Schema Visualization Canvas** — Explore table relationships on an interactive schema canvas with pan/zoom and draggable cards.
 - **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions, plus click-to-sort columns and drag-to-resize headers.
 - **🔎 Row Inspector** — Side panel for detailed row viewing and in-place field editing with save/cancel flow and JSON-aware helpers.
+- **🧪 Developer Sample Data Generator** — Generate sample rows directly into a selected table.
 - **🗑️ Safe Row Deletion** — Multi-select rows and delete with a production-environment confirmation guard to prevent accidental data loss.
 - **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
-- **✨ Pollinations AI** — Intelligent SQL assistance built right into the query editor.
-- **🎨 Premium Themes** — Switch between **Dark**, **Light**, and **Purple Solarized** modes.
+- **✨ AI SQL Assistant** — Intelligent SQL assistance built into the query editor, with Pollinations by default and support for custom/OpenAI profiles.
+- **🎨 Premium Themes** — Switch between **Dark**, **Dark Modern**, **Light**, and **Purple Solarized** modes.
 - **⌨️ Workflow Mastery** — Multi-tab interface, persistent state, and keyboard-first design (`⌘N`, `⌘T`, `⌘↵`).
 
 ## 🚀 Getting Started

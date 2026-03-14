@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, Eye, Pencil, X as XIcon } from 'lucide-react';
 import { formatCellValue } from '@/lib/formatters';
+import { isJsonColumn } from '@/lib/sql/columnTypes';
+import {
+  normalizeJsonInput,
+  parseStructuredColumnValue,
+} from '@/lib/sql/values';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatColumnTypeDisplay } from '@/lib/typeDisplay';
 import type { ColumnInfo } from '@/store/useAppStore';
-import {
-  isJsonColumn,
-  normalizeJsonInput,
-  parseStructuredColumnValue,
-} from '@/lib/sql-helpers';
 
 interface RowInspectorProps {
   isOpen: boolean;

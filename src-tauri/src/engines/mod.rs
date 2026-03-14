@@ -46,8 +46,14 @@ pub type EngineResult<T> = Result<T, EngineError>;
 ///
 /// The registry maintains a map of connection IDs to engine instances,
 /// allowing multiple simultaneous connections to different databases.
+/// Connection entry storing both the engine and its type.
+struct ConnectionEntry {
+    engine: Arc<dyn DatabaseEngine>,
+    engine_type: EngineType,
+}
+
 pub struct EngineRegistry {
-    connections: RwLock<HashMap<String, Arc<dyn DatabaseEngine>>>,
+    connections: RwLock<HashMap<String, ConnectionEntry>>,
 }
 
 impl EngineRegistry {
@@ -69,22 +75,27 @@ impl EngineRegistry {
             EngineType::Mysql => {
                 return Err(EngineError::UnsupportedEngine(
                     "MySQL engine not yet implemented".to_string(),
-                ))
+                ));
             }
         };
 
         engine.connect(&config).await?;
         let conn_id = config.id;
+        let engine_type = config.engine_type;
+        let entry = ConnectionEntry {
+            engine,
+            engine_type,
+        };
         let mut connections = self.connections.write().await;
-        connections.insert(conn_id.clone(), engine);
+        connections.insert(conn_id.clone(), entry);
         Ok(conn_id)
     }
 
     /// Disconnects and removes a connection from the registry.
     pub async fn disconnect(&self, conn_id: &str) -> EngineResult<()> {
         let mut connections = self.connections.write().await;
-        if let Some(engine) = connections.remove(conn_id) {
-            engine.disconnect().await;
+        if let Some(entry) = connections.remove(conn_id) {
+            entry.engine.disconnect().await;
         }
         Ok(())
     }
@@ -94,9 +105,25 @@ impl EngineRegistry {
     /// Returns an error if the connection is not found.
     pub async fn get_engine(&self, conn_id: &str) -> EngineResult<Arc<dyn DatabaseEngine>> {
         let connections = self.connections.read().await;
-        connections.get(conn_id).cloned().ok_or_else(|| {
-            EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
-        })
+        connections
+            .get(conn_id)
+            .map(|entry| entry.engine.clone())
+            .ok_or_else(|| {
+                EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
+            })
+    }
+
+    /// Gets the engine type for a connection by ID.
+    ///
+    /// Returns an error if the connection is not found.
+    pub async fn get_connection_type(&self, conn_id: &str) -> EngineResult<EngineType> {
+        let connections = self.connections.read().await;
+        connections
+            .get(conn_id)
+            .map(|entry| entry.engine_type)
+            .ok_or_else(|| {
+                EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
+            })
     }
 }
 

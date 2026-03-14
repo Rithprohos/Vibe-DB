@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { updateRows, type RowUpdateInput } from "@/lib/db";
-import type { ColumnInfo } from "@/store/useAppStore";
+import { isJsonColumn } from "@/lib/sql/columnTypes";
 import {
-  isJsonColumn,
   normalizeJsonInput,
   parseStructuredColumnValue,
-} from "@/lib/sql-helpers";
+} from "@/lib/sql/values";
+import type { ColumnInfo } from "@/store/useAppStore";
 import { stringifyCellValue } from "@/lib/formatters";
 
 interface EditingCell {
