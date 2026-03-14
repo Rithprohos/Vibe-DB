@@ -10,8 +10,14 @@ import type {
   CheckConstraint,
   ColumnDef,
   ForeignKeyConstraint,
+  SupportedEngine,
 } from '../../lib/createTableConstants';
-import { FK_ACTION_OPTIONS } from '../../lib/createTableConstants';
+import {
+  CHECK_CONSTRAINT_OPERATOR_OPTIONS,
+  CHECK_CONSTRAINT_SCOPE_OPTIONS,
+  FK_ACTION_OPTIONS,
+  getCheckConstraintValuePlaceholder,
+} from '../../lib/createTableConstants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,6 +35,7 @@ export interface ExpandedConstraintSections {
 
 interface ConstraintsSectionProps {
   tableName: string;
+  engineType: SupportedEngine;
   columns: ColumnDef[];
   foreignKeys: ForeignKeyConstraint[];
   checkConstraints: CheckConstraint[];
@@ -47,6 +54,7 @@ interface ConstraintsSectionProps {
 
 export function ConstraintsSection({
   tableName,
+  engineType,
   columns,
   foreignKeys,
   checkConstraints,
@@ -65,6 +73,9 @@ export function ConstraintsSection({
   const UNSET_SELECT_VALUE = '__vibedb_none__';
   const FK_LABEL_CLASS =
     'text-[10px] uppercase tracking-wider text-muted-foreground mb-1 h-8 flex items-end';
+  const checkConstraintColumns = Array.from(
+    new Set(columns.map((column) => column.name.trim()).filter(Boolean)),
+  );
 
   return (
     <div className="mt-8 space-y-4">
@@ -338,50 +349,299 @@ export function ConstraintsSection({
               checkConstraints.map((constraint, index) => (
                 <div
                   key={constraint.id}
-                  className="grid grid-cols-12 gap-2 items-start p-3 rounded-sm bg-background/50 border border-border/50"
+                  className="p-3 rounded-sm bg-background/50 border border-border/50 space-y-3"
                 >
-                  <div className="col-span-4">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
-                      Constraint Name (optional)
-                    </label>
-                    <Input
-                      type="text"
-                      value={constraint.name}
-                      onChange={(event) =>
-                        onUpdateCheckConstraint(constraint.id, {
-                          name: event.target.value,
-                        })
-                      }
-                      placeholder={`chk_${tableName}_${index + 1}`}
-                      className="h-8 bg-transparent border-border/50 text-xs"
-                    />
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                    <div className="md:col-span-6">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                        Constraint Name (optional)
+                      </label>
+                      <Input
+                        type="text"
+                        value={constraint.name}
+                        onChange={(event) =>
+                          onUpdateCheckConstraint(constraint.id, {
+                            name: event.target.value,
+                          })
+                        }
+                        placeholder={`chk_${tableName}_${index + 1}`}
+                        className="h-8 bg-transparent border-border/50 text-xs"
+                      />
+                    </div>
+
+                    <div className="md:col-span-4">
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                        Mode
+                      </label>
+                      <Select
+                        value={constraint.mode}
+                        onValueChange={(value) =>
+                          onUpdateCheckConstraint(constraint.id, {
+                            mode: value as CheckConstraint['mode'],
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="builder">Builder</SelectItem>
+                          <SelectItem value="custom">Custom SQL</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="md:col-span-2 md:pt-5 md:flex md:justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRemoveCheckConstraint(constraint.id)}
+                        className="w-7 h-7 p-0 hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="col-span-7">
-                    <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
-                      Expression
-                    </label>
-                    <Input
-                      type="text"
-                      value={constraint.expression}
-                      onChange={(event) =>
-                        onUpdateCheckConstraint(constraint.id, {
-                          expression: event.target.value,
-                        })
-                      }
-                      placeholder="price > 0"
-                      className="h-8 bg-transparent border-border/50 text-xs font-mono"
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-end pt-5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onRemoveCheckConstraint(constraint.id)}
-                      className="w-7 h-7 p-0 hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 size={13} />
-                    </Button>
-                  </div>
+
+                  {constraint.mode === 'builder' ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                        <div className="md:col-span-4">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                            Scope
+                          </label>
+                          <Select
+                            value={constraint.scope}
+                            onValueChange={(value) =>
+                              onUpdateCheckConstraint(constraint.id, {
+                                scope: value as CheckConstraint['scope'],
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CHECK_CONSTRAINT_SCOPE_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {constraint.scope === 'table' ? (
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                          <div className="md:col-span-4">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                              Field 1
+                            </label>
+                            <Select
+                              value={constraint.field || UNSET_SELECT_VALUE}
+                              onValueChange={(value) =>
+                                onUpdateCheckConstraint(constraint.id, {
+                                  field: value === UNSET_SELECT_VALUE ? '' : value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                                <SelectValue
+                                  placeholder={
+                                    checkConstraintColumns.length > 0
+                                      ? 'Select field'
+                                      : 'No columns yet'
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={UNSET_SELECT_VALUE}>Select field</SelectItem>
+                                {checkConstraintColumns.map((columnName) => (
+                                  <SelectItem key={columnName} value={columnName}>
+                                    {columnName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="md:col-span-4">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                              Expression
+                            </label>
+                            <Select
+                              value={constraint.operator}
+                              onValueChange={(value) =>
+                                onUpdateCheckConstraint(constraint.id, {
+                                  operator: value as CheckConstraint['operator'],
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CHECK_CONSTRAINT_OPERATOR_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="md:col-span-4">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                              Field 2
+                            </label>
+                            <Select
+                              value={constraint.compareField || UNSET_SELECT_VALUE}
+                              onValueChange={(value) =>
+                                onUpdateCheckConstraint(constraint.id, {
+                                  compareField: value === UNSET_SELECT_VALUE ? '' : value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                                <SelectValue
+                                  placeholder={
+                                    checkConstraintColumns.length > 0
+                                      ? 'Select field'
+                                      : 'No columns yet'
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={UNSET_SELECT_VALUE}>Select field</SelectItem>
+                                {checkConstraintColumns.map((columnName) => (
+                                  <SelectItem key={columnName} value={columnName}>
+                                    {columnName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                          <div className="md:col-span-4">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                              Field
+                            </label>
+                            <Select
+                              value={constraint.field || UNSET_SELECT_VALUE}
+                              onValueChange={(value) =>
+                                onUpdateCheckConstraint(constraint.id, {
+                                  field: value === UNSET_SELECT_VALUE ? '' : value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                                <SelectValue
+                                  placeholder={
+                                    checkConstraintColumns.length > 0
+                                      ? 'Select field'
+                                      : 'No columns yet'
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={UNSET_SELECT_VALUE}>Select field</SelectItem>
+                                {checkConstraintColumns.map((columnName) => (
+                                  <SelectItem key={columnName} value={columnName}>
+                                    {columnName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="md:col-span-4">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                              Expression
+                            </label>
+                            <Select
+                              value={constraint.operator}
+                              onValueChange={(value) =>
+                                onUpdateCheckConstraint(constraint.id, {
+                                  operator: value as CheckConstraint['operator'],
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CHECK_CONSTRAINT_OPERATOR_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="md:col-span-4">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                              Input
+                            </label>
+                            <Input
+                              type="text"
+                              value={constraint.value}
+                              onChange={(event) =>
+                                onUpdateCheckConstraint(constraint.id, {
+                                  value: event.target.value,
+                                })
+                              }
+                              placeholder={getCheckConstraintValuePlaceholder(constraint.operator)}
+                              className="h-8 bg-transparent border-border/50 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                          Generated SQL
+                        </label>
+                        <Input
+                          type="text"
+                          value={constraint.expression}
+                          readOnly
+                          placeholder={
+                            constraint.scope === 'table'
+                              ? 'Select field1, expression, and field2'
+                              : 'Select field and input to generate expression'
+                          }
+                          className="h-8 bg-background/30 border-border/50 text-xs font-mono text-muted-foreground"
+                        />
+                        {constraint.operator === 'regex' && engineType !== 'postgres' && (
+                          <p className="mt-1 text-[10px] text-muted-foreground/80">
+                            SQLite/Turso uses <span className="font-mono">REGEXP</span> for regex and
+                            may require a registered regexp function.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                        Expression
+                      </label>
+                      <Input
+                        type="text"
+                        value={constraint.expression}
+                        onChange={(event) =>
+                          onUpdateCheckConstraint(constraint.id, {
+                            expression: event.target.value,
+                          })
+                        }
+                        placeholder="price > 0 AND quantity <= max_quantity"
+                        className="h-8 bg-transparent border-border/50 text-xs font-mono"
+                      />
+                    </div>
+                  )}
                 </div>
               ))
             )}

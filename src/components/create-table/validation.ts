@@ -1,14 +1,17 @@
 import { validateColumnName } from '../../lib/tableName';
 import {
+  buildCheckConstraintExpression,
   FK_ACTION_OPTIONS,
   validateConstraintIdentifier,
   validateTypeParams,
   type CheckConstraint,
   type ColumnDef,
   type ForeignKeyConstraint,
+  type SupportedEngine,
 } from '../../lib/createTableConstants';
 
 interface ConstraintValidationInput {
+  engineType: SupportedEngine;
   foreignKeys: ForeignKeyConstraint[];
   checkConstraints: CheckConstraint[];
   namedColumnNames: Set<string>;
@@ -52,6 +55,7 @@ export function getInvalidTypeParamsError(columns: ColumnDef[]): string | null {
 }
 
 export function getLiveConstraintError({
+  engineType,
   foreignKeys,
   checkConstraints,
   namedColumnNames,
@@ -107,15 +111,22 @@ export function getLiveConstraintError({
   for (let index = 0; index < checkConstraints.length; index += 1) {
     const constraint = checkConstraints[index];
     const name = constraint.name.trim();
-    const expression = constraint.expression.trim();
-    const hasAnyValue = name.length > 0 || expression.length > 0;
+    const expression = buildCheckConstraintExpression(constraint, engineType);
+    const hasBuilderValue =
+      constraint.field.trim().length > 0 ||
+      constraint.compareField.trim().length > 0 ||
+      constraint.value.trim().length > 0 ||
+      constraint.mode === 'custom';
+    const hasAnyValue = name.length > 0 || expression.length > 0 || hasBuilderValue;
 
     if (!hasAnyValue) {
       continue;
     }
 
     if (!expression) {
-      return `Check constraint #${index + 1} expression is required`;
+      return constraint.mode === 'custom'
+        ? `Check constraint #${index + 1} expression is required`
+        : `Check constraint #${index + 1} requires a target, expression type, and input`;
     }
 
     if (name) {

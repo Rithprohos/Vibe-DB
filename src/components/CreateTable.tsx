@@ -9,6 +9,7 @@ import {
 } from '../lib/db';
 import { validateTableName } from '../lib/tableName';
 import {
+  buildCheckConstraintExpression,
   canUseAutoIncrement,
   createDefaultIdColumn,
   createEmptyCheckConstraint,
@@ -121,11 +122,12 @@ export default function CreateTable({ tabId }: Props) {
   const liveConstraintError = useMemo(
     () =>
       getLiveConstraintError({
+        engineType,
         foreignKeys,
         checkConstraints,
         namedColumnNames,
       }),
-    [foreignKeys, checkConstraints, namedColumnNames],
+    [engineType, foreignKeys, checkConstraints, namedColumnNames],
   );
 
   const sql = useCreateTableSqlPreview({
@@ -247,11 +249,34 @@ export default function CreateTable({ tabId }: Props) {
     setExpandedSections((previous) => ({ ...previous, checkConstraints: true }));
   }, []);
 
-  const updateCheckConstraint = useCallback((id: string, updates: Partial<CheckConstraint>) => {
-    setCheckConstraints((previous) =>
-      previous.map((constraint) => (constraint.id === id ? { ...constraint, ...updates } : constraint)),
-    );
-  }, []);
+  const updateCheckConstraint = useCallback(
+    (id: string, updates: Partial<CheckConstraint>) => {
+      setCheckConstraints((previous) =>
+        previous.map((constraint) => {
+          if (constraint.id !== id) {
+            return constraint;
+          }
+
+          const nextConstraint = { ...constraint, ...updates };
+          if (
+            typeof updates.scope === 'string' &&
+            updates.scope !== constraint.scope
+          ) {
+            if (updates.scope === 'table') {
+              nextConstraint.value = '';
+            } else {
+              nextConstraint.compareField = '';
+            }
+          }
+          if (nextConstraint.mode === 'builder') {
+            nextConstraint.expression = buildCheckConstraintExpression(nextConstraint, engineType);
+          }
+          return nextConstraint;
+        }),
+      );
+    },
+    [engineType],
+  );
 
   const removeCheckConstraint = useCallback((id: string) => {
     setCheckConstraints((previous) => previous.filter((constraint) => constraint.id !== id));
@@ -360,6 +385,42 @@ export default function CreateTable({ tabId }: Props) {
       return didChange ? next : previous;
     });
   }, [referenceColumnsByTable]);
+
+  useEffect(() => {
+    setCheckConstraints((previous) => {
+      let didChange = false;
+      const next = previous.map((constraint) => {
+        if (constraint.mode !== 'builder') {
+          return constraint;
+        }
+
+        const field = constraint.field.trim();
+        if (constraint.scope === 'column' && field && !namedColumnNames.has(field)) {
+          didChange = true;
+          return { ...constraint, field: '', expression: '' };
+        }
+        if (constraint.scope === 'table') {
+          const compareField = constraint.compareField.trim();
+          if (field && !namedColumnNames.has(field)) {
+            didChange = true;
+            return { ...constraint, field: '', expression: '' };
+          }
+          if (compareField && !namedColumnNames.has(compareField)) {
+            didChange = true;
+            return { ...constraint, compareField: '', expression: '' };
+          }
+        }
+
+        const expression = buildCheckConstraintExpression(constraint, engineType);
+        if (expression !== constraint.expression) {
+          didChange = true;
+          return { ...constraint, expression };
+        }
+        return constraint;
+      });
+      return didChange ? next : previous;
+    });
+  }, [engineType, namedColumnNames]);
 
   const handleSave = useCallback(async () => {
     if (!connId) {
@@ -532,6 +593,7 @@ export default function CreateTable({ tabId }: Props) {
 
           <ConstraintsSection
             tableName={tableName}
+            engineType={engineType}
             columns={columns}
             foreignKeys={foreignKeys}
             checkConstraints={checkConstraints}

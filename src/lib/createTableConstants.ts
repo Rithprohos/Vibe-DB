@@ -38,11 +38,30 @@ export interface ForeignKeyConstraint {
   onUpdate?: 'cascade' | 'set_null' | 'set_default' | 'restrict' | 'no_action';
 }
 
+export type CheckConstraintMode = 'builder' | 'custom';
+export type CheckConstraintScope = 'column' | 'table';
+
+export type CheckConstraintOperator =
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'eq'
+  | 'neq'
+  | 'like'
+  | 'regex';
+
 /** Check constraint definition */
 export interface CheckConstraint {
   id: string;
   name: string;
   expression: string;
+  mode: CheckConstraintMode;
+  scope: CheckConstraintScope;
+  field: string;
+  compareField: string;
+  operator: CheckConstraintOperator;
+  value: string;
 }
 
 /** Table constraint definitions */
@@ -60,6 +79,155 @@ export interface SqliteType {
 }
 
 export type SupportedEngine = "sqlite" | "turso" | "postgres";
+
+interface CheckConstraintOperatorConfig {
+  label: string;
+  requiresValue: boolean;
+  valuePlaceholder: string;
+}
+
+const CHECK_CONSTRAINT_OPERATOR_CONFIG: Record<
+  CheckConstraintOperator,
+  CheckConstraintOperatorConfig
+> = {
+  gt: {
+    label: 'Greater than (>)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  gte: {
+    label: 'Greater than or equal (>=)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  lt: {
+    label: 'Less than (<)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  lte: {
+    label: 'Less than or equal (<=)',
+    requiresValue: true,
+    valuePlaceholder: '0',
+  },
+  eq: {
+    label: 'Equals (=)',
+    requiresValue: true,
+    valuePlaceholder: '1 or active',
+  },
+  neq: {
+    label: 'Not equals (!=)',
+    requiresValue: true,
+    valuePlaceholder: '0 or archived',
+  },
+  like: {
+    label: 'LIKE pattern',
+    requiresValue: true,
+    valuePlaceholder: '%admin%',
+  },
+  regex: {
+    label: 'Regex match',
+    requiresValue: true,
+    valuePlaceholder: '^[A-Za-z0-9_]+$',
+  },
+};
+
+export const CHECK_CONSTRAINT_OPERATOR_OPTIONS: {
+  value: CheckConstraintOperator;
+  label: string;
+}[] = (Object.entries(CHECK_CONSTRAINT_OPERATOR_CONFIG) as Array<
+  [CheckConstraintOperator, CheckConstraintOperatorConfig]
+>).map(([value, config]) => ({
+  value,
+  label: config.label,
+}));
+
+export const CHECK_CONSTRAINT_SCOPE_OPTIONS: {
+  value: CheckConstraintScope;
+  label: string;
+}[] = [
+  { value: 'column', label: 'Column-level' },
+  { value: 'table', label: 'Table-level' },
+];
+
+const SQL_LITERAL_NUMBER_PATTERN = /^-?(?:\d+|\d*\.\d+)$/;
+const SQL_LITERAL_BOOLEAN_OR_NULL_PATTERN = /^(?:true|false|null)$/i;
+const SQL_SINGLE_QUOTED_PATTERN = /^'(?:[^']|'')*'$/;
+const SQL_DOUBLE_QUOTED_PATTERN = /^"(?:[^"]|"")*"$/;
+
+function quoteExpressionIdentifier(identifier: string): string {
+  return `"${identifier.split('"').join('""')}"`;
+}
+
+function asSqlValueLiteral(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (
+    SQL_LITERAL_NUMBER_PATTERN.test(trimmed) ||
+    SQL_LITERAL_BOOLEAN_OR_NULL_PATTERN.test(trimmed) ||
+    SQL_SINGLE_QUOTED_PATTERN.test(trimmed) ||
+    SQL_DOUBLE_QUOTED_PATTERN.test(trimmed)
+  ) {
+    return trimmed;
+  }
+
+  return `'${trimmed.split("'").join("''")}'`;
+}
+
+export function getCheckConstraintValuePlaceholder(
+  operator: CheckConstraintOperator,
+): string {
+  return CHECK_CONSTRAINT_OPERATOR_CONFIG[operator].valuePlaceholder;
+}
+
+export function buildCheckConstraintExpression(
+  constraint: CheckConstraint,
+  engine: SupportedEngine,
+): string {
+  if (constraint.mode === 'custom') {
+    return constraint.expression.trim();
+  }
+
+  const scope = constraint.scope;
+  const leftField = constraint.field.trim();
+  if (!leftField) {
+    return '';
+  }
+
+  const operatorSql: Record<CheckConstraintOperator, string> = {
+    gt: '>',
+    gte: '>=',
+    lt: '<',
+    lte: '<=',
+    eq: '=',
+    neq: '!=',
+    like: 'LIKE',
+    regex: engine === 'postgres' ? '~' : 'REGEXP',
+  };
+
+  if (scope === 'table') {
+    const rightField = constraint.compareField.trim();
+    if (!rightField) {
+      return '';
+    }
+    return `${quoteExpressionIdentifier(leftField)} ${operatorSql[constraint.operator]} ${quoteExpressionIdentifier(rightField)}`;
+  }
+
+  const config = CHECK_CONSTRAINT_OPERATOR_CONFIG[constraint.operator];
+  const rawValue = constraint.value.trim();
+  if (config.requiresValue && !rawValue) {
+    return '';
+  }
+  const sqlValue = asSqlValueLiteral(rawValue);
+  if (config.requiresValue && !sqlValue) {
+    return '';
+  }
+
+  return `${quoteExpressionIdentifier(leftField)} ${operatorSql[constraint.operator]} ${sqlValue}`.trim();
+}
 
 export interface DefaultOption {
   value: string;
@@ -304,6 +472,12 @@ export function createEmptyCheckConstraint(): CheckConstraint {
   return {
     id: `chk-${Date.now()}-${Math.random().toString(36).substring(7)}`,
     name: '',
+    mode: 'builder',
+    scope: 'column',
+    field: '',
+    compareField: '',
+    operator: 'gt',
+    value: '',
     expression: '',
   };
 }

@@ -226,6 +226,11 @@ export async function buildCreateTableSQL(
   foreignKeys: ForeignKeyConstraint[] = [],
   checkConstraints: CheckConstraint[] = [],
 ): Promise<string> {
+  const serializedCheckConstraints = checkConstraints.map((constraint) => ({
+    name: constraint.name,
+    expression: constraint.expression,
+  }));
+
   return measureDevFetch("build_create_table_sql", () =>
     invoke<string>("build_create_table_sql", {
       tableName,
@@ -233,7 +238,7 @@ export async function buildCreateTableSQL(
       ifNotExists,
       engineType,
       foreignKeys,
-      checkConstraints,
+      checkConstraints: serializedCheckConstraints,
     }),
   );
 }
