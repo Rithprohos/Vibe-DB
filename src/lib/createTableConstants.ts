@@ -86,6 +86,12 @@ interface CheckConstraintOperatorConfig {
   valuePlaceholder: string;
 }
 
+export interface CheckConstraintOperatorOption {
+  value: CheckConstraintOperator;
+  label: string;
+  disabled?: boolean;
+}
+
 const CHECK_CONSTRAINT_OPERATOR_CONFIG: Record<
   CheckConstraintOperator,
   CheckConstraintOperatorConfig
@@ -132,7 +138,7 @@ const CHECK_CONSTRAINT_OPERATOR_CONFIG: Record<
   },
 };
 
-export const CHECK_CONSTRAINT_OPERATOR_OPTIONS: {
+const CHECK_CONSTRAINT_OPERATOR_OPTIONS: {
   value: CheckConstraintOperator;
   label: string;
 }[] = (Object.entries(CHECK_CONSTRAINT_OPERATOR_CONFIG) as Array<
@@ -141,6 +147,27 @@ export const CHECK_CONSTRAINT_OPERATOR_OPTIONS: {
   value,
   label: config.label,
 }));
+
+export function isCheckConstraintOperatorSupported(
+  operator: CheckConstraintOperator,
+  engine: SupportedEngine,
+): boolean {
+  return operator !== 'regex' || engine === 'postgres';
+}
+
+export function getCheckConstraintOperatorOptions(
+  engine: SupportedEngine,
+): CheckConstraintOperatorOption[] {
+  return CHECK_CONSTRAINT_OPERATOR_OPTIONS.map((option) =>
+    isCheckConstraintOperatorSupported(option.value, engine)
+      ? option
+      : {
+          ...option,
+          label: `${option.label} (PostgreSQL only)`,
+          disabled: true,
+        },
+  );
+}
 
 export const CHECK_CONSTRAINT_SCOPE_OPTIONS: {
   value: CheckConstraintScope;
@@ -189,6 +216,10 @@ export function buildCheckConstraintExpression(
 ): string {
   if (constraint.mode === 'custom') {
     return constraint.expression.trim();
+  }
+
+  if (!isCheckConstraintOperatorSupported(constraint.operator, engine)) {
+    return '';
   }
 
   const scope = constraint.scope;

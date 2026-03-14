@@ -539,6 +539,80 @@ fn build_create_table_sql_rejects_partial_foreign_key_constraint() {
 }
 
 #[test]
+fn build_create_table_sql_rejects_invalid_foreign_key_on_delete_action() {
+    let columns = vec![CreateTableColumnInput {
+        name: "user_id".to_string(),
+        col_type: "INTEGER".to_string(),
+        type_params: None,
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+    let foreign_keys = vec![ForeignKeyConstraintInput {
+        column_name: "user_id".to_string(),
+        referenced_table: "users".to_string(),
+        referenced_column: "id".to_string(),
+        on_delete: Some("drop".to_string()),
+        on_update: None,
+    }];
+
+    let error = build_create_table_sql(
+        "orders".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        Some(foreign_keys),
+        None,
+    )
+    .expect_err("expected invalid ON DELETE action validation error");
+
+    assert_eq!(
+        error,
+        "Foreign key constraint #1 has invalid ON DELETE action: \"drop\""
+    );
+}
+
+#[test]
+fn build_create_table_sql_rejects_invalid_foreign_key_on_update_action() {
+    let columns = vec![CreateTableColumnInput {
+        name: "user_id".to_string(),
+        col_type: "INTEGER".to_string(),
+        type_params: None,
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+    let foreign_keys = vec![ForeignKeyConstraintInput {
+        column_name: "user_id".to_string(),
+        referenced_table: "users".to_string(),
+        referenced_column: "id".to_string(),
+        on_delete: None,
+        on_update: Some("drop".to_string()),
+    }];
+
+    let error = build_create_table_sql(
+        "orders".to_string(),
+        columns,
+        false,
+        Some("sqlite".to_string()),
+        Some(foreign_keys),
+        None,
+    )
+    .expect_err("expected invalid ON UPDATE action validation error");
+
+    assert_eq!(
+        error,
+        "Foreign key constraint #1 has invalid ON UPDATE action: \"drop\""
+    );
+}
+
+#[test]
 fn build_create_table_sql_rejects_empty_check_constraint_expression() {
     let columns = vec![CreateTableColumnInput {
         name: "amount".to_string(),

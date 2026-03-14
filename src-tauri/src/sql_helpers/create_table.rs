@@ -85,7 +85,7 @@ impl CreateTableDialect {
     }
 }
 
-fn format_fk_action(action: Option<&str>, prefix: &str) -> String {
+fn format_fk_action(action: Option<&str>, prefix: &str) -> Result<String, String> {
     match action {
         Some(a) => {
             let formatted = match a.to_ascii_lowercase().as_str() {
@@ -94,11 +94,11 @@ fn format_fk_action(action: Option<&str>, prefix: &str) -> String {
                 "set_default" => "SET DEFAULT",
                 "restrict" => "RESTRICT",
                 "no_action" => "NO ACTION",
-                _ => return String::new(),
+                _ => return Err(format!("has invalid {prefix} action: \"{a}\"")),
             };
-            format!(" {prefix} {formatted}")
+            Ok(format!(" {prefix} {formatted}"))
         }
-        None => String::new(),
+        None => Ok(String::new()),
     }
 }
 
@@ -251,8 +251,10 @@ pub fn build_create_table_sql(
             quote_identifier(ref_table)
         };
 
-        let on_delete = format_fk_action(fk.on_delete.as_deref(), "ON DELETE");
-        let on_update = format_fk_action(fk.on_update.as_deref(), "ON UPDATE");
+        let on_delete = format_fk_action(fk.on_delete.as_deref(), "ON DELETE")
+            .map_err(|reason| format!("Foreign key constraint #{} {reason}", index + 1))?;
+        let on_update = format_fk_action(fk.on_update.as_deref(), "ON UPDATE")
+            .map_err(|reason| format!("Foreign key constraint #{} {reason}", index + 1))?;
 
         let fk_sql = format!(
             "  FOREIGN KEY ({}) REFERENCES {} ({}){}{}",

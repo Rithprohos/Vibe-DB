@@ -13,9 +13,9 @@ import type {
   SupportedEngine,
 } from '../../lib/createTableConstants';
 import {
-  CHECK_CONSTRAINT_OPERATOR_OPTIONS,
   CHECK_CONSTRAINT_SCOPE_OPTIONS,
   FK_ACTION_OPTIONS,
+  getCheckConstraintOperatorOptions,
   getCheckConstraintValuePlaceholder,
 } from '../../lib/createTableConstants';
 import { Button } from '@/components/ui/button';
@@ -81,6 +81,7 @@ export function ConstraintsSection({
   const checkConstraintColumns = Array.from(
     new Set(columns.map((column) => column.name.trim()).filter(Boolean)),
   );
+  const checkConstraintOperatorOptions = getCheckConstraintOperatorOptions(engineType);
 
   return (
     <div className="mt-8 space-y-4">
@@ -487,8 +488,12 @@ export function ConstraintsSection({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {CHECK_CONSTRAINT_OPERATOR_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
+                                {checkConstraintOperatorOptions.map((option) => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                    disabled={option.disabled}
+                                  >
                                     {option.label}
                                   </SelectItem>
                                 ))}
@@ -578,8 +583,12 @@ export function ConstraintsSection({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {CHECK_CONSTRAINT_OPERATOR_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
+                                {checkConstraintOperatorOptions.map((option) => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                    disabled={option.disabled}
+                                  >
                                     {option.label}
                                   </SelectItem>
                                 ))}
@@ -623,8 +632,8 @@ export function ConstraintsSection({
                         />
                         {constraint.operator === 'regex' && engineType !== 'postgres' && (
                           <p className="mt-1 text-[10px] text-muted-foreground/80">
-                            SQLite/Turso uses <span className="font-mono">REGEXP</span> for regex and
-                            may require a registered regexp function.
+                            Regex builder is only available for PostgreSQL. Use another operator
+                            or switch to Custom SQL if your runtime provides regexp support.
                           </p>
                         )}
                       </div>

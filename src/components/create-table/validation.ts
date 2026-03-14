@@ -2,6 +2,7 @@ import { validateColumnName } from '../../lib/tableName';
 import {
   buildCheckConstraintExpression,
   FK_ACTION_OPTIONS,
+  isCheckConstraintOperatorSupported,
   validateConstraintIdentifier,
   validateQualifiedConstraintIdentifier,
   validateTypeParams,
@@ -127,6 +128,13 @@ export function getLiveConstraintError({
 
     if (!hasAnyValue) {
       continue;
+    }
+
+    if (
+      constraint.mode === 'builder' &&
+      !isCheckConstraintOperatorSupported(constraint.operator, engineType)
+    ) {
+      return `Check constraint #${index + 1}: regex is only supported for PostgreSQL in builder mode`;
     }
 
     if (!expression) {
