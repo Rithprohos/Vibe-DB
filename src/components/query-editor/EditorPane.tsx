@@ -2,7 +2,7 @@ import { memo, type PointerEvent as ReactPointerEvent, type RefObject } from 're
 import type { Extension } from '@codemirror/state';
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
-import { Copy, Loader2, Play, Save, WrapText } from 'lucide-react';
+import { Copy, Loader2, Play, Save, ShieldAlert, WrapText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,7 @@ interface QueryEditorPaneProps {
   query: string;
   editorExtensions: Extension[];
   wrapEditor: boolean;
+  isProductionConnection: boolean;
   basicSetup: Record<string, boolean>;
   onRun: () => void;
   onSave: () => void;
@@ -40,6 +41,7 @@ export const QueryEditorPane = memo(function QueryEditorPane({
   query,
   editorExtensions,
   wrapEditor,
+  isProductionConnection,
   basicSetup,
   onRun,
   onSave,
@@ -110,6 +112,27 @@ export const QueryEditorPane = memo(function QueryEditorPane({
           </span>
         </div>
       </div>
+
+      {isProductionConnection ? (
+        <div className="relative z-10 border-b border-warning/20 bg-warning/8 px-4 py-2.5 text-warning">
+          <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.14em]">
+            <ShieldAlert size={13} />
+            Production Query Policy Active
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="text-warning/80">Disabled in Query Editor:</span>
+            <span className="border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono font-semibold">
+              DROP
+            </span>
+            <span className="border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono font-semibold">
+              TRUNCATE
+            </span>
+            <span className="text-warning/70">
+              Use guided actions for destructive changes with confirmation.
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative z-0 min-h-0 flex-1 overflow-hidden">
         <CodeMirror

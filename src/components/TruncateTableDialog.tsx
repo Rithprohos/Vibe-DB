@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { truncateTable } from '../lib/db';
+import { getGuidedMutationPolicy } from '../lib/queryGuard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,6 +32,7 @@ export default function TruncateTableDialog({
   const connection = useAppStore(s => s.connections.find(c => c.id === connectionId));
   const connId = connection?.connId;
   const isPostgres = engineType === 'postgres';
+  const truncatePolicy = getGuidedMutationPolicy(connection?.tag, 'truncate-table');
 
   useEffect(() => {
     if (!open) {
@@ -95,11 +97,11 @@ export default function TruncateTableDialog({
               <AlertTriangle className="text-destructive h-5 w-5" />
             </div>
             <DialogTitle className="text-lg font-bold tracking-tight">
-              Truncate Table
+              {truncatePolicy.title}
             </DialogTitle>
           </div>
           <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-            Are you sure you want to truncate <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">{tableName}</code>?
+            {truncatePolicy.description} Are you sure you want to truncate <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono">{tableName}</code>?
             This will permanently delete <strong className="text-destructive">all rows</strong> in the table.
           </DialogDescription>
         </DialogHeader>
@@ -153,7 +155,7 @@ export default function TruncateTableDialog({
           <div className="flex gap-2 text-xs text-amber-500/90 bg-amber-500/10 border border-amber-500/20 rounded-sm p-3">
             <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-medium">This action cannot be undone.</p>
+              <p className="font-medium">{truncatePolicy.warning}</p>
               <p className="text-amber-500/70">
                 {isPostgres
                   ? 'TRUNCATE is faster than DELETE but cannot be rolled back in some cases.'

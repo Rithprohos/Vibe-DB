@@ -286,7 +286,7 @@ export default function EditTable({ tableName, tabId }: Props) {
     setError('');
 
     try {
-      await executeQuery(query, connId);
+      await executeQuery(query, connId, 'guided');
       showToast({ type: 'success', message: successMessage });
       return true;
     } catch (e: any) {

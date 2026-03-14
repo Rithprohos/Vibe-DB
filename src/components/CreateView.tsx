@@ -246,7 +246,7 @@ export default function CreateView({ tabId }: Props) {
       await buildCreateViewSQL(viewName, sourceSql, ifNotExists, temporary);
       const normalized = normalizeSelectForPreview(sourceSql);
       const previewSql = `SELECT * FROM (\n${normalized}\n) AS "__vibedb_preview" LIMIT ${PREVIEW_LIMIT};`;
-      const result = await executeQuery(previewSql, connId);
+      const result = await executeQuery(previewSql, connId, 'guided');
       setPreviewResult(result);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
@@ -285,7 +285,7 @@ export default function CreateView({ tabId }: Props) {
         ifNotExists,
         temporary,
       );
-      await executeQuery(sqlToRun, connId);
+      await executeQuery(sqlToRun, connId, 'guided');
 
       const tables = await listTables(connId);
       if (activeConnection) {

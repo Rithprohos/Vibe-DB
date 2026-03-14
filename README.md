@@ -1,94 +1,106 @@
-# VibeDB 🇰🇭
+# VibeDB
 
 <p align="center">
   <img src="./app-icon.png" alt="VibeDB Logo" width="120" height="120">
 </p>
 
 <p align="center">
-  <a href="./README.md"><b>🏠 Overview</b></a> &nbsp;•&nbsp;
-  <a href="./ROADMAP.md">🗺️ Roadmap</a> &nbsp;•&nbsp;
-  <a href="https://github.com/Rithprohos/vibe-db/releases">🚀 Releases</a> &nbsp;•&nbsp;
-  <a href="./changelog/">📜 Changelog</a> &nbsp;•&nbsp;
-  <a href="./LICENSE">⚖️ License</a>
+  <a href="./README.md"><b>Overview</b></a> &nbsp;•&nbsp;
+  <a href="./ROADMAP.md">Roadmap</a> &nbsp;•&nbsp;
+  <a href="https://github.com/Rithprohos/vibe-db/releases">Releases</a> &nbsp;•&nbsp;
+  <a href="./LICENSE">License</a>
 </p>
 
----
-
-A modern, high-performance database manager built with Tauri v2 and React. Supports SQLite, Turso (libSQL), and PostgreSQL. Engineered for speed, security, and a premium developer experience.
-
-![VibeDB](https://img.shields.io/badge/version-0.4.10-blue?style=for-the-badge)
-![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=for-the-badge)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=for-the-badge)
-[![Roadmap](https://img.shields.io/badge/Roadmap-View-blueviolet?style=for-the-badge)](./ROADMAP.md)
-
-## Why VibeDB?
-
-Paid database tools made sense before AI. Now a solo dev with agents can build the same thing in weeks — and give it away free. That's VibeDB.
+<p align="center">
+  Desktop database management for developers who want speed, clarity, and production-aware safety.
+</p>
 
 <p align="center">
   <img src="./screenshot/screen-shot-1.png" alt="VibeDB Screenshot" width="100%">
 </p>
 
-## 🛠️ Core Features
+## Product Story
 
-- **🚀 High Performance** — TanStack virtualization across table browsing, query results, logs, and sidebar lists, plus aggressive code-splitting for heavy UI paths.
-- **💎 Transactional Editing** — Stage multiple cell edits across different rows and commit them all in a single atomic SQL transaction. All row inserts, updates, and deletes are built and executed in Rust.
-- **🌍 Multi-Engine Ready** — SQLite, Turso (libSQL), and PostgreSQL supported. MySQL coming soon.
-- **🏗️ Visual Table & View Builder** — Create tables and views with a polished GUI including real-time, syntax-highlighted SQL preview.
-- **🕸️ Schema Visualization Canvas** — Explore table relationships on an interactive schema canvas with pan/zoom and draggable cards.
-- **🔍 Smart Data Filtering** — Visual WHERE clause builder with support for `BETWEEN`, `NOT BETWEEN`, and multiple conditions, plus click-to-sort columns and drag-to-resize headers.
-- **🔎 Row Inspector** — Side panel for detailed row viewing and in-place field editing with save/cancel flow and JSON-aware helpers.
-- **🧪 Developer Sample Data Generator** — Generate sample rows directly into a selected table.
-- **🗑️ Safe Row Deletion** — Multi-select rows and delete with a production-environment confirmation guard to prevent accidental data loss.
-- **🛡️ Encrypted Security** — Credentials stored in a `Stronghold` vault (Argon2id + XChaCha20-Poly1305).
-- **✨ AI SQL Assistant** — Intelligent SQL assistance built into the query editor, with Pollinations by default and support for custom/OpenAI profiles.
-- **🎨 Premium Themes** — Switch between **Dark**, **Dark Modern**, **Light**, and **Purple Solarized** modes.
-- **⌨️ Workflow Mastery** — Multi-tab interface, persistent state, and keyboard-first design (`⌘N`, `⌘T`, `⌘↵`).
+VibeDB is a desktop database manager built for real working sessions: browsing tables, shaping schemas, editing rows, running SQL, and moving carefully when a connection points at production.
 
-## 🚀 Getting Started
+It is designed to feel like a sharp devtool, not a bloated admin panel. Dense layouts, direct interactions, and visible safety rails are part of the product.
 
-```bash
-# Clone and install
-git clone https://github.com/Rithprohos/vibe-db.git
-cd vibe-db
-bun install
+## Core Values
 
-# Launch in dev mode
-bun run tdev
+- **Move fast, stay sharp** - Production access should stay usable, but never casual.
+- **Local-first trust** - Connections, preferences, and credentials stay in native desktop storage flows instead of living in the browser.
+- **Dense developer workflow** - Keyboard-first navigation, multi-tab work, and compact surfaces keep the tool focused on throughput.
+- **Safety as product** - Guardrails are visible, deliberate, and part of everyday usage instead of being buried behind configuration.
 
-# Build for production
-bun run build
-bun run tauri build
-```
+## Why Teams Reach For VibeDB
 
-## 🏗️ Architecture
+- **Production-aware query policy** - VibeDB sits between unrestricted SQL editors and fully read-only modes. Production-tagged connections remain usable, while destructive statements are blocked or explicitly confirmed.
+- **Transactional editing** - Multi-row changes are staged and committed as a single atomic operation instead of becoming a fragile sequence of ad hoc updates.
+- **Visual schema workflows** - Tables and views can be created through a polished builder with real-time SQL preview, while the schema canvas helps explore relationships quickly.
+- **Fast table navigation** - Large results, logs, and sidebar lists stay responsive through virtualization and compact UI patterns.
+- **Built-in query workflow** - SQL editing, saved queries, execution results, and schema refresh behavior live in one place instead of being scattered across modal-heavy flows.
+- **Local secret handling** - Sensitive credentials are stored with desktop-native protection primitives rather than plain browser storage.
 
-- **Frontend**: React 19 + TypeScript + Zustand + Vanilla CSS (design token system)
-- **Backend**: Rust + Tauri v2 + sqlx (SQLite & PostgreSQL) + libsql (Turso)
-- **Editor**: CodeMirror 6 with SQL syntax support
-- **State**: Persistent JSON via `tauri-plugin-store`; secrets via `tauri-plugin-stronghold`
+## Feature Highlights
 
-## 🔐 Security Posture
+### Query With Confidence
 
-As of **March 11, 2026**, VibeDB includes important baseline protections, but security hardening is still in progress.
+- `DROP` and `TRUNCATE` are blocked in the query editor for production-tagged connections.
+- `ALTER`, `CREATE`, `DELETE`, `INSERT`, `REPLACE`, and `UPDATE` require explicit confirmation before they run against production-tagged connections.
+- Read queries remain fast and direct.
+- Query policy is visible in the editor so developers know when the tool is treating a connection differently.
+- Guided flows such as create table, create view, edit table, row delete, and table truncate remain available with purpose-built confirmations instead of being treated like ad hoc SQL.
 
-### Implemented
+### Edit Data Like A Devtool
 
-- Query safety checks block destructive patterns such as `DELETE`/`UPDATE` without `WHERE`, tautological predicates (`1=1`, `TRUE`), and common `OR 1=1` injection forms.
-- Sensitive secrets (AI API keys and Turso auth tokens) are persisted via `tauri-plugin-stronghold` encryption at rest.
-- Connection metadata and UI preferences are stored through `tauri-plugin-store` instead of browser localStorage.
+- Inline editing and row inspection are built for quick, repeated changes.
+- Selected row deletes use confirmation guardrails for sensitive environments.
+- Schema-changing flows refresh the surrounding context so the app stays aligned with the database.
 
-### Current Gaps / In Progress
+### Stay In Flow
 
-- Strict Content Security Policy (CSP) is not fully enforced yet in `tauri.conf.json`.
-- Tauri capability scopes are broader than desired and are being audited to remove unused permissions.
-- Current Stronghold unlock material is app-known; encryption is present, but machine-bound or user-provided secret protection is not complete yet.
+- Multi-tab workflow for switching between queries, tables, and saved work.
+- Keyboard-first query execution and editing.
+- Compact, dark-first UI tuned for long working sessions.
 
-### Guidance
+### Work Across Engines
 
-- Treat current storage protections as a strong baseline, not a finalized security model.
-- Avoid storing high-sensitivity production credentials until the unlock model is upgraded to OS-backed secret storage or a user passphrase flow.
+- SQLite
+- Turso / libSQL
+- PostgreSQL
+- MySQL is planned next
 
----
+## Query Policy
 
-_Crafted with vibe coding and AI assistance. See [ROADMAP.md](./ROADMAP.md) for upcoming features — MySQL is next._
+Query policy is one of VibeDB's clearest product values.
+
+Many tools push teams toward only two extremes: fully unrestricted SQL access or fully read-only access. VibeDB takes a more practical approach for day-to-day engineering work. A production-tagged connection stays usable, but the editor applies statement-aware guardrails where mistakes are most expensive.
+
+Current behavior:
+
+- `DROP` and `TRUNCATE` are blocked in the query editor on production-tagged connections.
+- `ALTER`, `CREATE`, `DELETE`, `INSERT`, `REPLACE`, and `UPDATE` require confirmation there before execution.
+- Query parsing supports multi-statement SQL and ignores semicolons inside strings and comments.
+- Blocked editor statements are re-checked in Rust before execution.
+- Backend enforcement distinguishes between query editor execution and guided app flows, so query-editor restrictions do not accidentally break structured schema tools.
+- Guided destructive actions such as row deletion and table truncation keep their own production confirmation flows.
+
+This is an application-level safety rail. It complements database roles and permissions; it does not replace them.
+
+## Trust Model
+
+- Credentials and sensitive tokens are stored with `tauri-plugin-stronghold`.
+- App state and preferences are stored with `tauri-plugin-store`.
+- VibeDB is built to reduce accidental mistakes in live environments, especially during direct SQL work.
+
+## Designed For
+
+- Solo developers working across local, staging, and production environments
+- Small teams that want a fast desktop client with clear operational guardrails
+- Developers who prefer direct database access without giving up visible safety cues
+
+## Project Links
+
+- [Roadmap](./ROADMAP.md)
+- [Releases](https://github.com/Rithprohos/vibe-db/releases)
+- [License](./LICENSE)

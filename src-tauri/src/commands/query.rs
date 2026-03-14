@@ -1,6 +1,9 @@
 use crate::app_state::AppState;
 use crate::commands::get_connection_id;
 use crate::engines::QueryResult;
+use crate::query_guard::{
+    QueryExecutionSurface, QueryPolicyDecision, blocked_message, evaluate_query_policy,
+};
 use crate::sql_logging::emit_sql_log;
 use std::sync::Arc;
 use std::time::Instant;
@@ -13,9 +16,30 @@ pub async fn execute_query(
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
     query: String,
+    surface: QueryExecutionSurface,
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
+    let connection_tag = state
+        .registry
+        .get_connection_tag(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    if let QueryPolicyDecision::Blocked { statement } =
+        evaluate_query_policy(&query, connection_tag, surface)
+    {
+        let message = blocked_message(statement);
+        emit_sql_log(
+            &app,
+            query,
+            "error",
+            start.elapsed().as_secs_f64() * 1000.0,
+            message.clone(),
+        );
+        return Err(message);
+    }
+
     let engine = state
         .registry
         .get_engine(&id)

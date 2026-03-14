@@ -476,6 +476,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     showConfirmDialog,
     selectedCount,
     hasSelection,
+    deletePolicy,
     error: deleteError,
     handleDeleteClick,
     handleConfirmDelete,
@@ -1021,16 +1022,16 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
           <DialogHeader>
             <DialogTitle className="flex items-center text-destructive">
               <AlertTriangle className="mr-2 h-5 w-5" />
-              Confirm Deletion
+              {deletePolicy.title}
             </DialogTitle>
             <DialogDescription>
-              You are about to delete <strong>{selectedCount}</strong> row{selectedCount !== 1 ? 's' : ''} from
+              {deletePolicy.description} You are about to delete <strong>{selectedCount}</strong> row{selectedCount !== 1 ? 's' : ''} from
               the <strong>{tableName}</strong> table.
             </DialogDescription>
           </DialogHeader>
           <div className="py-3 px-3 bg-destructive/10 rounded border border-destructive/20">
             <p className="text-xs text-destructive/90 font-medium">
-              This connection is tagged as <strong>PRODUCTION</strong>. Deleted data cannot be recovered.
+              {deletePolicy.warning}
             </p>
           </div>
           <DialogFooter>
