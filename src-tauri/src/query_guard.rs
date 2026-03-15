@@ -250,8 +250,7 @@ fn extract_statement_tokens(statement: &str) -> Vec<String> {
         }
 
         let start = index;
-        while index < bytes.len()
-            && (bytes[index].is_ascii_alphanumeric() || bytes[index] == b'_')
+        while index < bytes.len() && (bytes[index].is_ascii_alphanumeric() || bytes[index] == b'_')
         {
             index += 1;
         }
@@ -446,9 +445,8 @@ mod tests {
 
     #[test]
     fn first_keyword_detects_mutating_statement_after_recursive_cte() {
-        let keyword = first_keyword(
-            "WITH RECURSIVE tree AS (SELECT 1 UNION ALL SELECT 2) DELETE FROM tree",
-        );
+        let keyword =
+            first_keyword("WITH RECURSIVE tree AS (SELECT 1 UNION ALL SELECT 2) DELETE FROM tree");
 
         assert_eq!(keyword, Some("DELETE".to_string()));
     }
