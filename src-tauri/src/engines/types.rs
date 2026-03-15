@@ -14,6 +14,15 @@ pub enum EngineType {
     Mysql,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectionTag {
+    Local,
+    Testing,
+    Development,
+    Production,
+}
+
 /// Configuration for a database connection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionConfig {
@@ -39,6 +48,8 @@ pub struct ConnectionConfig {
     pub auth_token: Option<String>,
     /// SSL mode (for PostgreSQL)
     pub ssl_mode: Option<String>,
+    /// User-assigned environment tag for safety policies
+    pub tag: Option<ConnectionTag>,
 }
 
 impl ConnectionConfig {
@@ -56,6 +67,7 @@ impl ConnectionConfig {
             database: None,
             auth_token: None,
             ssl_mode: None,
+            tag: None,
         }
     }
 
@@ -73,6 +85,7 @@ impl ConnectionConfig {
             database: None,
             auth_token: Some(auth_token),
             ssl_mode: None,
+            tag: None,
         }
     }
 
@@ -90,6 +103,7 @@ impl ConnectionConfig {
             database: None,
             auth_token: None,
             ssl_mode: None,
+            tag: None,
         }
     }
 
@@ -116,6 +130,7 @@ impl ConnectionConfig {
             database,
             auth_token: None,
             ssl_mode,
+            tag: None,
         }
     }
 }

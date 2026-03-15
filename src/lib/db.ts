@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef, ForeignKeyConstraint, CheckConstraint } from "./createTableConstants";
+import type { QueryExecutionSurface } from "./queryGuard";
 import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
 import { measureDevFetch } from "./dev-performance";
 import {
@@ -108,6 +109,7 @@ export async function connectDatabase(conn: Connection): Promise<string> {
     id: conn.id,
     name: conn.name,
     engine_type: engineType,
+    tag: conn.tag,
     path: conn.path,
     host: conn.host,
     port: conn.port,
@@ -135,6 +137,15 @@ export async function setActiveConnection(connId: string): Promise<void> {
   );
 }
 
+export async function updateConnectionTag(
+  connId: string,
+  tag?: Connection["tag"],
+): Promise<void> {
+  return measureDevFetch("update_connection_tag", () =>
+    invoke<void>("update_connection_tag", { connId, tag }),
+  );
+}
+
 export async function listTables(connId?: string): Promise<TableInfo[]> {
   return measureDevFetch("list_tables", () =>
     invoke<TableInfo[]>("list_tables", { connId }),
@@ -153,10 +164,11 @@ export async function getTableStructure(
 export async function executeQuery(
   query: string,
   connId?: string,
+  surface: QueryExecutionSurface = "guided",
 ): Promise<QueryResult> {
   const queryType = query.trim().split(/\s+/)[0]?.toUpperCase() || "UNKNOWN";
   return measureDevFetch(`execute_query:${queryType}`, () =>
-    invoke<QueryResult>("execute_query", { query, connId }),
+    invoke<QueryResult>("execute_query", { query, connId, surface }),
   );
 }
 
@@ -327,5 +339,14 @@ export async function truncateTable(
 ): Promise<QueryResult> {
   return measureDevFetch("truncate_table", () =>
     invoke<QueryResult>("truncate_table", { tableName, options, connId }),
+  );
+}
+
+export async function dropTable(
+  tableName: string,
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("drop_table", () =>
+    invoke<QueryResult>("drop_table", { tableName, connId }),
   );
 }

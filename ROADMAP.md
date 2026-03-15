@@ -138,6 +138,9 @@ SQL query building has been moved to the Rust backend. See [`changelog/v0.4.6.md
 - [ ] Return typed rows with reusable column metadata maps
 
 - [ ] Keep metadata fetches separate from row fetches
+- [ ] Add production guardrail settings with explicit per-user override controls
+- [ ] Support a `bypass policy` mode in Settings so advanced users can temporarily check/uncheck production query guardrails themselves
+- [ ] Show a strong in-app indicator whenever guardrails are manually bypassed
 - [ ] Add index recommendation flow with one-click `CREATE INDEX` assistance
 - [ ] Expand Rust-side command timing instrumentation
 

@@ -219,7 +219,10 @@ pub fn build_delete_queries(
     rows.iter()
         .map(|row| {
             let where_clause = build_where_clause_for_row(&row.row_data, columns)?;
-            Ok(format!("DELETE FROM {} WHERE {};", quoted_table, where_clause))
+            Ok(format!(
+                "DELETE FROM {} WHERE {};",
+                quoted_table, where_clause
+            ))
         })
         .collect()
 }

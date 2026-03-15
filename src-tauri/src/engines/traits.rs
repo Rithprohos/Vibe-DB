@@ -52,6 +52,12 @@ pub trait DatabaseEngine: Send + Sync {
         cascade: bool,
     ) -> EngineResult<QueryResult>;
 
+    /// Drops a table from the database.
+    ///
+    /// This permanently deletes the table and all its data.
+    /// Use with caution as this operation cannot be undone.
+    async fn drop_table(&self, table_name: &str) -> EngineResult<QueryResult>;
+
     /// Gets the total number of rows in a table.
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64>;
 

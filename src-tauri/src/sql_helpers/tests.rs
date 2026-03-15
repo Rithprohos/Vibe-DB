@@ -1,8 +1,8 @@
 use super::{
-    build_create_table_sql, build_create_view_sql, build_delete_queries, build_insert_queries,
-    build_insert_query, build_update_queries, build_where_clause_for_row, quote_qualified_identifier,
     CheckConstraintInput, CreateTableColumnInput, ForeignKeyConstraintInput, RowDataInput,
-    RowIdentifierInput, RowUpdateInput, TypeParams,
+    RowIdentifierInput, RowUpdateInput, TypeParams, build_create_table_sql, build_create_view_sql,
+    build_delete_queries, build_insert_queries, build_insert_query, build_update_queries,
+    build_where_clause_for_row, quote_qualified_identifier,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -163,9 +163,9 @@ fn build_create_view_sql_temp_if_not_exists() {
     .expect("expected SQL");
 
     assert_eq!(
-            sql,
-            "CREATE TEMP VIEW IF NOT EXISTS \"recent_orders\" AS\nWITH latest AS (SELECT * FROM orders) SELECT * FROM latest;"
-        );
+        sql,
+        "CREATE TEMP VIEW IF NOT EXISTS \"recent_orders\" AS\nWITH latest AS (SELECT * FROM orders) SELECT * FROM latest;"
+    );
 }
 
 #[test]
@@ -495,7 +495,9 @@ fn build_create_table_sql_postgres_supports_schema_qualified_foreign_key_table()
     .expect("expected SQL");
 
     assert!(
-        sql.contains("FOREIGN KEY (\"user_id\") REFERENCES \"auth\".\"users\" (\"id\") ON DELETE CASCADE"),
+        sql.contains(
+            "FOREIGN KEY (\"user_id\") REFERENCES \"auth\".\"users\" (\"id\") ON DELETE CASCADE"
+        ),
         "Expected schema-qualified FK reference. Got: {}",
         sql
     );

@@ -4,6 +4,7 @@ import {
   clearStoredConnectionAuthToken,
   saveStoredConnectionAuthToken,
 } from '../lib/connectionTokenStore';
+import { updateConnectionTag as syncConnectionTag } from '../lib/db';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,6 +87,10 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
         }
       }
 
+      if (connection.connId && connection.tag !== tag) {
+        await syncConnectionTag(connection.connId, tag);
+      }
+
       updateConnection(connection.id, {
         name: name.trim(),
         tag,
@@ -103,7 +108,8 @@ export default function EditConnectionDialog({ connection, open, onOpenChange }:
 
       onOpenChange(false);
     } catch (e: any) {
-      setError(`Failed to update secure token: ${e}`);
+      const message = e instanceof Error ? e.message : String(e);
+      setError(`Failed to update connection: ${message}`);
     } finally {
       setIsSaving(false);
     }

@@ -24,6 +24,7 @@ import {
 import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
 import { ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
 import TruncateTableDialog from './TruncateTableDialog';
+import DropTableDialog from './DropTableDialog';
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -36,10 +37,13 @@ export default function Sidebar() {
   const openTableTab = useAppStore(s => s.openTableTab);
   const openVisualizationTab = useAppStore(s => s.openVisualizationTab);
   const addTab = useAppStore(s => s.addTab);
+  const closeTab = useAppStore(s => s.closeTab);
 
   const activeConnection = activeSidebarConnectionId 
     ? connections.find(c => c.id === activeSidebarConnectionId) 
     : undefined;
+  const activeConnectionId = activeConnection?.id;
+  const activeConnectionConnId = activeConnection?.connId;
   const tables = activeSidebarConnectionId 
     ? (tablesByConnection[activeSidebarConnectionId] || []) 
     : [];
@@ -54,6 +58,8 @@ export default function Sidebar() {
   const [selectedSchema, setSelectedSchema] = useState(ALL_SCHEMAS_VALUE);
   const [truncateDialogOpen, setTruncateDialogOpen] = useState(false);
   const [truncateTableName, setTruncateTableName] = useState('');
+  const [dropDialogOpen, setDropDialogOpen] = useState(false);
+  const [dropTableName, setDropTableName] = useState('');
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -190,18 +196,33 @@ export default function Sidebar() {
     return { filteredTables: nextTables, filteredViews: nextViews };
   }, [tables, normalizedSearch, selectedSchema, showSchemaFilter]);
 
-  const handleRefresh = async () => {
-    if (!activeConnection?.connId || isRefreshing) return;
+  const handleRefresh = useCallback(async () => {
+    if (!activeConnectionConnId || !activeConnectionId || isRefreshing) return;
     setIsRefreshing(true);
     try {
-      const result = await listTables(activeConnection.connId);
-      setTables(activeConnection.id, result);
+      const result = await listTables(activeConnectionConnId);
+      setTables(activeConnectionId, result);
     } catch (e) {
       console.error('Failed to refresh:', e);
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [activeConnectionConnId, activeConnectionId, isRefreshing, setTables]);
+
+  const handleDropSuccess = useCallback((tableName: string) => {
+    if (!activeConnectionId) return;
+
+    const relatedTabs = useAppStore
+      .getState()
+      .tabs
+      .filter((tab) => tab.connectionId === activeConnectionId && tab.tableName === tableName);
+
+    relatedTabs.forEach((tab) => {
+      closeTab(tab.id);
+    });
+
+    void handleRefresh();
+  }, [activeConnectionId, closeTab, handleRefresh]);
 
   const handleNewQuery = () => {
     if (!activeConnection) return;
@@ -252,6 +273,12 @@ export default function Sidebar() {
     if (!activeConnection) return;
     setTruncateTableName(tableName);
     setTruncateDialogOpen(true);
+  }, [activeConnection]);
+
+  const handleDropTable = useCallback((tableName: string) => {
+    if (!activeConnection) return;
+    setDropTableName(tableName);
+    setDropDialogOpen(true);
   }, [activeConnection]);
 
   const handleOpenVisualize = useCallback((tableName: string) => {
@@ -532,9 +559,15 @@ export default function Sidebar() {
                     <ContextMenuSeparator />
                     <ContextMenuItem
                       onClick={() => handleTruncateTable(qualifiedName)}
-                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                      className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
                     >
                       Truncate Table
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => handleDropTable(qualifiedName)}
+                      className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                    >
+                      Drop Table
                     </ContextMenuItem>
                   </>
                 )}
@@ -584,6 +617,17 @@ export default function Sidebar() {
             // Refresh tables after truncation to update row counts
             void handleRefresh();
           }}
+        />
+      )}
+
+      {/* Drop Table Dialog */}
+      {activeConnection && (
+        <DropTableDialog
+          open={dropDialogOpen}
+          onOpenChange={setDropDialogOpen}
+          tableName={dropTableName}
+          connectionId={activeConnection.id}
+          onSuccess={handleDropSuccess}
         />
       )}
     </div>

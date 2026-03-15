@@ -329,3 +329,53 @@ pub async fn truncate_table(
         }
     }
 }
+
+/// Drops a table from the database.
+///
+/// This permanently deletes the table and all its data.
+#[tauri::command]
+pub async fn drop_table(
+    app: AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+    table_name: String,
+) -> Result<crate::engines::QueryResult, String> {
+    let start = Instant::now();
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let trimmed_table_name = table_name.trim();
+    let sql = format!(
+        "DROP TABLE {}",
+        quote_qualified_identifier(trimmed_table_name)
+    );
+
+    match engine.drop_table(trimmed_table_name).await {
+        Ok(result) => {
+            let message = format!("Table '{trimmed_table_name}' dropped");
+            emit_sql_log(
+                &app,
+                sql,
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                sql,
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
+}

@@ -160,3 +160,27 @@ async fn test_turso_truncate_table_removes_all_rows() {
     engine.disconnect().await;
     cleanup_temp_db(&db_path);
 }
+
+#[tokio::test]
+async fn test_turso_drop_table_removes_table() {
+    let db_path = create_temp_db_path("test_vibedb_turso_drop");
+    let engine = TursoEngine::new();
+    let config = create_turso_local_config(&db_path.to_string_lossy());
+
+    let connected: EngineResult<()> = engine.connect(&config).await;
+    assert!(connected.is_ok());
+
+    let created = engine
+        .execute_query("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+        .await;
+    assert!(created.is_ok());
+
+    let dropped = engine.drop_table("items").await.unwrap();
+    assert!(dropped.message.contains("items"));
+
+    let tables = engine.list_tables().await.unwrap();
+    assert!(tables.iter().all(|table| table.name != "items"));
+
+    engine.disconnect().await;
+    cleanup_temp_db(&db_path);
+}

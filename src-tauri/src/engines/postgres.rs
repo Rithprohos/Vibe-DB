@@ -756,6 +756,33 @@ impl DatabaseEngine for PostgresEngine {
         })
     }
 
+    async fn drop_table(&self, table_name: &str) -> EngineResult<QueryResult> {
+        Self::validate_table_name(table_name)?;
+
+        let pool = self.pool.read().await;
+        let pool = pool.as_ref().ok_or_else(|| {
+            EngineError::ConnectionFailed("Not connected to database".to_string())
+        })?;
+
+        let trimmed_table = table_name.trim();
+        let sql = format!(
+            "DROP TABLE {}",
+            Self::quote_qualified_identifier(trimmed_table)
+        );
+
+        sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+        Ok(QueryResult {
+            columns: vec![],
+            rows: vec![],
+            rows_affected: 0,
+            message: format!("Table '{trimmed_table}' dropped"),
+        })
+    }
+
     async fn get_table_row_count(&self, table_name: &str) -> EngineResult<i64> {
         Self::validate_table_name(table_name)?;
 

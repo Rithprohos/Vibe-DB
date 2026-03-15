@@ -9,11 +9,11 @@ mod values;
 pub use counts::extract_count;
 pub use create_table::build_create_table_sql;
 pub use create_view::build_create_view_sql;
-pub use filters::{build_where_clause, normalize_order_dir, FilterConditionInput};
+pub use filters::{FilterConditionInput, build_where_clause, normalize_order_dir};
 pub use identifiers::{quote_identifier, quote_qualified_identifier};
 pub use rows::{
-    build_delete_queries, build_insert_queries, build_update_queries, RowDataInput,
-    RowIdentifierInput, RowUpdateInput,
+    RowDataInput, RowIdentifierInput, RowUpdateInput, build_delete_queries, build_insert_queries,
+    build_update_queries,
 };
 
 #[cfg(test)]

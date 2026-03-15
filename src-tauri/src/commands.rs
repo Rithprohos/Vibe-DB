@@ -5,11 +5,11 @@ mod schema;
 
 pub use connection::{
     connect_database, create_database, disconnect_database, get_connection_id,
-    get_database_version, set_active_connection,
+    get_database_version, set_active_connection, update_connection_tag,
 };
 pub use query::{execute_query, execute_transaction};
 pub use rows::{delete_rows, insert_rows, update_rows};
 pub use schema::{
-    get_filtered_row_count, get_table_data, get_table_row_count, get_table_structure, list_tables,
-    truncate_table,
+    drop_table, get_filtered_row_count, get_table_data, get_table_row_count, get_table_structure,
+    list_tables, truncate_table,
 };
