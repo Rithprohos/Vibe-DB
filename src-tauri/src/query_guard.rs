@@ -79,23 +79,81 @@ fn classify_statement(statement: &str) -> QueryStatementKind {
 }
 
 fn first_keyword(statement: &str) -> Option<String> {
-    let keywords = extract_statement_keywords(statement);
-    let first = keywords.first().cloned()?;
+    let tokens = extract_statement_tokens(statement);
+    let first = tokens.first().cloned()?;
 
     if first != "WITH" {
         return Some(first);
     }
 
-    keywords
-        .into_iter()
-        .skip(1)
-        .find(|keyword| is_mutating_keyword(keyword.as_str()))
-        .or(Some(first))
+    with_statement_keyword(tokens).or(Some(first))
 }
 
-fn extract_statement_keywords(statement: &str) -> Vec<String> {
+fn with_statement_keyword(tokens: Vec<String>) -> Option<String> {
+    let mut index = 1usize;
+
+    if tokens.get(index).is_some_and(|token| token == "RECURSIVE") {
+        index += 1;
+    }
+
+    loop {
+        index += 1;
+
+        if tokens.get(index).is_some_and(|token| token == "(") {
+            skip_parenthesized_tokens(&tokens, &mut index)?;
+            index += 1;
+        }
+
+        if !tokens.get(index).is_some_and(|token| token == "AS") {
+            return None;
+        }
+        index += 1;
+
+        if !tokens.get(index).is_some_and(|token| token == "(") {
+            return None;
+        }
+
+        skip_parenthesized_tokens(&tokens, &mut index)?;
+        index += 1;
+
+        match tokens.get(index).map(String::as_str) {
+            Some(",") => {
+                index += 1;
+                continue;
+            }
+            Some(keyword) if is_mutating_keyword(keyword) => {
+                return Some(keyword.to_string());
+            }
+            Some(_) => return None,
+            None => return None,
+        }
+    }
+}
+
+fn skip_parenthesized_tokens(tokens: &[String], index: &mut usize) -> Option<()> {
+    let mut depth = 0usize;
+
+    while let Some(token) = tokens.get(*index) {
+        match token.as_str() {
+            "(" => depth += 1,
+            ")" => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(());
+                }
+            }
+            _ => {}
+        }
+
+        *index += 1;
+    }
+
+    None
+}
+
+fn extract_statement_tokens(statement: &str) -> Vec<String> {
     let bytes = statement.as_bytes();
-    let mut keywords = Vec::new();
+    let mut tokens = Vec::new();
     let mut index = 0usize;
     let mut in_single = false;
     let mut in_double = false;
@@ -180,20 +238,28 @@ fn extract_statement_keywords(statement: &str) -> Vec<String> {
             _ => {}
         }
 
+        if matches!(byte, b'(' | b')' | b',') {
+            tokens.push(char::from(byte).to_string());
+            index += 1;
+            continue;
+        }
+
         if !byte.is_ascii_alphabetic() {
             index += 1;
             continue;
         }
 
         let start = index;
-        while index < bytes.len() && bytes[index].is_ascii_alphabetic() {
+        while index < bytes.len()
+            && (bytes[index].is_ascii_alphanumeric() || bytes[index] == b'_')
+        {
             index += 1;
         }
 
-        keywords.push(statement[start..index].to_ascii_uppercase());
+        tokens.push(statement[start..index].to_ascii_uppercase());
     }
 
-    keywords
+    tokens
 }
 
 fn is_mutating_keyword(keyword: &str) -> bool {
@@ -367,5 +433,23 @@ mod tests {
         );
 
         assert_eq!(keyword, Some("WITH".to_string()));
+    }
+
+    #[test]
+    fn first_keyword_ignores_mutating_words_inside_cte_names() {
+        let keyword = first_keyword(
+            "WITH drop_tmp AS (SELECT 1), update_rows AS (SELECT 2) SELECT * FROM drop_tmp",
+        );
+
+        assert_eq!(keyword, Some("WITH".to_string()));
+    }
+
+    #[test]
+    fn first_keyword_detects_mutating_statement_after_recursive_cte() {
+        let keyword = first_keyword(
+            "WITH RECURSIVE tree AS (SELECT 1 UNION ALL SELECT 2) DELETE FROM tree",
+        );
+
+        assert_eq!(keyword, Some("DELETE".to_string()));
     }
 }

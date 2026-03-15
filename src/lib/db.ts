@@ -332,3 +332,12 @@ export async function truncateTable(
     invoke<QueryResult>("truncate_table", { tableName, options, connId }),
   );
 }
+
+export async function dropTable(
+  tableName: string,
+  connId?: string,
+): Promise<QueryResult> {
+  return measureDevFetch("drop_table", () =>
+    invoke<QueryResult>("drop_table", { tableName, connId }),
+  );
+}

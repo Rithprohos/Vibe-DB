@@ -138,6 +138,20 @@ impl EngineRegistry {
                 EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
             })
     }
+
+    /// Updates the user-assigned environment tag for a live connection.
+    pub async fn set_connection_tag(
+        &self,
+        conn_id: &str,
+        tag: Option<ConnectionTag>,
+    ) -> EngineResult<()> {
+        let mut connections = self.connections.write().await;
+        let entry = connections.get_mut(conn_id).ok_or_else(|| {
+            EngineError::ConnectionFailed(format!("No connection found: {}", conn_id))
+        })?;
+        entry.tag = tag;
+        Ok(())
+    }
 }
 
 impl Default for EngineRegistry {

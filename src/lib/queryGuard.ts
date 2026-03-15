@@ -1,7 +1,7 @@
 import type { Connection } from '@/store/useAppStore';
 
 export type QueryExecutionSurface = 'query-editor' | 'guided';
-export type GuidedMutationKind = 'delete-rows' | 'truncate-table';
+export type GuidedMutationKind = 'delete-rows' | 'truncate-table' | 'drop-table';
 export type ConnectionTag = Connection['tag'];
 
 const BLOCKED_IN_QUERY_EDITOR = new Set(['DROP', 'TRUNCATE']);
@@ -110,22 +110,43 @@ export function getGuidedMutationPolicy(
         };
   }
 
+  if (mutationKind === 'truncate-table') {
+    return connectionTag === 'production'
+      ? {
+          ...defaultPolicy,
+          requiresConfirmation: true,
+          title: 'Truncate Table',
+          description:
+            'Production guardrails require confirmation before guided destructive actions.',
+          warning:
+            'This connection is tagged as PRODUCTION. Truncation is destructive and cannot be undone.',
+        }
+      : {
+          ...defaultPolicy,
+          title: 'Truncate Table',
+          description:
+            'You are about to remove every row from this table.',
+          warning: 'This action cannot be undone.',
+        };
+  }
+
+  // drop-table
   return connectionTag === 'production'
     ? {
         ...defaultPolicy,
         requiresConfirmation: true,
-        title: 'Truncate Table',
+        title: 'Drop Table',
         description:
           'Production guardrails require confirmation before guided destructive actions.',
         warning:
-          'This connection is tagged as PRODUCTION. Truncation is destructive and cannot be undone.',
+          'This connection is tagged as PRODUCTION. Dropping a table is destructive and cannot be undone.',
       }
     : {
         ...defaultPolicy,
-        title: 'Truncate Table',
+        title: 'Drop Table',
         description:
-          'You are about to remove every row from this table.',
-        warning: 'This action cannot be undone.',
+          'You are about to permanently delete this table and all its data.',
+        warning: 'This action cannot be undone. The table and all its data will be permanently lost.',
       };
 }
 

@@ -287,6 +287,28 @@ async fn test_sqlite_engine_truncate_table_removes_all_rows() {
 }
 
 #[tokio::test]
+async fn test_sqlite_engine_drop_table_removes_table() {
+    let engine = SqliteEngine::new();
+    let temp_path = std::env::temp_dir().join("test_vibedb_drop.db");
+    let config = create_test_config(&temp_path.to_string_lossy());
+
+    let _: EngineResult<()> = engine.connect(&config).await;
+
+    let _: EngineResult<QueryResult> = engine
+        .execute_query("CREATE TABLE drop_test (id INTEGER PRIMARY KEY)")
+        .await;
+
+    let drop_result = engine.drop_table("drop_test").await.unwrap();
+    assert!(drop_result.message.contains("drop_test"));
+
+    let tables = engine.list_tables().await.unwrap();
+    assert!(tables.iter().all(|table| table.name != "drop_test"));
+
+    engine.disconnect().await;
+    let _ = std::fs::remove_file(&temp_path);
+}
+
+#[tokio::test]
 async fn test_sqlite_engine_execute_query_error() {
     let engine = SqliteEngine::new();
     let temp_path = std::env::temp_dir().join("test_vibedb_error.db");

@@ -12,7 +12,7 @@ use ai::config::AI_STRONGHOLD_PASSWORD_SALT;
 use ai::{generate_sql, get_default_ai_provider_config, ping_ai_provider};
 use app_state::AppState;
 use commands::{
-    connect_database, create_database, delete_rows, disconnect_database, execute_query,
+    connect_database, create_database, delete_rows, disconnect_database, drop_table, execute_query,
     execute_transaction, get_database_version, get_filtered_row_count, get_table_data,
     get_table_row_count, get_table_structure, insert_rows, list_tables, set_active_connection,
     truncate_table, update_rows,
@@ -66,6 +66,7 @@ pub fn run() {
             create_database,
             get_database_version,
             delete_rows,
+            drop_table,
             insert_rows,
             update_rows,
             truncate_table,
