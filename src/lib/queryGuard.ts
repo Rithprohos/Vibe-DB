@@ -216,44 +216,111 @@ export function splitSqlStatements(query: string): string[] {
 }
 
 function getLeadingKeyword(statement: string): string | null {
-  let index = 0;
+  const keywords = extractStatementKeywords(statement);
+  if (keywords.length === 0) return null;
 
-  while (index < statement.length) {
-    const char = statement[index];
-    const nextChar = statement[index + 1];
+  const [firstKeyword, ...remainingKeywords] = keywords;
+  if (firstKeyword !== 'WITH') return firstKeyword;
 
-    if (/\s/.test(char)) {
-      index += 1;
-      continue;
-    }
+  const withMutationKeyword = remainingKeywords.find((keyword) =>
+    BLOCKED_IN_QUERY_EDITOR.has(keyword) || CONFIRM_REQUIRED_IN_QUERY_EDITOR.has(keyword),
+  );
 
-    if (char === '-' && nextChar === '-') {
-      index += 2;
-      while (index < statement.length && statement[index] !== '\n') {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (char === '/' && nextChar === '*') {
-      index += 2;
-      while (
-        index < statement.length &&
-        !(statement[index] === '*' && statement[index + 1] === '/')
-      ) {
-        index += 1;
-      }
-      index += 2;
-      continue;
-    }
-
-    break;
-  }
-
-  const match = statement.slice(index).match(/^[A-Za-z]+/);
-  return match ? match[0].toUpperCase() : null;
+  return withMutationKeyword ?? firstKeyword;
 }
 
 function dedupeStatements(statements: string[]): string[] {
   return Array.from(new Set(statements));
+}
+
+function extractStatementKeywords(statement: string): string[] {
+  const keywords: string[] = [];
+  let inSingle = false;
+  let inDouble = false;
+  let inBacktick = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let index = 0; index < statement.length; index += 1) {
+    const char = statement[index];
+    const nextChar = statement[index + 1];
+
+    if (inLineComment) {
+      if (char === '\n') inLineComment = false;
+      continue;
+    }
+
+    if (inBlockComment) {
+      if (char === '*' && nextChar === '/') {
+        inBlockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (inSingle) {
+      if (char === "'") inSingle = false;
+      continue;
+    }
+
+    if (inDouble) {
+      if (char === '"') inDouble = false;
+      continue;
+    }
+
+    if (inBacktick) {
+      if (char === '`') inBacktick = false;
+      continue;
+    }
+
+    if (char === '-' && nextChar === '-') {
+      inLineComment = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === '/' && nextChar === '*') {
+      inBlockComment = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === "'") {
+      inSingle = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inDouble = true;
+      continue;
+    }
+
+    if (char === '`') {
+      inBacktick = true;
+      continue;
+    }
+
+    if (!isAsciiLetter(char)) {
+      continue;
+    }
+
+    let end = index + 1;
+    while (end < statement.length && isAsciiLetter(statement[end])) {
+      end += 1;
+    }
+
+    keywords.push(statement.slice(index, end).toUpperCase());
+    index = end - 1;
+  }
+
+  return keywords;
+}
+
+function isAsciiLetter(value: string): boolean {
+  if (value.length !== 1) return false;
+  const code = value.charCodeAt(0);
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122)
+  );
 }
