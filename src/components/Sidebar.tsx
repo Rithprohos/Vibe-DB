@@ -532,7 +532,7 @@ export default function Sidebar() {
                     <ContextMenuSeparator />
                     <ContextMenuItem
                       onClick={() => handleTruncateTable(qualifiedName)}
-                      className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                      className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
                     >
                       Truncate Table
                     </ContextMenuItem>
