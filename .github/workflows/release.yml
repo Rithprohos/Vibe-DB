@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: "Version bump to apply before building"
+        description: "Version bump to apply before building (choose 'none' to reuse existing tag)"
         required: true
         default: patch
         type: choice
         options:
+          - none
           - patch
           - minor
           - major
@@ -34,10 +35,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.target_ref }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "24"
+          bun-version: "latest"
 
       - name: Configure git author
         run: |
@@ -45,16 +46,28 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Bump selected version
+        if: ${{ inputs.bump_type != 'none' }}
         run: bash scripts/bump-version.sh "${{ inputs.bump_type }}"
 
       - name: Read release version
         id: version
         run: |
-          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          VERSION="$(bun -e "console.log(JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version)")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag_name=v$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Verify existing tag when bump is none
+        if: ${{ inputs.bump_type == 'none' }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag_name }}"
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG was not found. Use patch/minor/major to create a new tag first."
+            exit 1
+          fi
+
       - name: Push release commit and tag
+        if: ${{ inputs.bump_type != 'none' }}
         env:
           BRANCH_NAME: ${{ inputs.target_ref }}
         run: |
@@ -90,6 +103,8 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -134,10 +149,10 @@ jobs:
         with:
           ref: refs/tags/${{ needs.prepare-release.outputs.tag_name }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "24"
+          bun-version: "latest"
 
       - name: Download release assets
         run: |
@@ -147,7 +162,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate latest.json
-        run: node scripts/generate-latest-json.mjs artifacts
+        run: bun scripts/generate-latest-json.mjs artifacts
 
       - name: Upload latest.json
         run: gh release upload ${{ needs.prepare-release.outputs.tag_name }} latest.json --clobber
@@ -168,6 +183,8 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
 
       - name: Generate release body
         env:
