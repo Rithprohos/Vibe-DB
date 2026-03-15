@@ -38,7 +38,10 @@ pub fn build_create_view_sql(
 ) -> Result<String, String> {
     let trimmed_view_name = view_name.trim();
     validate_identifier(trimmed_view_name, "View")?;
-    if trimmed_view_name.to_ascii_lowercase().starts_with("sqlite_") {
+    if trimmed_view_name
+        .to_ascii_lowercase()
+        .starts_with("sqlite_")
+    {
         return Err("View name cannot start with 'sqlite_'".to_string());
     }
 

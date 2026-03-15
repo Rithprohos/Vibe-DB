@@ -135,7 +135,9 @@ pub fn build_create_table_sql(
     validate_identifier(trimmed_table_name, "Table")?;
 
     if dialect.rejects_sqlite_reserved_prefix()
-        && trimmed_table_name.to_ascii_lowercase().starts_with("sqlite_")
+        && trimmed_table_name
+            .to_ascii_lowercase()
+            .starts_with("sqlite_")
     {
         return Err("Table name cannot start with 'sqlite_'".to_string());
     }

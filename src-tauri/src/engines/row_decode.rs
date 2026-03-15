@@ -1,6 +1,6 @@
+use sqlx::Row;
 use sqlx::postgres::PgRow;
 use sqlx::sqlite::SqliteRow;
-use sqlx::Row;
 
 use super::{EngineError, EngineResult};
 

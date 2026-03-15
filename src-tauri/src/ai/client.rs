@@ -4,10 +4,10 @@ use std::time::Duration;
 use thiserror::Error;
 
 use super::config::{
-    resolve_default_api_key, trim_trailing_slashes, AI_GENERATION_TIMEOUT_SECS,
-    AI_PING_TIMEOUT_SECS,
+    AI_GENERATION_TIMEOUT_SECS, AI_PING_TIMEOUT_SECS, resolve_default_api_key,
+    trim_trailing_slashes,
 };
-use super::prompts::{clean_generated_sql, SQL_QUERY_ASSISTANT};
+use super::prompts::{SQL_QUERY_ASSISTANT, clean_generated_sql};
 use super::{GenerateSqlRequest, GenerateSqlResponse};
 
 #[derive(Debug, Serialize)]

@@ -129,10 +129,7 @@ impl EngineRegistry {
     }
 
     /// Gets the user-assigned environment tag for a connection by ID.
-    pub async fn get_connection_tag(
-        &self,
-        conn_id: &str,
-    ) -> EngineResult<Option<ConnectionTag>> {
+    pub async fn get_connection_tag(&self, conn_id: &str) -> EngineResult<Option<ConnectionTag>> {
         let connections = self.connections.read().await;
         connections
             .get(conn_id)
