@@ -237,25 +237,85 @@ export function splitSqlStatements(query: string): string[] {
 }
 
 function getLeadingKeyword(statement: string): string | null {
-  const keywords = extractStatementKeywords(statement);
-  if (keywords.length === 0) return null;
+  const tokens = extractStatementTokens(statement);
+  const firstToken = tokens[0];
+  if (!firstToken) return null;
 
-  const [firstKeyword, ...remainingKeywords] = keywords;
-  if (firstKeyword !== 'WITH') return firstKeyword;
+  if (firstToken !== 'WITH') return firstToken;
 
-  const withMutationKeyword = remainingKeywords.find((keyword) =>
-    BLOCKED_IN_QUERY_EDITOR.has(keyword) || CONFIRM_REQUIRED_IN_QUERY_EDITOR.has(keyword),
-  );
-
-  return withMutationKeyword ?? firstKeyword;
+  return getWithStatementKeyword(tokens) ?? firstToken;
 }
 
 function dedupeStatements(statements: string[]): string[] {
   return Array.from(new Set(statements));
 }
 
-function extractStatementKeywords(statement: string): string[] {
-  const keywords: string[] = [];
+function getWithStatementKeyword(tokens: string[]): string | null {
+  let index = 1;
+
+  if (tokens[index] === 'RECURSIVE') {
+    index += 1;
+  }
+
+  while (index < tokens.length) {
+    index += 1;
+
+    if (tokens[index] === '(') {
+      const closingParenIndex = skipParenthesizedTokens(tokens, index);
+      if (closingParenIndex === null) return null;
+      index = closingParenIndex + 1;
+    }
+
+    if (tokens[index] !== 'AS') {
+      return null;
+    }
+    index += 1;
+
+    if (tokens[index] !== '(') {
+      return null;
+    }
+
+    const closingParenIndex = skipParenthesizedTokens(tokens, index);
+    if (closingParenIndex === null) return null;
+    index = closingParenIndex + 1;
+
+    const nextToken = tokens[index];
+    if (nextToken === ',') {
+      index += 1;
+      continue;
+    }
+
+    if (nextToken && isMutatingKeyword(nextToken)) {
+      return nextToken;
+    }
+
+    return null;
+  }
+
+  return null;
+}
+
+function skipParenthesizedTokens(tokens: string[], startIndex: number): number | null {
+  let depth = 0;
+
+  for (let index = startIndex; index < tokens.length; index += 1) {
+    if (tokens[index] === '(') {
+      depth += 1;
+      continue;
+    }
+
+    if (tokens[index] === ')') {
+      depth -= 1;
+      if (depth === 0) return index;
+      if (depth < 0) return null;
+    }
+  }
+
+  return null;
+}
+
+function extractStatementTokens(statement: string): string[] {
+  const tokens: string[] = [];
   let inSingle = false;
   let inDouble = false;
   let inBacktick = false;
@@ -321,20 +381,32 @@ function extractStatementKeywords(statement: string): string[] {
       continue;
     }
 
+    if (char === '(' || char === ')' || char === ',') {
+      tokens.push(char);
+      continue;
+    }
+
     if (!isAsciiLetter(char)) {
       continue;
     }
 
     let end = index + 1;
-    while (end < statement.length && isAsciiLetter(statement[end])) {
+    while (end < statement.length && isAsciiWordChar(statement[end])) {
       end += 1;
     }
 
-    keywords.push(statement.slice(index, end).toUpperCase());
+    tokens.push(statement.slice(index, end).toUpperCase());
     index = end - 1;
   }
 
-  return keywords;
+  return tokens;
+}
+
+function isMutatingKeyword(keyword: string): boolean {
+  return (
+    BLOCKED_IN_QUERY_EDITOR.has(keyword) ||
+    CONFIRM_REQUIRED_IN_QUERY_EDITOR.has(keyword)
+  );
 }
 
 function isAsciiLetter(value: string): boolean {
@@ -343,5 +415,16 @@ function isAsciiLetter(value: string): boolean {
   return (
     (code >= 65 && code <= 90) ||
     (code >= 97 && code <= 122)
+  );
+}
+
+function isAsciiWordChar(value: string): boolean {
+  if (value.length !== 1) return false;
+  const code = value.charCodeAt(0);
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    code === 95
   );
 }
