@@ -15,7 +15,7 @@ use commands::{
     connect_database, create_database, delete_rows, disconnect_database, drop_table, execute_query,
     execute_transaction, get_database_version, get_filtered_row_count, get_table_data,
     get_table_row_count, get_table_structure, insert_rows, list_tables, set_active_connection,
-    truncate_table, update_rows,
+    truncate_table, update_connection_tag, update_rows,
 };
 use menu::setup_menu;
 use sql_helpers::{build_create_table_sql, build_create_view_sql};
@@ -54,6 +54,7 @@ pub fn run() {
             connect_database,
             disconnect_database,
             set_active_connection,
+            update_connection_tag,
             build_create_table_sql,
             build_create_view_sql,
             list_tables,

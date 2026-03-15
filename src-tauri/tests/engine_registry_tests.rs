@@ -1,6 +1,6 @@
 // Tests for engine registry and error handling
 use vibe_db_lib::engines::{
-    ConnectionConfig, EngineError, EngineRegistry, EngineResult, EngineType,
+    ConnectionConfig, ConnectionTag, EngineError, EngineRegistry, EngineResult, EngineType,
 };
 
 #[test]
@@ -98,4 +98,35 @@ async fn test_engine_registry_connect_unsupported_engine() {
 
     let err: EngineError = result.unwrap_err();
     assert!(err.to_string().contains("Unsupported engine"));
+}
+
+#[tokio::test]
+async fn test_engine_registry_updates_connection_tag() {
+    let registry = EngineRegistry::new();
+    let temp_path = std::env::temp_dir().join("test_vibedb_tag_sync.db");
+    let mut config = ConnectionConfig::sqlite(
+        "test-tag-sync".to_string(),
+        "Test Tag Sync".to_string(),
+        temp_path.to_string_lossy().to_string(),
+    );
+    config.tag = Some(ConnectionTag::Production);
+
+    registry.connect(config).await.unwrap();
+    assert_eq!(
+        registry.get_connection_tag("test-tag-sync").await.unwrap(),
+        Some(ConnectionTag::Production)
+    );
+
+    registry
+        .set_connection_tag("test-tag-sync", Some(ConnectionTag::Development))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        registry.get_connection_tag("test-tag-sync").await.unwrap(),
+        Some(ConnectionTag::Development)
+    );
+
+    registry.disconnect("test-tag-sync").await.unwrap();
+    let _ = std::fs::remove_file(&temp_path);
 }

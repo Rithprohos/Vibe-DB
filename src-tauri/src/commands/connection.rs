@@ -1,5 +1,5 @@
 use crate::app_state::AppState;
-use crate::engines::{ConnectionConfig, DatabaseEngine};
+use crate::engines::{ConnectionConfig, ConnectionTag, DatabaseEngine};
 use std::sync::Arc;
 
 /// Connects to a database.
@@ -44,6 +44,20 @@ pub async fn set_active_connection(
     let mut active = state.active_connection.write().await;
     *active = Some(conn_id);
     Ok(())
+}
+
+/// Updates the environment tag tracked for a live connection.
+#[tauri::command]
+pub async fn update_connection_tag(
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: String,
+    tag: Option<ConnectionTag>,
+) -> Result<(), String> {
+    state
+        .registry
+        .set_connection_tag(&conn_id, tag)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 /// Creates a new SQLite database file.

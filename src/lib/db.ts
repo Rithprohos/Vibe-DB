@@ -137,6 +137,15 @@ export async function setActiveConnection(connId: string): Promise<void> {
   );
 }
 
+export async function updateConnectionTag(
+  connId: string,
+  tag?: Connection["tag"],
+): Promise<void> {
+  return measureDevFetch("update_connection_tag", () =>
+    invoke<void>("update_connection_tag", { connId, tag }),
+  );
+}
+
 export async function listTables(connId?: string): Promise<TableInfo[]> {
   return measureDevFetch("list_tables", () =>
     invoke<TableInfo[]>("list_tables", { connId }),
