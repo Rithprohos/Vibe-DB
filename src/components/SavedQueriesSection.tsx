@@ -47,8 +47,6 @@ function SavedQueriesSectionComponent() {
   const [open, setOpen] = useState(false);
   const [renameState, setRenameState] = useState<RenameState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedQuery | null>(null);
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
-  const [contextMenuEpoch, setContextMenuEpoch] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   const normalizedSearch = useMemo(() => search.trim().toLocaleLowerCase(), [search]);
@@ -189,10 +187,7 @@ function SavedQueriesSectionComponent() {
                           paddingBottom: "4px",
                         }}
                       >
-                        <ContextMenu
-                          key={`${savedQuery.id}:${contextMenuEpoch}`}
-                          onOpenChange={setIsContextMenuOpen}
-                        >
+                        <ContextMenu modal={false}>
                           <ContextMenuTrigger asChild>
                             <button
                               type="button"
@@ -273,21 +268,6 @@ function SavedQueriesSectionComponent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {isContextMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          onPointerDown={() => {
-            setContextMenuEpoch((value) => value + 1);
-            setIsContextMenuOpen(false);
-          }}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setContextMenuEpoch((value) => value + 1);
-            setIsContextMenuOpen(false);
-          }}
-        />
-      )}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Plus, type LucideIcon } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
@@ -47,8 +47,6 @@ export default function SidebarObjectSection({
   onOpenStructure,
   renderMenuItems,
 }: SidebarObjectSectionProps) {
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
-  const [contextMenuEpoch, setContextMenuEpoch] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -123,10 +121,7 @@ export default function SidebarObjectSection({
                         paddingBottom: '2px',
                       }}
                     >
-                      <ContextMenu
-                        key={`${qualifiedName}:${contextMenuEpoch}`}
-                        onOpenChange={setIsContextMenuOpen}
-                      >
+                      <ContextMenu modal={false}>
                         <ContextMenuTrigger asChild>
                           <div
                             className={cn(
@@ -168,21 +163,6 @@ export default function SidebarObjectSection({
           </div>
         </div>
       </div>
-
-      {isContextMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          onPointerDown={() => {
-            setContextMenuEpoch((value) => value + 1);
-            setIsContextMenuOpen(false);
-          }}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            setContextMenuEpoch((value) => value + 1);
-            setIsContextMenuOpen(false);
-          }}
-        />
-      )}
     </>
   );
 }
