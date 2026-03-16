@@ -19,7 +19,9 @@ export interface CellInputProps {
   onSave: (val: string) => void;
   onCancel: () => void;
   disabled?: boolean;
-  inputType?: "text" | "date";
+  inputType?: "text" | "date" | "enum";
+  enumOptions?: string[];
+  allowNull?: boolean;
 }
 
 export const OPERATORS = [

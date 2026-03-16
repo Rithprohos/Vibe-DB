@@ -51,6 +51,7 @@ fn test_column_info_creation() {
         cid: 0,
         name: "id".to_string(),
         col_type: "INTEGER".to_string(),
+        enum_values: None,
         notnull: true,
         dflt_value: None,
         pk: true,

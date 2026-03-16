@@ -1,4 +1,5 @@
 import { MAX_QUICK_SEARCH_RECENT_ITEMS, MAX_TABS } from "../constants";
+import { getTableTransferContextKey } from "@/features/table-transfer/state";
 import {
   createDefaultVisualizationState,
   createDefaultTableViewState,
@@ -6,7 +7,12 @@ import {
   pruneVisualizationStateByTabs,
   pruneTableViewStateByTabs,
 } from "../helpers";
-import type { AppState } from "../types";
+import type {
+  AppState,
+  PersistedTableTransferContext,
+  Tab,
+  TableViewState,
+} from "../types";
 import type { AppGet, AppSet } from "./shared";
 
 type TabsSlice = Pick<
@@ -14,6 +20,7 @@ type TabsSlice = Pick<
   | "tabs"
   | "activeTabId"
   | "tableViewStateByTabId"
+  | "tableTransferContextByKey"
   | "visualizationStateByTabId"
   | "quickSearchRecentItems"
   | "addTab"
@@ -31,11 +38,31 @@ type TabsSlice = Pick<
 
 let tabCounter = 0;
 
+export function updateTableTransferContextForTab(
+  tableTransferContextByKey: Record<string, PersistedTableTransferContext>,
+  tab: Pick<Tab, "connectionId" | "tableName" | "type"> | undefined,
+  tableViewState: Pick<TableViewState, "appliedFilters" | "sortCol" | "sortDir">,
+): Record<string, PersistedTableTransferContext> {
+  if (!tab || tab.type !== "data" || !tab.tableName) {
+    return tableTransferContextByKey;
+  }
+
+  return {
+    ...tableTransferContextByKey,
+    [getTableTransferContextKey(tab.connectionId, tab.tableName)]: {
+      appliedFilters: tableViewState.appliedFilters.map((filter) => ({ ...filter })),
+      sortCol: tableViewState.sortCol,
+      sortDir: tableViewState.sortDir,
+    },
+  };
+}
+
 export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
   return {
     tabs: [],
     activeTabId: null,
     tableViewStateByTabId: {},
+    tableTransferContextByKey: {},
     visualizationStateByTabId: {},
     quickSearchRecentItems: [],
 
@@ -112,15 +139,25 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
       })),
 
     updateTableViewState: (tabId, updates) =>
-      set((state) => ({
-        tableViewStateByTabId: {
-          ...state.tableViewStateByTabId,
-          [tabId]: {
-            ...(state.tableViewStateByTabId[tabId] ?? createDefaultTableViewState()),
-            ...updates,
+      set((state) => {
+        const nextTableViewState = {
+          ...(state.tableViewStateByTabId[tabId] ?? createDefaultTableViewState()),
+          ...updates,
+        };
+        const tab = state.tabs.find((currentTab) => currentTab.id === tabId);
+
+        return {
+          tableViewStateByTabId: {
+            ...state.tableViewStateByTabId,
+            [tabId]: nextTableViewState,
           },
-        },
-      })),
+          tableTransferContextByKey: updateTableTransferContextForTab(
+            state.tableTransferContextByKey,
+            tab,
+            nextTableViewState,
+          ),
+        };
+      }),
 
     updateVisualizationState: (tabId, updates) =>
       set((state) => ({

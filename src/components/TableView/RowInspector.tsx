@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatColumnTypeDisplay } from '@/lib/typeDisplay';
 import type { ColumnInfo } from '@/store/useAppStore';
+import { isEnumColumn } from '@/lib/sql/columnTypes';
+import { EnumValueSelect } from './EnumValueSelect';
 
 interface RowInspectorProps {
   isOpen: boolean;
@@ -65,6 +67,10 @@ export function RowInspector({
   const isJsonEditor = Boolean(
     editingColumnInfo && isJsonColumn(editingColumnInfo.col_type),
   );
+  const isEnumEditor = Boolean(
+    editingColumnInfo && isEnumColumn(editingColumnInfo),
+  );
+  const enumOptions = editingColumnInfo?.enum_values ?? [];
   const liveJsonError = useMemo(() => {
     if (!isJsonEditor) return '';
     const trimmed = draftValue.trim();
@@ -262,27 +268,53 @@ export function RowInspector({
                               </div>
                             </div>
                           )}
-                          <textarea
-                            value={draftValue}
-                            onChange={(event) => {
-                              setDraftValue(event.target.value);
-                              if (editorError) setEditorError('');
-                            }}
-                            className="min-h-[112px] w-full resize-y border border-border/60 bg-background px-2 py-1.5 text-[12px] leading-5 font-mono text-foreground outline-none focus:border-primary"
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                                event.preventDefault();
-                                void handleSaveEdit();
-                                return;
-                              }
-                              if (event.key === 'Escape') {
-                                event.preventDefault();
-                                handleCancelEdit();
-                              }
-                            }}
-                            placeholder="NULL"
-                            autoFocus
-                          />
+                          {isEnumEditor ? (
+                            <div className="rounded-sm border border-border/60 bg-background">
+                              <EnumValueSelect
+                                value={draftValue}
+                                options={enumOptions}
+                                allowNull={!editingColumnInfo?.notnull}
+                                autoFocus
+                                className="h-9 px-2 py-1.5 text-[12px]"
+                                onChange={(value) => {
+                                  setDraftValue(value);
+                                  if (editorError) setEditorError('');
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Escape') {
+                                    event.preventDefault();
+                                    handleCancelEdit();
+                                  }
+                                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                                    event.preventDefault();
+                                    void handleSaveEdit();
+                                  }
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <textarea
+                              value={draftValue}
+                              onChange={(event) => {
+                                setDraftValue(event.target.value);
+                                if (editorError) setEditorError('');
+                              }}
+                              className="min-h-[112px] w-full resize-y border border-border/60 bg-background px-2 py-1.5 text-[12px] leading-5 font-mono text-foreground outline-none focus:border-primary"
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                                  event.preventDefault();
+                                  void handleSaveEdit();
+                                  return;
+                                }
+                                if (event.key === 'Escape') {
+                                  event.preventDefault();
+                                  handleCancelEdit();
+                                }
+                              }}
+                              placeholder="NULL"
+                              autoFocus
+                            />
+                          )}
                           {(editorError || liveJsonError) && (
                             <div className="text-[11px] text-destructive">
                               {editorError || liveJsonError}

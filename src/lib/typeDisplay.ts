@@ -4,6 +4,11 @@ export function formatColumnTypeDisplay(columnType: string | null | undefined): 
     return '—';
   }
 
+  const enumMatch = rawType.match(/^enum\((.+)\)$/i);
+  if (enumMatch) {
+    return `ENUM(${enumMatch[1]})`;
+  }
+
   const varcharMatch = rawType.match(/^character varying(\(\d+\))?$/i);
   if (varcharMatch) {
     return `VARCHAR${varcharMatch[1] ?? ''}`;

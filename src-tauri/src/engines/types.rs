@@ -155,6 +155,9 @@ pub struct ColumnInfo {
     pub name: String,
     /// Column data type
     pub col_type: String,
+    /// Enum labels for PostgreSQL enum columns
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enum_values: Option<Vec<String>>,
     /// Whether the column is NOT NULL
     pub notnull: bool,
     /// Default value for the column

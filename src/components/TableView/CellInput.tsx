@@ -2,13 +2,16 @@ import React, { useState, useEffect, useRef, memo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { DateTimePicker } from '../ui/DateTimePicker';
 import type { CellInputProps } from './types';
+import { EnumValueSelect } from './EnumValueSelect';
 
-export const CellInput = memo(({ initialValue, onValueChange, onSave, onCancel, disabled, inputType = 'text' }: CellInputProps) => {
+export const CellInput = memo(({ initialValue, onValueChange, onSave, onCancel, disabled, inputType = 'text', enumOptions = [], allowNull = false }: CellInputProps) => {
   const [localValue, setLocalValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement>(null);
+  const latestValueRef = useRef(initialValue);
 
   useEffect(() => {
     setLocalValue(initialValue);
+    latestValueRef.current = initialValue;
   }, [initialValue]);
 
   useEffect(() => {
@@ -20,6 +23,7 @@ export const CellInput = memo(({ initialValue, onValueChange, onSave, onCancel, 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setLocalValue(val);
+    latestValueRef.current = val;
     onValueChange(val);
   };
 
@@ -59,6 +63,33 @@ export const CellInput = memo(({ initialValue, onValueChange, onSave, onCancel, 
     );
   }
 
+  if (inputType === 'enum') {
+    return (
+      <div className="flex items-center w-full h-full p-0 relative">
+        <EnumValueSelect
+          value={localValue}
+          options={enumOptions}
+          allowNull={allowNull}
+          autoFocus
+          disabled={disabled}
+          className="h-full px-2 py-0.5 text-xs"
+          onChange={(val) => {
+            setLocalValue(val);
+            latestValueRef.current = val;
+            onValueChange(val);
+            onSave(val);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              onCancel();
+            }
+          }}
+          onBlur={() => onSave(latestValueRef.current)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center w-full h-full p-0 relative">
       <input
@@ -80,7 +111,7 @@ export const CellInput = memo(({ initialValue, onValueChange, onSave, onCancel, 
           }
         }}
         onBlur={() => {
-          onSave(localValue);
+          onSave(latestValueRef.current);
         }}
         disabled={disabled}
         autoComplete="off"

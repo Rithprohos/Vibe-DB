@@ -1,97 +1,32 @@
 use crate::app_state::AppState;
 use crate::commands::get_connection_id;
-use crate::engines::QueryResult;
-use crate::query_guard::{
-    QueryExecutionSurface, QueryPolicyDecision, blocked_message, evaluate_query_policy,
-};
 use crate::sql_logging::emit_sql_log;
-use serde::Serialize;
+use crate::transfer::{
+    ExportTableDataInput, ExportTableDataResult, ImportTableDataInput, ImportTableDataResult,
+    export_table_data as run_export_table_data, import_table_data as run_import_table_data,
+};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExecuteQueryResponse {
-    #[serde(flatten)]
-    pub result: QueryResult,
-    pub duration_ms: f64,
+fn summarize_sql_for_log(sql: &str) -> String {
+    const MAX_SQL_LOG_LEN: usize = 12_000;
+
+    if sql.len() <= MAX_SQL_LOG_LEN {
+        return sql.to_string();
+    }
+
+    let head = &sql[..MAX_SQL_LOG_LEN];
+    format!("{head}\n-- SQL log truncated")
 }
 
-/// Executes a SQL query.
 #[tauri::command]
-pub async fn execute_query(
+pub async fn export_table_data(
     app: AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     conn_id: Option<String>,
-    query: String,
-    surface: QueryExecutionSurface,
-) -> Result<ExecuteQueryResponse, String> {
-    let start = Instant::now();
-    let id = get_connection_id(&state, conn_id).await?;
-    let connection_tag = state
-        .registry
-        .get_connection_tag(&id)
-        .await
-        .map_err(|error| error.to_string())?;
-
-    if let QueryPolicyDecision::Blocked { statement } =
-        evaluate_query_policy(&query, connection_tag, surface)
-    {
-        let message = blocked_message(statement);
-        emit_sql_log(
-            &app,
-            query,
-            "error",
-            start.elapsed().as_secs_f64() * 1000.0,
-            message.clone(),
-        );
-        return Err(message);
-    }
-
-    let engine = state
-        .registry
-        .get_engine(&id)
-        .await
-        .map_err(|error| error.to_string())?;
-
-    match engine.execute_query(&query).await {
-        Ok(result) => {
-            let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
-            emit_sql_log(
-                &app,
-                query,
-                "success",
-                duration_ms,
-                result.message.clone(),
-            );
-            Ok(ExecuteQueryResponse {
-                result,
-                duration_ms,
-            })
-        }
-        Err(error) => {
-            let message = error.to_string();
-            emit_sql_log(
-                &app,
-                query,
-                "error",
-                start.elapsed().as_secs_f64() * 1000.0,
-                message.clone(),
-            );
-            Err(message)
-        }
-    }
-}
-
-/// Executes multiple SQL queries in a single transaction.
-#[tauri::command]
-pub async fn execute_transaction(
-    app: AppHandle,
-    state: tauri::State<'_, Arc<AppState>>,
-    conn_id: Option<String>,
-    queries: Vec<String>,
-) -> Result<QueryResult, String> {
+    input: ExportTableDataInput,
+) -> Result<ExportTableDataResult, String> {
     let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
@@ -99,13 +34,12 @@ pub async fn execute_transaction(
         .get_engine(&id)
         .await
         .map_err(|error| error.to_string())?;
-    let sql = queries.join("\n");
 
-    match engine.execute_transaction(&queries).await {
+    match run_export_table_data(engine.as_ref(), &input).await {
         Ok(result) => {
             emit_sql_log(
                 &app,
-                sql,
+                result.sql.clone(),
                 "success",
                 start.elapsed().as_secs_f64() * 1000.0,
                 result.message.clone(),
@@ -116,7 +50,47 @@ pub async fn execute_transaction(
             let message = error.to_string();
             emit_sql_log(
                 &app,
-                sql,
+                "-- export_table_data failed".to_string(),
+                "error",
+                start.elapsed().as_secs_f64() * 1000.0,
+                message.clone(),
+            );
+            Err(message)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn import_table_data(
+    app: AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+    input: ImportTableDataInput,
+) -> Result<ImportTableDataResult, String> {
+    let start = Instant::now();
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    match run_import_table_data(engine.as_ref(), &input).await {
+        Ok(result) => {
+            emit_sql_log(
+                &app,
+                summarize_sql_for_log(&result.sql),
+                "success",
+                start.elapsed().as_secs_f64() * 1000.0,
+                result.message.clone(),
+            );
+            Ok(result)
+        }
+        Err(error) => {
+            let message = error.to_string();
+            emit_sql_log(
+                &app,
+                "-- import_table_data failed".to_string(),
                 "error",
                 start.elapsed().as_secs_f64() * 1000.0,
                 message.clone(),

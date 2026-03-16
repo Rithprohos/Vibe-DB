@@ -4,7 +4,7 @@ use serde::Deserialize;
 use super::identifiers::quote_identifier;
 use super::values::{format_sql_literal, is_numeric_column};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterConditionInput {
     pub field: String,

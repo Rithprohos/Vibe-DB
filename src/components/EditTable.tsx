@@ -110,8 +110,8 @@ export default function EditTable({ tableName, tabId }: Props) {
     return validateColumnName(nextName);
   }, [newColumnName]);
   const newColumnTypeParamError = useMemo(
-    () => validateTypeParams(newColumnType, newColumnTypeParams),
-    [newColumnType, newColumnTypeParams],
+    () => validateTypeParams(newColumnType, newColumnTypeParams, engineType),
+    [engineType, newColumnType, newColumnTypeParams],
   );
 
   const renameColumnToError = useMemo(() => {
@@ -586,13 +586,14 @@ export default function EditTable({ tableName, tabId }: Props) {
         {error && <EditTableErrorBanner error={error} />}
 
         <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
-          <EditTableOperationsPanel
+        <EditTableOperationsPanel
             loadingColumns={loadingColumns}
             isBusy={isBusy}
             columns={columns}
             manageableIndexes={manageableIndexes}
-            currentTableName={currentTableName}
-            engineTypeLabel={engineTypeLabel}
+          currentTableName={currentTableName}
+          engineType={engineType}
+          engineTypeLabel={engineTypeLabel}
             engineDataTypes={engineDataTypes}
             nextTableName={nextTableName}
             onNextTableNameChange={setNextTableName}

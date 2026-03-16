@@ -29,6 +29,7 @@ export interface ColumnInfo {
   cid: number;
   name: string;
   col_type: string;
+  enum_values?: string[] | null;
   notnull: boolean | number;
   dflt_value: string | null;
   pk: boolean | number;
@@ -57,6 +58,7 @@ export interface QueryResult {
   rows: any[][];
   rows_affected: number;
   message: string;
+  durationMs?: number;
 }
 
 export interface QueryResultLight {
@@ -89,6 +91,12 @@ export interface TableViewState {
   appliedFilters: TableFilterCondition[];
   isInspectorOpen: boolean;
   selectedRowIndex: number | null;
+}
+
+export interface PersistedTableTransferContext {
+  appliedFilters: TableFilterCondition[];
+  sortCol: string | null;
+  sortDir: "ASC" | "DESC";
 }
 
 export interface VisualizationPoint {
@@ -206,6 +214,7 @@ export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   tableViewStateByTabId: Record<string, TableViewState>;
+  tableTransferContextByKey: Record<string, PersistedTableTransferContext>;
   visualizationStateByTabId: Record<string, VisualizationState>;
 
   // Logs

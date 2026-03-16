@@ -1,4 +1,8 @@
-import type { SqliteType, TypeParams } from '../../lib/createTableConstants';
+import type {
+  SqliteType,
+  SupportedEngine,
+  TypeParams,
+} from '../../lib/createTableConstants';
 import { getSqliteTypeColor, supportsTypeParams } from '../../lib/createTableConstants';
 import { isSchemaFlagEnabled } from '../../lib/schemaFlags';
 import type { ColumnInfo, IndexInfo } from '../../store/useAppStore';
@@ -140,6 +144,7 @@ interface EditTableOperationsPanelProps {
   columns: ColumnInfo[];
   manageableIndexes: IndexInfo[];
   currentTableName: string;
+  engineType: SupportedEngine;
   engineTypeLabel: string;
   engineDataTypes: readonly SqliteType[];
   nextTableName: string;
@@ -193,6 +198,7 @@ export function EditTableOperationsPanel({
   columns,
   manageableIndexes,
   currentTableName,
+  engineType,
   engineTypeLabel,
   engineDataTypes,
   nextTableName,
@@ -327,6 +333,7 @@ export function EditTableOperationsPanel({
             <TypeParameterFields
               typeValue={newColumnType}
               params={newColumnTypeParams}
+              engineType={engineType}
               onChange={onNewColumnTypeParamsChange}
               size="default"
             />

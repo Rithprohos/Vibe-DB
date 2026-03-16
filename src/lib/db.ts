@@ -2,6 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ColumnDef, ForeignKeyConstraint, CheckConstraint } from "./createTableConstants";
 import type { QueryExecutionSurface } from "./queryGuard";
 import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
+import type {
+  ExportTableDataInput,
+  ExportTableDataResult,
+  ImportTableDataInput,
+  ImportTableDataResult,
+} from "../features/table-transfer/types";
 import { measureDevFetch } from "./dev-performance";
 import {
   clearStoredAiApiKey,
@@ -221,6 +227,24 @@ export async function getTableData(
 export async function createDatabase(dbPath: string): Promise<string> {
   return measureDevFetch("create_database", () =>
     invoke<string>("create_database", { dbPath }),
+  );
+}
+
+export async function exportTableData(
+  input: ExportTableDataInput,
+  connId?: string,
+): Promise<ExportTableDataResult> {
+  return measureDevFetch("export_table_data", () =>
+    invoke<ExportTableDataResult>("export_table_data", { input, connId }),
+  );
+}
+
+export async function importTableData(
+  input: ImportTableDataInput,
+  connId?: string,
+): Promise<ImportTableDataResult> {
+  return measureDevFetch("import_table_data", () =>
+    invoke<ImportTableDataResult>("import_table_data", { input, connId }),
   );
 }
 

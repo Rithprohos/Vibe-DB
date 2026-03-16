@@ -6,6 +6,12 @@ export interface CellFormatOptions {
   prettyJson?: boolean;
 }
 
+// Browsers render non-printable control bytes as empty square glyphs in inputs/cells.
+// Strip them from UI-facing strings while keeping normal whitespace intact.
+export function sanitizeRenderableText(value: string): string {
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "");
+}
+
 export function stringifyCellValue(
   value: unknown,
   options?: CellFormatOptions,
@@ -55,13 +61,13 @@ export function formatCellValue(
 
   if (typeof value === "object") {
     return {
-      text: stringifyCellValue(value, options),
+      text: sanitizeRenderableText(stringifyCellValue(value, options)),
       className: "text-foreground font-mono text-[13px]",
     };
   }
 
   return {
-    text: stringifyCellValue(value, options),
+    text: sanitizeRenderableText(stringifyCellValue(value, options)),
     className: "text-foreground font-mono text-[13px]",
   };
 }

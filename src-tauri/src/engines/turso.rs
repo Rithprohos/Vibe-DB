@@ -249,6 +249,7 @@ impl DatabaseEngine for TursoEngine {
                         cid,
                         name,
                         col_type,
+                        enum_values: None,
                         notnull: notnull != 0,
                         dflt_value,
                         pk: pk != 0,

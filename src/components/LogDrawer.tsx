@@ -21,7 +21,7 @@ interface LogItemProps {
 
 const LogItem = memo(function LogItem({ log, onCopy }: LogItemProps) {
   const timeString = useMemo(() => new Date(log.timestamp).toLocaleTimeString(), [log.timestamp]);
-  const durationString = useMemo(() => `${log.duration.toFixed(1)}ms`, [log.duration]);
+  const durationString = useMemo(() => `${Math.round(log.duration)}ms`, [log.duration]);
   const isError = log.status === 'error';
   const containerClass = useMemo(() => cn(
     "flex items-start gap-2 rounded-md border bg-secondary/50 text-xs overflow-hidden group transition-colors hover:bg-secondary/80",

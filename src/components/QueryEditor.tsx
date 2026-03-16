@@ -153,6 +153,34 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     return queryToRun;
   }, [tabId]);
 
+  // On failed queries, Tauri can emit the SQL log a tick after the promise rejects.
+  // Retry briefly so the editor duration can use the same backend timing as Logs.
+  const getLoggedDuration = useCallback(
+    async (sql: string, status: 'success' | 'error', startedAtMs: number) => {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const match = useAppStore
+          .getState()
+          .logs.find(
+            (log) =>
+              log.status === status &&
+              log.sql === sql &&
+              log.timestamp >= startedAtMs,
+          );
+
+        if (match) {
+          return match.duration;
+        }
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 16);
+        });
+      }
+
+      return null;
+    },
+    [],
+  );
+
   const openSaveDialog = useCallback((mode: SavedQueryDialogMode) => {
     const store = useAppStore.getState();
     const currentTab = store.tabs.find(tab => tab.id === tabId);
@@ -325,10 +353,11 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     setPendingConfirmation(null);
     store.updateTab(tabId, { error: '', result: null });
     const start = performance.now();
+    const startedAt = Date.now();
 
     try {
       const nextResult = await executeQuery(queryToRun, activeConnectionConnId, 'query-editor');
-      setDuration(performance.now() - start);
+      setDuration(nextResult.durationMs ?? performance.now() - start);
 
       const truncated = nextResult.rows.length > MAX_RESULT_ROWS;
       const resultToStore = truncated
@@ -342,12 +371,14 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         store.setTables(activeConnectionId, tablesList);
       }
     } catch (errorValue: any) {
-      setDuration(performance.now() - start);
+      // Prefer backend-reported duration for consistency with Log Drawer.
+      const loggedDuration = await getLoggedDuration(queryToRun, 'error', startedAt);
+      setDuration(loggedDuration ?? performance.now() - start);
       store.updateTab(tabId, { error: errorValue.toString(), result: null });
     } finally {
       setRunning(false);
     }
-  }, [activeConnectionConnId, activeConnectionId, tabId]);
+  }, [activeConnectionConnId, activeConnectionId, getLoggedDuration, tabId]);
 
   const handleRun = useCallback(async (editorView?: EditorViewLike) => {
     const queryToRun = getQueryToRun(editorView);

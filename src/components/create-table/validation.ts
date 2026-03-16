@@ -47,8 +47,15 @@ export function getInvalidColumnNameError(columns: ColumnDef[]): string | null {
 }
 
 export function getInvalidTypeParamsError(columns: ColumnDef[]): string | null {
+  return getInvalidTypeParamsErrorForEngine(columns, 'sqlite');
+}
+
+export function getInvalidTypeParamsErrorForEngine(
+  columns: ColumnDef[],
+  engineType: SupportedEngine,
+): string | null {
   for (const column of columns) {
-    const maybeError = validateTypeParams(column.type, column.typeParams);
+    const maybeError = validateTypeParams(column.type, column.typeParams, engineType);
     if (maybeError) {
       return maybeError;
     }

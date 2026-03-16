@@ -7,15 +7,16 @@ mod menu;
 mod query_guard;
 mod sql_helpers;
 mod sql_logging;
+mod transfer;
 
 use ai::config::AI_STRONGHOLD_PASSWORD_SALT;
 use ai::{generate_sql, get_default_ai_provider_config, ping_ai_provider};
 use app_state::AppState;
 use commands::{
     connect_database, create_database, delete_rows, disconnect_database, drop_table, execute_query,
-    execute_transaction, get_database_version, get_filtered_row_count, get_table_data,
-    get_table_row_count, get_table_structure, insert_rows, list_tables, set_active_connection,
-    truncate_table, update_connection_tag, update_rows,
+    execute_transaction, export_table_data, get_database_version, get_filtered_row_count,
+    get_table_data, get_table_row_count, get_table_structure, import_table_data, insert_rows,
+    list_tables, set_active_connection, truncate_table, update_connection_tag, update_rows,
 };
 use menu::setup_menu;
 use sql_helpers::{build_create_table_sql, build_create_view_sql};
@@ -69,6 +70,8 @@ pub fn run() {
             delete_rows,
             drop_table,
             insert_rows,
+            import_table_data,
+            export_table_data,
             update_rows,
             truncate_table,
             get_default_ai_provider_config,

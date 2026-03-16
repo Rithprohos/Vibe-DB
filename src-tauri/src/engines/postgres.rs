@@ -145,6 +145,13 @@ impl PostgresEngine {
         safety::validate_query_safety(query)
     }
 
+    fn json_from_unchecked_text(row: &PgRow, col_name: &str) -> Option<serde_json::Value> {
+        row.try_get_unchecked::<Option<String>, _>(col_name)
+            .ok()
+            .flatten()
+            .map(serde_json::Value::String)
+    }
+
     /// Converts a PostgreSQL row value to JSON based on the column type info.
     fn json_from_row(row: &PgRow, col_idx: usize) -> serde_json::Value {
         let columns = row.columns();
@@ -180,6 +187,11 @@ impl PostgresEngine {
                         None => serde_json::Value::Null,
                     }
                 } else if let Ok(val) = row.try_get::<Option<Vec<f64>>, _>(col_name) {
+                    match val {
+                        Some(arr) => serde_json::json!(arr),
+                        None => serde_json::Value::Null,
+                    }
+                } else if let Ok(val) = row.try_get_unchecked::<Option<Vec<String>>, _>(col_name) {
                     match val {
                         Some(arr) => serde_json::json!(arr),
                         None => serde_json::Value::Null,
@@ -267,7 +279,9 @@ impl PostgresEngine {
             }
             // Numeric/Decimal - handle as string to preserve precision
             "NUMERIC" | "DECIMAL" => {
-                if let Ok(val) = row.try_get::<Option<String>, _>(col_name) {
+                if let Some(val) = Self::json_from_unchecked_text(row, col_name) {
+                    val
+                } else if let Ok(val) = row.try_get::<Option<f64>, _>(col_name) {
                     val.map(|v| serde_json::json!(v))
                         .unwrap_or(serde_json::Value::Null)
                 } else {
@@ -328,6 +342,8 @@ impl PostgresEngine {
                     serde_json::json!(val)
                 } else if let Ok(Some(val)) = row.try_get::<Option<bool>, _>(col_name) {
                     serde_json::json!(val)
+                } else if let Some(val) = Self::json_from_unchecked_text(row, col_name) {
+                    val
                 } else {
                     serde_json::Value::Null
                 }
@@ -441,28 +457,54 @@ impl DatabaseEngine for PostgresEngine {
         let _quoted_schema = Self::quote_identifier(&schema);
         let _quoted_table = Self::quote_identifier(&table);
 
-        // Get columns from information_schema.columns
+        // Use PostgreSQL catalog metadata so parameterized and user-defined types
+        // come back as their real type names instead of generic placeholders.
+        // Tag enum columns explicitly so the frontend can render them as ENUM(name).
         let column_rows = sqlx::query(
             r#"
             SELECT
-                ordinal_position as cid,
-                column_name as name,
-                data_type as col_type,
-                CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END as notnull,
-                column_default as dflt_value,
+                columns.ordinal_position as cid,
+                columns.column_name as name,
+                CASE
+                    WHEN typ.typtype = 'e' THEN
+                        'enum(' || COALESCE(pg_catalog.format_type(attr.atttypid, attr.atttypmod), columns.data_type) || ')'
+                    ELSE
+                        COALESCE(pg_catalog.format_type(attr.atttypid, attr.atttypmod), columns.data_type)
+                END as col_type,
+                CASE
+                    WHEN typ.typtype = 'e' THEN ARRAY(
+                        SELECT enum_item.enumlabel
+                        FROM pg_catalog.pg_enum enum_item
+                        WHERE enum_item.enumtypid = typ.oid
+                        ORDER BY enum_item.enumsortorder
+                    )
+                    ELSE NULL
+                END as enum_values,
+                CASE WHEN columns.is_nullable = 'NO' THEN 1 ELSE 0 END as notnull,
+                columns.column_default as dflt_value,
                 CASE WHEN EXISTS (
-                    SELECT 1 FROM information_schema.table_constraints tc
-                    JOIN information_schema.constraint_column_usage ccu
-                        ON tc.constraint_name = ccu.constraint_name
-                    WHERE tc.table_schema = $1
-                      AND tc.table_name = $2
-                      AND tc.constraint_type = 'PRIMARY KEY'
-                      AND ccu.column_name = columns.column_name
+                    SELECT 1
+                    FROM pg_catalog.pg_constraint con
+                    WHERE con.conrelid = cls.oid
+                      AND con.contype = 'p'
+                      AND attr.attnum = ANY(con.conkey)
                 ) THEN 1 ELSE 0 END as pk
-            FROM information_schema.columns
-            WHERE table_schema = $1
-              AND table_name = $2
-            ORDER BY ordinal_position
+            FROM information_schema.columns columns
+            JOIN pg_catalog.pg_namespace ns
+              ON ns.nspname = columns.table_schema
+            JOIN pg_catalog.pg_class cls
+              ON cls.relname = columns.table_name
+             AND cls.relnamespace = ns.oid
+            JOIN pg_catalog.pg_attribute attr
+              ON attr.attrelid = cls.oid
+             AND attr.attname = columns.column_name
+            JOIN pg_catalog.pg_type typ
+              ON typ.oid = attr.atttypid
+            WHERE columns.table_schema = $1
+              AND columns.table_name = $2
+              AND attr.attnum > 0
+              AND NOT attr.attisdropped
+            ORDER BY columns.ordinal_position
             "#,
         )
         .bind(&schema)
@@ -474,10 +516,15 @@ impl DatabaseEngine for PostgresEngine {
         let columns: Vec<ColumnInfo> = column_rows
             .iter()
             .map(|row| {
+                let enum_values = row
+                    .try_get::<Option<Vec<String>>, _>("enum_values")
+                    .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
                 Ok(ColumnInfo {
                     cid: row_decode::decode_postgres_i64(row, "cid")? - 1, // PostgreSQL is 1-indexed, we want 0-indexed
                     name: row.get("name"),
                     col_type: row.get("col_type"),
+                    enum_values,
                     notnull: row.get::<i32, _>("notnull") != 0,
                     dflt_value: row.get("dflt_value"),
                     pk: row.get::<i32, _>("pk") != 0,
@@ -599,7 +646,7 @@ impl DatabaseEngine for PostgresEngine {
             || upper.starts_with("TABLE");
 
         if is_select {
-            let rows = sqlx::query(trimmed)
+            let rows = sqlx::raw_sql(trimmed)
                 .fetch_all(pool)
                 .await
                 .map_err(|e| EngineError::QueryError(e.to_string()))?;
