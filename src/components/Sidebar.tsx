@@ -25,6 +25,7 @@ import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
 import { ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
 import TruncateTableDialog from './TruncateTableDialog';
 import DropTableDialog from './DropTableDialog';
+import { orderPinnedTablesFirst } from '@/lib/sidebarTablePinning';
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -32,8 +33,10 @@ export default function Sidebar() {
   const connections = useAppStore(s => s.connections);
   const isConnected = useAppStore(s => s.isConnected);
   const tablesByConnection = useAppStore(s => s.tablesByConnection);
+  const pinnedTablesByConnection = useAppStore(s => s.pinnedTablesByConnection);
   const selectedTable = useAppStore(s => s.selectedTable);
   const setTables = useAppStore(s => s.setTables);
+  const togglePinnedTable = useAppStore(s => s.togglePinnedTable);
   const openTableTab = useAppStore(s => s.openTableTab);
   const openVisualizationTab = useAppStore(s => s.openVisualizationTab);
   const addTab = useAppStore(s => s.addTab);
@@ -144,6 +147,14 @@ export default function Sidebar() {
   }, [tables]);
   const showSchemaFilter = isPostgresConnection && schemaOptions.length > 0;
   const showSchemaBadge = isPostgresConnection && schemaOptions.length > 1;
+  const pinnedTableNames = useMemo(
+    () => (activeConnectionId ? (pinnedTablesByConnection[activeConnectionId] ?? []) : []),
+    [activeConnectionId, pinnedTablesByConnection],
+  );
+  const pinnedTableNameSet = useMemo(
+    () => new Set(pinnedTableNames),
+    [pinnedTableNames],
+  );
   const defaultSchemaValue = useMemo(
     () => {
       if (schemaOptions.some((schema) => schema.value === 'public')) {
@@ -195,6 +206,10 @@ export default function Sidebar() {
 
     return { filteredTables: nextTables, filteredViews: nextViews };
   }, [tables, normalizedSearch, selectedSchema, showSchemaFilter]);
+  const orderedFilteredTables = useMemo(
+    () => orderPinnedTablesFirst(filteredTables, pinnedTableNameSet),
+    [filteredTables, pinnedTableNameSet],
+  );
 
   const handleRefresh = useCallback(async () => {
     if (!activeConnectionConnId || !activeConnectionId || isRefreshing) return;
@@ -280,6 +295,11 @@ export default function Sidebar() {
     setDropTableName(tableName);
     setDropDialogOpen(true);
   }, [activeConnection]);
+
+  const handleTogglePinnedTable = useCallback((tableName: string) => {
+    if (!activeConnectionId) return;
+    togglePinnedTable(activeConnectionId, tableName);
+  }, [activeConnectionId, togglePinnedTable]);
 
   const handleOpenVisualize = useCallback((tableName: string) => {
     if (!activeConnection) return;
@@ -534,7 +554,7 @@ export default function Sidebar() {
 
               <SidebarObjectSection
                 title="Tables"
-                items={filteredTables}
+                items={orderedFilteredTables}
                 open={tablesOpen}
                 onToggle={() => setTablesOpen(!tablesOpen)}
                 onCreate={handleCreateTable}
@@ -543,6 +563,7 @@ export default function Sidebar() {
                 itemIcon={LayoutTemplate}
                 selectedItem={selectedTable}
                 showSchemaBadge={showSchemaBadge}
+                isItemPinned={(qualifiedName) => pinnedTableNameSet.has(qualifiedName)}
                 listClassName="flex-1 min-h-0 overflow-auto pr-1"
                 containerClassName="flex min-h-0 flex-1 flex-col"
                 onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
@@ -551,6 +572,10 @@ export default function Sidebar() {
                   <>
                     <ContextMenuItem onClick={() => handleOpenVisualize(qualifiedName)}>
                       Open Table Visualize
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => handleTogglePinnedTable(qualifiedName)}>
+                      {pinnedTableNameSet.has(qualifiedName) ? 'Unpin Table' : 'Pin Table'}
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem onClick={() => handleEditTable(qualifiedName)}>

@@ -21,11 +21,18 @@ export function useThemeSync(theme: Theme): void {
   }, [theme]);
 }
 
-function shouldAllowNativeContextMenu(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
+function shouldAllowContextMenu(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (
     target.closest('input, textarea, [contenteditable="true"], [role="textbox"], .cm-editor, .cm-content') !== null
-  );
+  ) {
+    return true;
+  }
+
+  return target.closest('[data-vibedb-context-menu-trigger]') !== null;
 }
 
 export function useProductionContextMenuGuard(): void {
@@ -35,7 +42,7 @@ export function useProductionContextMenuGuard(): void {
     }
 
     const handleContextMenu = (event: MouseEvent) => {
-      if (shouldAllowNativeContextMenu(event.target)) {
+      if (shouldAllowContextMenu(event.target)) {
         return;
       }
 
