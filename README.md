@@ -38,6 +38,7 @@ It is designed to feel like a sharp devtool, not a bloated admin panel. Dense la
 - **Transactional editing** - Multi-row changes are staged and committed as a single atomic operation instead of becoming a fragile sequence of ad hoc updates.
 - **Visual schema workflows** - Tables and views can be created through a polished builder with real-time SQL preview, while the schema canvas helps explore relationships quickly.
 - **Fast table navigation** - Large results, logs, and sidebar lists stay responsive through virtualization and compact UI patterns.
+- **Pin important tables** - Right-click any table in the sidebar to pin it, keeping critical tables at the top of the list for faster access.
 - **Built-in query workflow** - SQL editing, saved queries, execution results, and schema refresh behavior live in one place instead of being scattered across modal-heavy flows.
 - **Local secret handling** - Sensitive credentials are stored with desktop-native protection primitives rather than plain browser storage.
 
@@ -60,6 +61,8 @@ It is designed to feel like a sharp devtool, not a bloated admin panel. Dense la
 ### Stay In Flow
 
 - Multi-tab workflow for switching between queries, tables, and saved work.
+- Sidebar table context menu supports `Pin Table` / `Unpin Table`.
+- Pinned tables are shown at the top of the table list.
 - Keyboard-first query execution and editing.
 - Compact, dark-first UI tuned for long working sessions.
 
