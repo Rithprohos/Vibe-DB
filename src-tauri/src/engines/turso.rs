@@ -9,6 +9,9 @@ use super::types::{
 };
 use super::{EngineError, EngineResult};
 
+#[cfg(windows)]
+const TURSO_LOCAL_UNSUPPORTED: &str = "Local Turso/libSQL files are not supported on Windows builds. Use a remote libsql/https URL with auth token, or use the SQLite engine for local files.";
+
 /// Turso/libSQL database engine implementation.
 ///
 /// Supports both remote Turso databases (via libsql:// URL) and
@@ -116,12 +119,21 @@ impl DatabaseEngine for TursoEngine {
             ));
         } else {
             // Local file connection
-            let db = Builder::new_local(&url)
-                .build()
-                .await
-                .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
-            db.connect()
-                .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?
+            #[cfg(windows)]
+            {
+                return Err(EngineError::ConfigError(
+                    TURSO_LOCAL_UNSUPPORTED.to_string(),
+                ));
+            }
+            #[cfg(not(windows))]
+            {
+                let db = Builder::new_local(&url)
+                    .build()
+                    .await
+                    .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
+                db.connect()
+                    .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?
+            }
         };
 
         conn.execute("PRAGMA foreign_keys = ON", ())
@@ -616,23 +628,34 @@ impl DatabaseEngine for TursoEngine {
     }
 
     async fn create_database(&self, path: &str) -> EngineResult<String> {
-        // For Turso, creating a local database means just opening it
-        // The libsql builder will create the file if it doesn't exist
-        let db = Builder::new_local(path)
-            .build()
-            .await
-            .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
+        #[cfg(windows)]
+        {
+            let _ = path;
+            return Err(EngineError::ConfigError(
+                TURSO_LOCAL_UNSUPPORTED.to_string(),
+            ));
+        }
 
-        let conn = db
-            .connect()
-            .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
+        #[cfg(not(windows))]
+        {
+            // For Turso, creating a local database means just opening it
+            // The libsql builder will create the file if it doesn't exist
+            let db = Builder::new_local(path)
+                .build()
+                .await
+                .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
 
-        // Execute a simple query to ensure the database is valid
-        conn.execute("SELECT 1", ())
-            .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+            let conn = db
+                .connect()
+                .map_err(|e| EngineError::ConnectionFailed(e.to_string()))?;
 
-        Ok(path.to_string())
+            // Execute a simple query to ensure the database is valid
+            conn.execute("SELECT 1", ())
+                .await
+                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+
+            Ok(path.to_string())
+        }
     }
 
     async fn get_version(&self) -> EngineResult<String> {
