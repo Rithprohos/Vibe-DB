@@ -1,5 +1,6 @@
 import { pruneTableViewStateByTabs } from "../helpers";
-import type { AppState } from "../types";
+import { getQualifiedTableName } from "@/lib/databaseObjects";
+import type { AppState, TableInfo } from "../types";
 import type { AppSet } from "./shared";
 
 type ConnectionSlice = Pick<
@@ -9,6 +10,7 @@ type ConnectionSlice = Pick<
   | "isConnected"
   | "showConnectionDialog"
   | "tablesByConnection"
+  | "pinnedTablesByConnection"
   | "selectedTable"
   | "addConnection"
   | "removeConnection"
@@ -20,8 +22,76 @@ type ConnectionSlice = Pick<
   | "setIsConnected"
   | "setShowConnectionDialog"
   | "setTables"
+  | "togglePinnedTable"
   | "setSelectedTable"
 >;
+
+export function removePinnedTablesForConnection(
+  pinnedTablesByConnection: Record<string, string[]>,
+  connectionId: string,
+): Record<string, string[]> {
+  if (!(connectionId in pinnedTablesByConnection)) {
+    return pinnedTablesByConnection;
+  }
+
+  const nextPinnedTables = { ...pinnedTablesByConnection };
+  delete nextPinnedTables[connectionId];
+  return nextPinnedTables;
+}
+
+export function togglePinnedTableForConnection(
+  pinnedTablesByConnection: Record<string, string[]>,
+  connectionId: string,
+  tableName: string,
+): Record<string, string[]> {
+  const currentPinnedTables = pinnedTablesByConnection[connectionId] ?? [];
+  const isPinned = currentPinnedTables.includes(tableName);
+  const nextPinnedTablesForConnection = isPinned
+    ? currentPinnedTables.filter((pinnedTableName) => pinnedTableName !== tableName)
+    : [...currentPinnedTables, tableName];
+
+  if (nextPinnedTablesForConnection.length === 0) {
+    return removePinnedTablesForConnection(pinnedTablesByConnection, connectionId);
+  }
+
+  return {
+    ...pinnedTablesByConnection,
+    [connectionId]: nextPinnedTablesForConnection,
+  };
+}
+
+export function prunePinnedTablesForConnection(
+  pinnedTablesByConnection: Record<string, string[]>,
+  connectionId: string,
+  tables: TableInfo[],
+): Record<string, string[]> {
+  const currentPinnedTables = pinnedTablesByConnection[connectionId];
+  if (!currentPinnedTables || currentPinnedTables.length === 0) {
+    return pinnedTablesByConnection;
+  }
+
+  const knownTableNames = new Set(
+    tables
+      .filter((table) => table.table_type === "table")
+      .map((table) => getQualifiedTableName(table)),
+  );
+  const nextPinnedTablesForConnection = currentPinnedTables.filter((tableName) =>
+    knownTableNames.has(tableName),
+  );
+
+  if (nextPinnedTablesForConnection.length === currentPinnedTables.length) {
+    return pinnedTablesByConnection;
+  }
+
+  if (nextPinnedTablesForConnection.length === 0) {
+    return removePinnedTablesForConnection(pinnedTablesByConnection, connectionId);
+  }
+
+  return {
+    ...pinnedTablesByConnection,
+    [connectionId]: nextPinnedTablesForConnection,
+  };
+}
 
 export function createConnectionSlice(set: AppSet): ConnectionSlice {
   return {
@@ -30,6 +100,7 @@ export function createConnectionSlice(set: AppSet): ConnectionSlice {
     isConnected: false,
     showConnectionDialog: false,
     tablesByConnection: {},
+    pinnedTablesByConnection: {},
     selectedTable: null,
 
     addConnection: (conn) =>
@@ -45,6 +116,10 @@ export function createConnectionSlice(set: AppSet): ConnectionSlice {
         connections: state.connections.filter((c) => c.id !== id),
         activeSidebarConnectionId:
           state.activeSidebarConnectionId === id ? null : state.activeSidebarConnectionId,
+        pinnedTablesByConnection: removePinnedTablesForConnection(
+          state.pinnedTablesByConnection,
+          id,
+        ),
       })),
 
     disconnectConnection: (id) =>
@@ -130,6 +205,20 @@ export function createConnectionSlice(set: AppSet): ConnectionSlice {
           ...state.tablesByConnection,
           [connectionId]: tables,
         },
+        pinnedTablesByConnection: prunePinnedTablesForConnection(
+          state.pinnedTablesByConnection,
+          connectionId,
+          tables,
+        ),
+      })),
+
+    togglePinnedTable: (connectionId, tableName) =>
+      set((state) => ({
+        pinnedTablesByConnection: togglePinnedTableForConnection(
+          state.pinnedTablesByConnection,
+          connectionId,
+          tableName,
+        ),
       })),
 
     setSelectedTable: (name) => set({ selectedTable: name }),

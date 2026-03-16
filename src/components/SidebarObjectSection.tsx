@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, Plus, type LucideIcon } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pin, Plus, type LucideIcon } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ interface SidebarObjectSectionProps {
   createButtonClassName?: string;
   itemIcon: LucideIcon;
   selectedItem: string | null;
+  isItemPinned?: (qualifiedName: string) => boolean;
   showSchemaBadge: boolean;
   listClassName: string;
   containerClassName?: string;
@@ -40,6 +41,7 @@ export default function SidebarObjectSection({
   createButtonClassName,
   itemIcon: ItemIcon,
   selectedItem,
+  isItemPinned,
   showSchemaBadge,
   listClassName,
   containerClassName,
@@ -108,6 +110,7 @@ export default function SidebarObjectSection({
                   const qualifiedName = getQualifiedTableName(item);
                   const schemaName = getSchemaName(item);
                   const isSelected = selectedItem === qualifiedName;
+                  const pinned = isItemPinned?.(qualifiedName) ?? false;
 
                   return (
                     <div
@@ -138,9 +141,20 @@ export default function SidebarObjectSection({
                               className={isSelected ? 'text-primary' : 'text-muted-foreground'}
                             />
                             <span className="truncate">{item.name}</span>
-                            {showSchemaBadge && schemaName && (
-                              <span className="ml-auto rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
-                                {schemaName}
+                            {(pinned || (showSchemaBadge && schemaName)) && (
+                              <span className="ml-auto flex items-center gap-1.5">
+                                {pinned && (
+                                  <Pin
+                                    size={11}
+                                    className={isSelected ? 'text-primary/90' : 'text-muted-foreground/70'}
+                                    aria-label="Pinned table"
+                                  />
+                                )}
+                                {showSchemaBadge && schemaName && (
+                                  <span className="rounded-sm border border-border/60 bg-background/70 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-muted-foreground/70">
+                                    {schemaName}
+                                  </span>
+                                )}
                               </span>
                             )}
                           </div>

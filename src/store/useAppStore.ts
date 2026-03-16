@@ -66,6 +66,7 @@ export const useAppStore = create<AppState>()(
           hasAuthToken: c.hasAuthToken,
         })),
         activeSidebarConnectionId: state.activeSidebarConnectionId,
+        pinnedTablesByConnection: state.pinnedTablesByConnection,
         tabs: state.tabs,
         activeTabId: state.activeTabId,
         savedQueries: state.savedQueries,

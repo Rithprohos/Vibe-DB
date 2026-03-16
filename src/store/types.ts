@@ -199,6 +199,7 @@ export interface AppState {
 
   // Database objects
   tablesByConnection: Record<string, TableInfo[]>;
+  pinnedTablesByConnection: Record<string, string[]>;
   selectedTable: string | null;
 
   // Tabs
@@ -268,6 +269,7 @@ export interface AppState {
   setIsConnected: (val: boolean) => void;
   setShowConnectionDialog: (val: boolean) => void;
   setTables: (connectionId: string, tables: TableInfo[]) => void;
+  togglePinnedTable: (connectionId: string, tableName: string) => void;
   setSelectedTable: (name: string | null) => void;
 
   // Tab actions
