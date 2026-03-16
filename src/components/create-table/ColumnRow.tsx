@@ -173,6 +173,7 @@ export const ColumnRow = memo(function ColumnRow({
         <TypeParameterFields
           typeValue={col.type}
           params={col.typeParams}
+          engineType={engineType}
           onChange={(typeParams) => onUpdate(col.id, { typeParams })}
           size="compact"
         />

@@ -166,7 +166,7 @@ pub fn build_create_table_sql(
             parts.push(quote_identifier(column.name.trim()));
 
             let column_type = column.col_type.trim();
-            validate_type_params(column_type, column.type_params.as_ref())?;
+            validate_type_params(dialect, column_type, column.type_params.as_ref())?;
 
             match dialect {
                 CreateTableDialect::Postgres => {
@@ -329,7 +329,11 @@ fn postgres_serial_type(column_type: &str) -> Option<&'static str> {
     }
 }
 
-fn validate_type_params(column_type: &str, type_params: Option<&TypeParams>) -> Result<(), String> {
+fn validate_type_params(
+    dialect: CreateTableDialect,
+    column_type: &str,
+    type_params: Option<&TypeParams>,
+) -> Result<(), String> {
     let type_upper = column_type.to_ascii_uppercase();
     let Some(params) = type_params else {
         return Ok(());
@@ -358,12 +362,18 @@ fn validate_type_params(column_type: &str, type_params: Option<&TypeParams>) -> 
         }
 
         if let Some(scale) = params.scale {
-            if scale < 0 {
+            if matches!(dialect, CreateTableDialect::Postgres) {
+                if !(-1000..=1000).contains(&scale) {
+                    return Err("Scale must be between -1000 and 1000".to_string());
+                }
+            } else if scale < 0 {
                 return Err("Scale cannot be negative".to_string());
             }
-            if let Some(precision) = params.precision {
-                if scale > precision {
-                    return Err("Scale cannot exceed precision".to_string());
+            if !matches!(dialect, CreateTableDialect::Postgres) {
+                if let Some(precision) = params.precision {
+                    if scale > precision {
+                        return Err("Scale cannot exceed precision".to_string());
+                    }
                 }
             }
         }
@@ -406,9 +416,7 @@ fn format_column_type(column_type: &str, type_params: Option<&TypeParams>) -> St
         if let Some(precision) = params.precision {
             if precision > 0 {
                 if let Some(scale) = params.scale {
-                    if scale >= 0 {
-                        return format!("{}({},{})", column_type, precision, scale);
-                    }
+                    return format!("{}({},{})", column_type, precision, scale);
                 }
                 return format!("{}({})", column_type, precision);
             }

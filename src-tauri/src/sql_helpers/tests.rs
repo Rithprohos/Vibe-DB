@@ -1117,7 +1117,77 @@ fn build_create_table_sql_numeric_with_precision_only() {
 }
 
 #[test]
-fn build_create_table_sql_rejects_scale_greater_than_precision() {
+fn build_create_table_sql_postgres_allows_scale_greater_than_precision() {
+    let columns = vec![CreateTableColumnInput {
+        name: "price".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(4),
+            scale: Some(5),
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "products".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        None,
+        None,
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("NUMERIC(4,5)"),
+        "PostgreSQL should allow scale greater than precision. Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_postgres_allows_negative_numeric_scale() {
+    let columns = vec![CreateTableColumnInput {
+        name: "price".to_string(),
+        col_type: "NUMERIC".to_string(),
+        type_params: Some(TypeParams {
+            length: None,
+            precision: Some(4),
+            scale: Some(-2),
+        }),
+        primary_key: false,
+        auto_increment: false,
+        not_null: false,
+        unique: false,
+        default_option: "none".to_string(),
+        default_value: "".to_string(),
+    }];
+
+    let sql = build_create_table_sql(
+        "products".to_string(),
+        columns,
+        false,
+        Some("postgres".to_string()),
+        None,
+        None,
+    )
+    .expect("expected SQL");
+
+    assert!(
+        sql.contains("NUMERIC(4,-2)"),
+        "PostgreSQL should allow negative numeric scale. Got: {}",
+        sql
+    );
+}
+
+#[test]
+fn build_create_table_sql_sqlite_rejects_scale_greater_than_precision() {
     let columns = vec![CreateTableColumnInput {
         name: "price".to_string(),
         col_type: "NUMERIC".to_string(),
@@ -1138,7 +1208,7 @@ fn build_create_table_sql_rejects_scale_greater_than_precision() {
         "products".to_string(),
         columns,
         false,
-        Some("postgres".to_string()),
+        Some("sqlite".to_string()),
         None,
         None,
     )

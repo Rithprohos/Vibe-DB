@@ -3,7 +3,9 @@ import type { ChangeEvent } from 'react';
 import {
   getTypeParamConfig,
   normalizeTypeParams,
+  supportsExtendedPostgresNumericScale,
   validateTypeParams,
+  type SupportedEngine,
   type TypeParams,
 } from '../lib/createTableConstants';
 import { Input } from '@/components/ui/input';
@@ -13,6 +15,7 @@ interface Props {
   typeValue: string;
   params?: TypeParams;
   onChange: (params: TypeParams | undefined) => void;
+  engineType?: SupportedEngine;
   size?: 'compact' | 'default';
 }
 
@@ -30,6 +33,7 @@ export function TypeParameterFields({
   typeValue,
   params,
   onChange,
+  engineType = 'sqlite',
   size = 'default',
 }: Props) {
   const config = useMemo(() => getTypeParamConfig(typeValue), [typeValue]);
@@ -38,8 +42,12 @@ export function TypeParameterFields({
     [typeValue, params],
   );
   const error = useMemo(
-    () => validateTypeParams(typeValue, normalizedParams),
-    [typeValue, normalizedParams],
+    () => validateTypeParams(typeValue, normalizedParams, engineType),
+    [engineType, typeValue, normalizedParams],
+  );
+  const allowsNegativeScale = useMemo(
+    () => supportsExtendedPostgresNumericScale(typeValue, engineType),
+    [engineType, typeValue],
   );
 
   const updateParams = useCallback(
@@ -78,6 +86,8 @@ export function TypeParameterFields({
     size === 'compact'
       ? 'h-6 bg-transparent border-border/50 px-1.5 text-center text-xs'
       : 'h-8 bg-transparent border-border/60 px-2 text-center text-xs';
+  const numberInputClassName =
+    '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 
   const errorClassName = error ? 'border-destructive/50' : '';
 
@@ -94,7 +104,12 @@ export function TypeParameterFields({
               placeholder="255"
               value={normalizedParams?.length ?? ''}
               onChange={handleLengthChange}
-              className={cn(commonClassName, size === 'compact' ? 'w-16' : 'w-20', errorClassName)}
+              className={cn(
+                commonClassName,
+                numberInputClassName,
+                size === 'compact' ? 'w-16' : 'w-20',
+                errorClassName,
+              )}
               aria-label={`${typeValue} length`}
             />
             <span className="text-[10px] text-muted-foreground">)</span>
@@ -111,19 +126,29 @@ export function TypeParameterFields({
               title="Precision"
               value={normalizedParams?.precision ?? ''}
               onChange={handlePrecisionChange}
-              className={cn(commonClassName, size === 'compact' ? 'w-12' : 'w-16', errorClassName)}
+              className={cn(
+                commonClassName,
+                numberInputClassName,
+                size === 'compact' ? 'w-12' : 'w-16',
+                errorClassName,
+              )}
               aria-label={`${typeValue} precision`}
             />
             <span className="text-[10px] text-muted-foreground">,</span>
             <Input
               type="number"
-              min={0}
+              min={allowsNegativeScale ? -1000 : 0}
               max={1000}
               placeholder="s"
               title="Scale"
               value={normalizedParams?.scale ?? ''}
               onChange={handleScaleChange}
-              className={cn(commonClassName, size === 'compact' ? 'w-12' : 'w-16', errorClassName)}
+              className={cn(
+                commonClassName,
+                numberInputClassName,
+                size === 'compact' ? 'w-12' : 'w-16',
+                errorClassName,
+              )}
               aria-label={`${typeValue} scale`}
             />
             <span className="text-[10px] text-muted-foreground">)</span>
@@ -140,7 +165,12 @@ export function TypeParameterFields({
               title="Precision (0-6)"
               value={normalizedParams?.precision ?? ''}
               onChange={handlePrecisionChange}
-              className={cn(commonClassName, size === 'compact' ? 'w-14' : 'w-20', errorClassName)}
+              className={cn(
+                commonClassName,
+                numberInputClassName,
+                size === 'compact' ? 'w-14' : 'w-20',
+                errorClassName,
+              )}
               aria-label={`${typeValue} precision`}
             />
             <span className="text-[10px] text-muted-foreground">)</span>

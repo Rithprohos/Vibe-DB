@@ -494,7 +494,7 @@ export function formatTypeWithParams(typeValue: string, params?: TypeParams): st
       break;
     case 'precision-scale':
       if (normalizedParams.precision !== undefined && normalizedParams.precision > 0) {
-        if (normalizedParams.scale !== undefined && normalizedParams.scale >= 0) {
+        if (normalizedParams.scale !== undefined) {
           return `${typeValue}(${normalizedParams.precision},${normalizedParams.scale})`;
         }
         return `${typeValue}(${normalizedParams.precision})`;
@@ -507,6 +507,18 @@ export function formatTypeWithParams(typeValue: string, params?: TypeParams): st
       break;
   }
   return typeValue;
+}
+
+function isNumericType(typeValue: string): boolean {
+  const normalized = typeValue.trim().toUpperCase();
+  return normalized === 'NUMERIC' || normalized === 'DECIMAL';
+}
+
+export function supportsExtendedPostgresNumericScale(
+  typeValue: string,
+  engine: SupportedEngine,
+): boolean {
+  return engine === 'postgres' && isNumericType(typeValue);
 }
 
 /** Create a new empty foreign key constraint */
@@ -547,7 +559,11 @@ export const FK_ACTION_OPTIONS: { value: ForeignKeyConstraint['onDelete']; label
 ];
 
 /** Validate type parameters. */
-export function validateTypeParams(typeValue: string, params?: TypeParams): string | null {
+export function validateTypeParams(
+  typeValue: string,
+  params?: TypeParams,
+  engine: SupportedEngine = 'sqlite',
+): string | null {
   const config = getTypeParamConfig(typeValue);
   const normalizedParams = normalizeTypeParams(typeValue, params);
   if (!config?.supportsParams || !normalizedParams) {
@@ -575,10 +591,21 @@ export function validateTypeParams(typeValue: string, params?: TypeParams): stri
         }
       }
       if (normalizedParams.scale !== undefined) {
-        if (normalizedParams.scale < 0) {
+        const supportsExtendedScale = supportsExtendedPostgresNumericScale(
+          typeValue,
+          engine,
+        );
+        if (
+          supportsExtendedScale &&
+          (normalizedParams.scale < -1000 || normalizedParams.scale > 1000)
+        ) {
+          return 'Scale must be between -1000 and 1000';
+        }
+        if (!supportsExtendedScale && normalizedParams.scale < 0) {
           return 'Scale cannot be negative';
         }
         if (
+          !supportsExtendedScale &&
           normalizedParams.precision !== undefined &&
           normalizedParams.scale > normalizedParams.precision
         ) {

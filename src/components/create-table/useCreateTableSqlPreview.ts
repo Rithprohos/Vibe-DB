@@ -9,7 +9,7 @@ import type {
 } from '../../lib/createTableConstants';
 import {
   getInvalidColumnNameError,
-  getInvalidTypeParamsError,
+  getInvalidTypeParamsErrorForEngine,
 } from './validation';
 
 interface UseCreateTableSqlPreviewInput {
@@ -57,7 +57,7 @@ export function useCreateTableSqlPreview({
       setSql('');
       return;
     }
-    if (getInvalidTypeParamsError(columns)) {
+    if (getInvalidTypeParamsErrorForEngine(columns, engineType)) {
       setSql('');
       return;
     }

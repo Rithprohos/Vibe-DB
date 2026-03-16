@@ -31,7 +31,7 @@ import {
 import { useCreateTableSqlPreview } from './create-table/useCreateTableSqlPreview';
 import {
   getInvalidColumnNameError,
-  getInvalidTypeParamsError,
+  getInvalidTypeParamsErrorForEngine,
   getLiveColumnNameErrors,
   getLiveConstraintError,
 } from './create-table/validation';
@@ -136,7 +136,10 @@ export default function CreateTable({ tabId }: Props) {
     return validateTableName(tableName);
   }, [tableName]);
   const liveColumnNameErrors = useMemo(() => getLiveColumnNameErrors(columns), [columns]);
-  const liveTypeParamsError = useMemo(() => getInvalidTypeParamsError(columns), [columns]);
+  const liveTypeParamsError = useMemo(
+    () => getInvalidTypeParamsErrorForEngine(columns, engineType),
+    [columns, engineType],
+  );
   const liveConstraintError = useMemo(
     () =>
       getLiveConstraintError({
