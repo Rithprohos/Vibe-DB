@@ -42,10 +42,6 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 [target.'cfg(not(windows))'.dependencies]
 libsql = "0.9.5"
 
-[target.'cfg(windows)'.dependencies]
-# Avoid duplicate SQLite symbol linkage with sqlx on Windows.
-libsql = { version = "0.9.5", default-features = false, features = ["remote", "tls"] }
-
 [dev-dependencies]
 tokio-test = "0.4"
 

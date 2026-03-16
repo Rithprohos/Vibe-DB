@@ -3,6 +3,10 @@ mod row_decode;
 mod safety;
 pub mod sqlite;
 mod traits;
+#[cfg(not(windows))]
+pub mod turso;
+#[cfg(windows)]
+#[path = "turso_stub.rs"]
 pub mod turso;
 pub mod types;
 
