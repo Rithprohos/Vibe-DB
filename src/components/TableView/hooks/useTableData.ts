@@ -1,6 +1,10 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import {
+  TABLE_TRANSFER_IMPORTED_EVENT,
+} from "@/features/table-transfer/constants";
+import type { TableTransferImportedDetail } from "@/features/table-transfer/types";
+import {
   getTableData,
   getTableRowCount,
   getTableStructure,
@@ -14,6 +18,9 @@ export const useTableData = (tableName: string, tabId: string) => {
     [tabId],
   );
   const tab = useAppStore((s) => s.tabs.find((t) => t.id === tabId));
+  const appliedFilterState = useAppStore(
+    (s) => s.tableViewStateByTabId[tabId]?.appliedFilters ?? [],
+  );
   const activeConnection = useAppStore((s) =>
     s.connections.find((c) => c.id === tab?.connectionId),
   );
@@ -143,6 +150,46 @@ export const useTableData = (tableName: string, tabId: string) => {
     sortCol,
     sortDir,
     updateTableViewState,
+  ]);
+
+  useEffect(() => {
+    if (!activeConnection?.id || !activeConnection?.connId) {
+      return;
+    }
+
+    const handleImported = (event: Event) => {
+      const detail = (event as CustomEvent<TableTransferImportedDetail>).detail;
+      if (
+        detail.connectionId !== activeConnection.id ||
+        detail.tableName !== tableName
+      ) {
+        return;
+      }
+
+      const currentFilters = appliedFilterState.map((filter) => ({
+        field: filter.field,
+        operator: filter.operator,
+        value: filter.value,
+        valueTo: filter.valueTo,
+      }));
+
+      void Promise.all([fetchStructure(), fetchRowCount(currentFilters)]).then(() =>
+        fetchData(currentFilters),
+      );
+    };
+
+    window.addEventListener(TABLE_TRANSFER_IMPORTED_EVENT, handleImported);
+    return () => {
+      window.removeEventListener(TABLE_TRANSFER_IMPORTED_EVENT, handleImported);
+    };
+  }, [
+    activeConnection?.connId,
+    activeConnection?.id,
+    appliedFilterState,
+    fetchData,
+    fetchRowCount,
+    fetchStructure,
+    tableName,
   ]);
 
   return {

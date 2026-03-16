@@ -91,6 +91,12 @@ export interface TableViewState {
   selectedRowIndex: number | null;
 }
 
+export interface PersistedTableTransferContext {
+  appliedFilters: TableFilterCondition[];
+  sortCol: string | null;
+  sortDir: "ASC" | "DESC";
+}
+
 export interface VisualizationPoint {
   x: number;
   y: number;
@@ -206,6 +212,7 @@ export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   tableViewStateByTabId: Record<string, TableViewState>;
+  tableTransferContextByKey: Record<string, PersistedTableTransferContext>;
   visualizationStateByTabId: Record<string, VisualizationState>;
 
   // Logs

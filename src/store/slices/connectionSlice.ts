@@ -26,6 +26,22 @@ type ConnectionSlice = Pick<
   | "setSelectedTable"
 >;
 
+export function removeTableTransferContextForConnection(
+  tableTransferContextByKey: AppState["tableTransferContextByKey"],
+  connectionId: string,
+): AppState["tableTransferContextByKey"] {
+  const keyPrefix = `${connectionId}:`;
+  const nextEntries = Object.entries(tableTransferContextByKey).filter(
+    ([key]) => !key.startsWith(keyPrefix),
+  );
+
+  if (nextEntries.length === Object.keys(tableTransferContextByKey).length) {
+    return tableTransferContextByKey;
+  }
+
+  return Object.fromEntries(nextEntries);
+}
+
 export function removePinnedTablesForConnection(
   pinnedTablesByConnection: Record<string, string[]>,
   connectionId: string,
@@ -118,6 +134,10 @@ export function createConnectionSlice(set: AppSet): ConnectionSlice {
           state.activeSidebarConnectionId === id ? null : state.activeSidebarConnectionId,
         pinnedTablesByConnection: removePinnedTablesForConnection(
           state.pinnedTablesByConnection,
+          id,
+        ),
+        tableTransferContextByKey: removeTableTransferContextForConnection(
+          state.tableTransferContextByKey,
           id,
         ),
       })),
