@@ -29,6 +29,7 @@ export interface ColumnInfo {
   cid: number;
   name: string;
   col_type: string;
+  enum_values?: string[] | null;
   notnull: boolean | number;
   dflt_value: string | null;
   pk: boolean | number;

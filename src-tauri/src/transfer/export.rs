@@ -105,6 +105,7 @@ mod tests {
             cid: 0,
             name: name.to_string(),
             col_type: col_type.to_string(),
+            enum_values: None,
             notnull: false,
             dflt_value: None,
             pk: false,

@@ -3,6 +3,13 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { DateTimePicker } from '../ui/DateTimePicker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 
 export const NewRowTextInput = ({ 
   value, 
@@ -87,5 +94,91 @@ export const NewRowDateInput = ({ value, onChange, placeholder }: { value: strin
         />
       </PopoverContent>
     </Popover>
+  );
+};
+
+const DEFAULT_SENTINEL = '__new_row_default__';
+const NULL_SENTINEL = '__new_row_null__';
+
+export const NewRowEnumInput = ({
+  value,
+  onChange,
+  onKeyDown,
+  options,
+  placeholder,
+  disabled,
+  autoFocus,
+  allowNull,
+  allowDefault,
+}: {
+  value: string,
+  onChange: (val: string) => void,
+  onKeyDown?: (e: React.KeyboardEvent<HTMLButtonElement>) => void,
+  options: string[],
+  placeholder: string,
+  disabled?: boolean,
+  autoFocus?: boolean,
+  allowNull?: boolean,
+  allowDefault?: boolean,
+}) => {
+  const [open, setOpen] = useState(false);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (autoFocus) {
+      triggerRef.current?.focus();
+    }
+  }, [autoFocus]);
+
+  const isKeyword = value === 'DEFAULT' || value === 'NULL';
+  const selectValue =
+    value === 'DEFAULT' && allowDefault
+      ? DEFAULT_SENTINEL
+      : value === 'NULL' && allowNull
+        ? NULL_SENTINEL
+        : value || undefined;
+
+  return (
+    <Select
+      open={open}
+      onOpenChange={setOpen}
+      value={selectValue}
+      onValueChange={(nextValue) => {
+        if (nextValue === DEFAULT_SENTINEL) {
+          onChange('DEFAULT');
+          return;
+        }
+        if (nextValue === NULL_SENTINEL) {
+          onChange('NULL');
+          return;
+        }
+        onChange(nextValue);
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        ref={triggerRef}
+        className={cn(
+          'h-full min-h-[32px] rounded-none border-0 bg-transparent px-2 py-1.5 text-sm font-mono shadow-none focus:ring-1 focus:ring-inset focus:ring-primary',
+          isKeyword ? 'text-primary/70 italic font-bold' : 'text-foreground',
+        )}
+        onKeyDown={onKeyDown}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="font-mono">
+        {allowDefault && (
+          <SelectItem value={DEFAULT_SENTINEL}>DEFAULT</SelectItem>
+        )}
+        {allowNull && (
+          <SelectItem value={NULL_SENTINEL}>NULL</SelectItem>
+        )}
+        {options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {option}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 };

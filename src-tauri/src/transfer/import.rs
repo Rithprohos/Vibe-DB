@@ -143,6 +143,7 @@ mod tests {
             cid: 0,
             name: name.to_string(),
             col_type: "TEXT".to_string(),
+            enum_values: None,
             notnull,
             dflt_value: default.map(str::to_string),
             pk,

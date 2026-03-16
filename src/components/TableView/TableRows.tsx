@@ -7,6 +7,7 @@ import type { ColumnInfo } from '@/store/useAppStore';
 import { CellInput } from './CellInput';
 import type { EditingCellState } from './types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { isEnumColumn } from '@/lib/sql/columnTypes';
 
 interface VirtualCellProps {
   colName: string;
@@ -17,6 +18,8 @@ interface VirtualCellProps {
   isEditing: boolean;
   isRowNum: boolean;
   isDateCol: boolean;
+  enumOptions: string[];
+  allowNull: boolean;
   isRowChecked: boolean;
   hasActiveEditingCell: boolean;
   editValue: string;
@@ -38,6 +41,8 @@ const VirtualCell = memo(function VirtualCell({
   isEditing,
   isRowNum,
   isDateCol,
+  enumOptions,
+  allowNull,
   isRowChecked,
   hasActiveEditingCell,
   editValue,
@@ -88,7 +93,9 @@ const VirtualCell = memo(function VirtualCell({
           onSave={(val) => onSaveCell(rowIndex, colName, val)}
           onCancel={onCancelEdit}
           disabled={saving}
-          inputType={isDateCol ? 'date' : 'text'}
+          inputType={isDateCol ? 'date' : enumOptions.length > 0 ? 'enum' : 'text'}
+          enumOptions={enumOptions}
+          allowNull={allowNull}
         />
       ) : (
         <div
@@ -182,6 +189,8 @@ export const VirtualRow = memo(function VirtualRow({
         const columnInfo = columnInfoByName[colName];
         const colType = columnInfo?.col_type.toLowerCase() || 'text';
         const isDateCol = colType.includes('date') || colType.includes('time');
+        const enumOptions = isEnumColumn(columnInfo) ? columnInfo?.enum_values ?? [] : [];
+        const allowNull = !columnInfo?.notnull;
 
         return (
           <VirtualCell
@@ -194,6 +203,8 @@ export const VirtualRow = memo(function VirtualRow({
             isEditing={isEditing}
             isRowNum={colName === 'rowNum'}
             isDateCol={isDateCol}
+            enumOptions={enumOptions}
+            allowNull={allowNull}
             isRowChecked={isChecked}
             hasActiveEditingCell={Boolean(editingCell)}
             editValue={editValue}

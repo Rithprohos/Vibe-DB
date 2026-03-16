@@ -203,6 +203,7 @@ impl DatabaseEngine for SqliteEngine {
                     cid: row_decode::decode_sqlite_i64(row, "cid")?,
                     name: row.get("name"),
                     col_type: row.get("type"),
+                    enum_values: None,
                     notnull: row.get::<i32, _>("notnull") != 0,
                     dflt_value: row.get("dflt_value"),
                     pk: row.get::<i32, _>("pk") != 0,

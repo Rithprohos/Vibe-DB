@@ -253,10 +253,10 @@ export const useCellEditing = (
       }
 
       await updateRows(tableName, rowUpdates, activeConnection.connId);
-      setPendingEdits({});
       setEditingCell(null);
       setEditValue("");
       await fetchData();
+      setPendingEdits({});
       return true;
     } catch (errorValue: unknown) {
       setError(
