@@ -5,9 +5,18 @@ use crate::query_guard::{
     QueryExecutionSurface, QueryPolicyDecision, blocked_message, evaluate_query_policy,
 };
 use crate::sql_logging::emit_sql_log;
+use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecuteQueryResponse {
+    #[serde(flatten)]
+    pub result: QueryResult,
+    pub duration_ms: f64,
+}
 
 /// Executes a SQL query.
 #[tauri::command]
@@ -17,7 +26,7 @@ pub async fn execute_query(
     conn_id: Option<String>,
     query: String,
     surface: QueryExecutionSurface,
-) -> Result<QueryResult, String> {
+) -> Result<ExecuteQueryResponse, String> {
     let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let connection_tag = state
@@ -48,14 +57,18 @@ pub async fn execute_query(
 
     match engine.execute_query(&query).await {
         Ok(result) => {
+            let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
             emit_sql_log(
                 &app,
                 query,
                 "success",
-                start.elapsed().as_secs_f64() * 1000.0,
+                duration_ms,
                 result.message.clone(),
             );
-            Ok(result)
+            Ok(ExecuteQueryResponse {
+                result,
+                duration_ms,
+            })
         }
         Err(error) => {
             let message = error.to_string();

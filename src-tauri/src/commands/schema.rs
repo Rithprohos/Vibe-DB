@@ -1,12 +1,12 @@
 use crate::app_state::AppState;
 use crate::commands::get_connection_id;
-use crate::engines::{TableInfo, TableStructure};
+use crate::engines::{QueryResult, TableInfo, TableStructure};
 use crate::sql_helpers::{
     FilterConditionInput, build_where_clause, extract_count, normalize_order_dir, quote_identifier,
     quote_qualified_identifier,
 };
 use crate::sql_logging::emit_sql_log;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
@@ -21,6 +21,14 @@ pub struct TruncateTableOptions {
     /// Whether to cascade to foreign key references (PostgreSQL only).
     #[serde(default)]
     pub cascade: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetTableDataResponse {
+    #[serde(flatten)]
+    pub result: QueryResult,
+    pub duration_ms: f64,
 }
 
 /// Lists all tables in the database.
@@ -176,7 +184,7 @@ pub async fn get_table_data(
     order_by: Option<String>,
     order_dir: Option<String>,
     filters: Option<Vec<FilterConditionInput>>,
-) -> Result<crate::engines::QueryResult, String> {
+) -> Result<GetTableDataResponse, String> {
     let start = Instant::now();
     let id = get_connection_id(&state, conn_id).await?;
     let engine = state
@@ -219,6 +227,7 @@ pub async fn get_table_data(
 
     match engine.execute_query(&query).await {
         Ok(result) => {
+            let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
             let message = format!(
                 "{} row(s) fetched{}",
                 result.rows.len(),
@@ -228,10 +237,13 @@ pub async fn get_table_data(
                 &app,
                 query,
                 "success",
-                start.elapsed().as_secs_f64() * 1000.0,
+                duration_ms,
                 message,
             );
-            Ok(result)
+            Ok(GetTableDataResponse {
+                result,
+                duration_ms,
+            })
         }
         Err(error) => {
             let message = error.to_string();

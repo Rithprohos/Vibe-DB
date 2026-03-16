@@ -282,6 +282,28 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
     () => (selectedRowIndex !== null ? tableData[selectedRowIndex] ?? null : null),
     [selectedRowIndex, tableData],
   );
+  const tableQueryDurationMs = data?.durationMs;
+  const tableQueryDurationLabel = useMemo(() => {
+    if (tableQueryDurationMs == null || Number.isNaN(tableQueryDurationMs)) {
+      return null;
+    }
+    if (tableQueryDurationMs < 1000) {
+      return `${Math.round(tableQueryDurationMs)}ms`;
+    }
+    return `${(tableQueryDurationMs / 1000).toFixed(2)}s`;
+  }, [tableQueryDurationMs]);
+  const tableQueryDurationToneClass = useMemo(() => {
+    if (tableQueryDurationMs == null || Number.isNaN(tableQueryDurationMs)) {
+      return "border-border/60 text-foreground/70";
+    }
+    if (tableQueryDurationMs < 200) {
+      return "border-border/60 text-foreground/70";
+    }
+    if (tableQueryDurationMs <= 800) {
+      return "border-amber-500/35 text-amber-500";
+    }
+    return "border-destructive/35 text-destructive";
+  }, [tableQueryDurationMs]);
 
   useEffect(() => {
     updateTableViewState(tabId, {
@@ -1009,12 +1031,20 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
       {/* Footer Info */}
       <div className="p-1 px-3 border-t border-border bg-muted/30 flex items-center justify-between text-[10px] text-muted-foreground/50 font-mono uppercase tracking-widest">
         <div className="flex items-center space-x-3">
-          <div className="flex items-center">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 mr-2 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
-            Connected
-          </div>
-          <div className="h-2 w-px bg-border/50" />
           <span>{tableName}</span>
+          {tableQueryDurationLabel && (
+            <div className="flex items-center space-x-1.5">
+              <span>Query time</span>
+              <span
+                className={cn(
+                  "rounded-sm border bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums tracking-normal leading-none",
+                  tableQueryDurationToneClass,
+                )}
+              >
+                {tableQueryDurationLabel}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">

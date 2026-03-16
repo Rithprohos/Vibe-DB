@@ -58,6 +58,7 @@ export interface QueryResult {
   rows: any[][];
   rows_affected: number;
   message: string;
+  durationMs?: number;
 }
 
 export interface QueryResultLight {
