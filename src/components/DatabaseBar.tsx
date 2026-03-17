@@ -23,10 +23,10 @@ const selectors = {
 };
 
 const TAG_STYLES: Record<NonNullable<Connection['tag']>, string> = {
-  local: 'border-emerald-500/30 bg-emerald-500/12 text-emerald-300',
-  testing: 'border-amber-500/30 bg-amber-500/12 text-amber-300',
-  development: 'border-sky-500/30 bg-sky-500/12 text-sky-300',
-  production: 'border-rose-500/35 bg-rose-500/12 text-rose-300',
+  local: 'bg-emerald-500/14 text-emerald-300',
+  testing: 'bg-amber-500/14 text-amber-300',
+  development: 'bg-sky-500/14 text-sky-300',
+  production: 'bg-rose-500/14 text-rose-300',
 };
 
 function getConnectionTypeIcon(type: Connection['type'], className: string) {
@@ -74,14 +74,15 @@ export default function DatabaseBar() {
 
   return (
     <div
-      className="relative z-10 hidden-scrollbar flex w-[76px] shrink-0 select-none flex-col items-center gap-1.5 overflow-y-auto border-r border-border/35 bg-background px-1.5 py-2"
+      className="relative z-10 hidden-scrollbar flex w-[76px] shrink-0 select-none flex-col items-center gap-1.5 overflow-y-auto bg-background px-2 py-2.5"
       style={{
         backgroundImage:
-          'radial-gradient(circle at top, rgba(var(--glow-color), 0.08), transparent 30%), linear-gradient(180deg, rgba(var(--glow-color), 0.025), transparent 22%)',
+          'radial-gradient(circle at top, rgba(var(--glow-color), 0.07), transparent 30%), linear-gradient(180deg, rgba(var(--glow-color), 0.02), transparent 22%)',
       }}
     >
-      <div className="w-full px-1 pb-0.5">
-        <div className="rounded-sm border border-border/35 bg-background/70 px-1.5 py-1 text-center text-[8px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75 shadow-sm shadow-black/10">
+      <div className="pointer-events-none absolute inset-y-3 right-0 w-px bg-gradient-to-b from-transparent via-border/55 to-transparent" />
+      <div className="w-full px-1 pb-1">
+        <div className="text-center text-[8px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/65">
           DBs
         </div>
       </div>
@@ -94,34 +95,33 @@ export default function DatabaseBar() {
                   <button
                     onClick={() => handleConnectionClick(conn)}
                     className={cn(
-                      'group relative w-full overflow-hidden rounded-md border px-1.5 py-2 text-left transition-all duration-200',
+                      'group relative w-full overflow-hidden rounded-md px-1.5 py-2.5 text-left transition-all duration-200',
                       activeSidebarConnectionId === conn.id
-                        ? 'border-primary/25 bg-background/85 text-foreground shadow-[0_0_0_1px_rgba(var(--glow-color),0.08),0_14px_24px_rgba(0,0,0,0.22)]'
-                        : 'border-border/30 bg-background/60 text-muted-foreground hover:border-primary/18 hover:bg-background/78 hover:text-foreground',
+                        ? 'bg-[linear-gradient(180deg,rgba(var(--glow-color),0.16),rgba(var(--glow-color),0.04)_100%)] text-foreground shadow-[0_14px_24px_rgba(0,0,0,0.2)]'
+                        : 'bg-background/36 text-muted-foreground hover:bg-background/62 hover:text-foreground',
                     )}
                   >
                     <div
                       className={cn(
                         'absolute inset-0 opacity-0 transition-opacity duration-200',
                         activeSidebarConnectionId === conn.id
-                          ? 'bg-[radial-gradient(circle_at_top,rgba(var(--glow-color),0.16),transparent_55%)] opacity-100'
-                          : 'bg-[radial-gradient(circle_at_top,rgba(var(--glow-color),0.12),transparent_58%)] group-hover:opacity-100',
+                          ? 'bg-[radial-gradient(circle_at_top,rgba(var(--glow-color),0.18),transparent_58%)] opacity-100'
+                          : 'bg-[radial-gradient(circle_at_top,rgba(var(--glow-color),0.1),transparent_60%)] group-hover:opacity-100',
                       )}
                     />
                     {activeSidebarConnectionId === conn.id && (
                       <>
-                        <div className="absolute inset-y-2 left-0 w-0.5 bg-primary" />
-                        <div className="absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+                        <div className="absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
                       </>
                     )}
 
                     <div className="relative flex flex-col items-center gap-1.5">
                       <div
                         className={cn(
-                          'flex h-10 w-10 items-center justify-center rounded-md border transition-all duration-200',
+                          'flex h-10 w-10 items-center justify-center rounded-sm transition-all duration-200',
                           activeSidebarConnectionId === conn.id
-                            ? 'border-primary/22 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
-                            : 'border-border/30 bg-background/88 text-muted-foreground shadow-sm shadow-black/10 group-hover:border-primary/18 group-hover:text-primary',
+                            ? 'bg-primary/12 text-primary shadow-[0_8px_18px_rgba(var(--glow-color),0.18)]'
+                            : 'bg-background/78 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] group-hover:bg-background/88 group-hover:text-primary',
                         )}
                       >
                         {getConnectionTypeIcon(
@@ -140,7 +140,7 @@ export default function DatabaseBar() {
                         {conn.tag && (
                           <span
                             className={cn(
-                              'inline-flex max-w-full items-center rounded-sm border px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em]',
+                              'inline-flex max-w-full items-center rounded-sm px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em]',
                               TAG_STYLES[conn.tag],
                             )}
                           >
@@ -190,10 +190,10 @@ export default function DatabaseBar() {
           <TooltipTrigger asChild>
             <button
               onClick={handleShowConnectionDialog}
-              className="group mt-0.5 w-full rounded-md border border-dashed border-border/35 bg-background/55 px-1.5 py-2 text-muted-foreground transition-all duration-200 hover:border-primary/22 hover:bg-background/78 hover:text-foreground"
+              className="group mt-0.5 w-full rounded-md bg-background/30 px-1.5 py-2.5 text-muted-foreground transition-all duration-200 hover:bg-background/56 hover:text-foreground"
             >
               <div className="flex flex-col items-center gap-1.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border/30 bg-background/88 shadow-sm shadow-black/10 transition-colors group-hover:border-primary/18 group-hover:text-primary">
+                <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-background/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors group-hover:bg-background/92 group-hover:text-primary">
                   <Plus size={18} className="group-hover:scale-110 transition-transform" />
                 </div>
                 <span className="text-[9px] font-medium uppercase tracking-[0.16em]">New</span>
