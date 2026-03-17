@@ -36,18 +36,24 @@ import { FIELD_ERROR_CLASS, FORM_FIELD_CLASS } from './shared';
 interface EditTableHeaderProps {
   currentTableName: string;
   loadingColumns: boolean;
+  isAnyBusyAction: boolean;
+  hasConnection: boolean;
   columns: ColumnInfo[];
   indexes: IndexInfo[];
   connectionName?: string;
+  engineTypeLabel: string;
   onRefresh: () => void;
 }
 
 export function EditTableHeader({
   currentTableName,
   loadingColumns,
+  isAnyBusyAction,
+  hasConnection,
   columns,
   indexes,
   connectionName,
+  engineTypeLabel,
   onRefresh,
 }: EditTableHeaderProps) {
   return (
@@ -75,10 +81,10 @@ export function EditTableHeader({
             variant="outline"
             size="sm"
             onClick={onRefresh}
-            disabled={loadingColumns}
+            disabled={loadingColumns || isAnyBusyAction || !hasConnection}
             className="border-border/60 bg-background/40 text-xs"
           >
-            {loadingColumns ? (
+            {loadingColumns || isAnyBusyAction ? (
               <Loader2 size={12} className="mr-1.5 animate-spin" />
             ) : (
               <RefreshCw size={12} className="mr-1.5" />
@@ -88,7 +94,7 @@ export function EditTableHeader({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 px-4 py-3 text-[11px] md:grid-cols-5 md:px-5">
+      <div className="grid grid-cols-2 gap-3 px-4 py-3 text-[11px] md:grid-cols-6 md:px-5">
         <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
           <div className="text-muted-foreground">Columns</div>
           <div className="mt-1 font-mono text-foreground">{columns.length}</div>
@@ -108,6 +114,10 @@ export function EditTableHeader({
         <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
           <div className="text-muted-foreground">Indexes</div>
           <div className="mt-1 font-mono text-foreground">{indexes.length}</div>
+        </div>
+        <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
+          <div className="text-muted-foreground">Engine</div>
+          <div className="mt-1 truncate font-mono text-foreground">{engineTypeLabel}</div>
         </div>
         <div className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
           <div className="text-muted-foreground">Connection</div>
@@ -140,10 +150,12 @@ export function EditTableErrorBanner({ error }: EditTableErrorBannerProps) {
 
 interface EditTableOperationsPanelProps {
   loadingColumns: boolean;
+  isAnyBusyAction: boolean;
+  operationsEnabled: boolean;
   isBusy: (action: string) => boolean;
   columns: ColumnInfo[];
   manageableIndexes: IndexInfo[];
-  currentTableName: string;
+  currentTableBaseName: string;
   engineType: SupportedEngine;
   engineTypeLabel: string;
   engineDataTypes: readonly SqliteType[];
@@ -194,10 +206,12 @@ interface EditTableOperationsPanelProps {
 
 export function EditTableOperationsPanel({
   loadingColumns,
+  isAnyBusyAction,
+  operationsEnabled,
   isBusy,
   columns,
   manageableIndexes,
-  currentTableName,
+  currentTableBaseName,
   engineType,
   engineTypeLabel,
   engineDataTypes,
@@ -245,9 +259,15 @@ export function EditTableOperationsPanel({
   onDropConfirmChange,
   onDropColumn,
 }: EditTableOperationsPanelProps) {
+  const sectionClass =
+    'rounded-lg border border-border/80 bg-surface/25 p-4 shadow-sm backdrop-blur-sm transition-colors hover:border-border';
+  const dangerSectionClass =
+    'rounded-lg border border-destructive/35 bg-destructive/5 p-4 shadow-sm backdrop-blur-sm transition-colors hover:border-destructive/55';
+  const controlsDisabled = loadingColumns || isAnyBusyAction || !operationsEnabled;
+
   return (
     <div className="space-y-4">
-      <section className="rounded-md border border-border bg-surface/20 p-4">
+      <section className={sectionClass}>
         <div className="mb-3 flex items-center gap-2">
           <Table2 size={14} className="text-primary" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -259,15 +279,16 @@ export function EditTableOperationsPanel({
             value={nextTableName}
             onChange={(e) => onNextTableNameChange(e.target.value)}
             placeholder="New table name"
+            disabled={controlsDisabled}
             className={cn(FORM_FIELD_CLASS, renameTableNameError && FIELD_ERROR_CLASS)}
           />
           <Button
             onClick={onRenameTable}
             disabled={
-              loadingColumns ||
+              controlsDisabled ||
               isBusy('rename-table') ||
               !nextTableName.trim() ||
-              nextTableName.trim() === currentTableName ||
+              nextTableName.trim() === currentTableBaseName ||
               Boolean(renameTableNameError)
             }
             className="h-9 md:min-w-[130px]"
@@ -283,7 +304,7 @@ export function EditTableOperationsPanel({
         )}
       </section>
 
-      <section className="rounded-md border border-border bg-surface/20 p-4">
+      <section className={sectionClass}>
         <div className="mb-3 flex items-center gap-2">
           <Type size={14} className="text-primary" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -295,9 +316,14 @@ export function EditTableOperationsPanel({
             value={newColumnName}
             onChange={(e) => onNewColumnNameChange(e.target.value)}
             placeholder="Column name"
+            disabled={controlsDisabled}
             className={cn(FORM_FIELD_CLASS, newColumnNameError && FIELD_ERROR_CLASS)}
           />
-          <Select value={newColumnType} onValueChange={onNewColumnTypeChange}>
+          <Select
+            value={newColumnType}
+            onValueChange={onNewColumnTypeChange}
+            disabled={controlsDisabled}
+          >
             <SelectTrigger className={cn(FORM_FIELD_CLASS, 'justify-start gap-2')}>
               <span
                 className={cn(
@@ -342,6 +368,7 @@ export function EditTableOperationsPanel({
             value={newColumnDefault}
             onChange={(e) => onNewColumnDefaultChange(e.target.value)}
             placeholder="DEFAULT value/expression (optional)"
+            disabled={controlsDisabled}
             className={cn(FORM_FIELD_CLASS, 'md:col-span-2')}
           />
         </div>
@@ -350,13 +377,14 @@ export function EditTableOperationsPanel({
             <Checkbox
               checked={newColumnNotNull}
               onCheckedChange={(value) => onNewColumnNotNullChange(!!value)}
+              disabled={controlsDisabled}
             />
             NOT NULL
           </label>
           <Button
             onClick={onAddColumn}
             disabled={
-              loadingColumns ||
+              controlsDisabled ||
               isBusy('add-column') ||
               !newColumnName.trim() ||
               Boolean(newColumnNameError) ||
@@ -375,7 +403,7 @@ export function EditTableOperationsPanel({
         )}
       </section>
 
-      <section className="rounded-md border border-border bg-surface/20 p-4">
+      <section className={sectionClass}>
         <div className="mb-3 flex items-center gap-2">
           <PencilRuler size={14} className="text-primary" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -383,7 +411,11 @@ export function EditTableOperationsPanel({
           </h3>
         </div>
         <div className="grid gap-2 md:grid-cols-[1fr,1fr,auto]">
-          <Select value={renameColumnFrom} onValueChange={onRenameColumnFromChange}>
+          <Select
+            value={renameColumnFrom}
+            onValueChange={onRenameColumnFromChange}
+            disabled={controlsDisabled}
+          >
             <SelectTrigger className={FORM_FIELD_CLASS}>
               <SelectValue placeholder="Current column" />
             </SelectTrigger>
@@ -402,12 +434,13 @@ export function EditTableOperationsPanel({
             value={renameColumnTo}
             onChange={(e) => onRenameColumnToChange(e.target.value)}
             placeholder="New column name"
+            disabled={controlsDisabled}
             className={cn(FORM_FIELD_CLASS, renameColumnToError && FIELD_ERROR_CLASS)}
           />
           <Button
             onClick={onRenameColumn}
             disabled={
-              loadingColumns ||
+              controlsDisabled ||
               isBusy('rename-column') ||
               !renameColumnFrom.trim() ||
               !renameColumnTo.trim() ||
@@ -426,7 +459,7 @@ export function EditTableOperationsPanel({
         )}
       </section>
 
-      <section className="rounded-md border border-border bg-surface/20 p-4">
+      <section className={sectionClass}>
         <div className="mb-3 flex items-center gap-2">
           <Hash size={14} className="text-primary" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -438,12 +471,13 @@ export function EditTableOperationsPanel({
             value={newIndexName}
             onChange={(e) => onNewIndexNameChange(e.target.value)}
             placeholder="index_name"
+            disabled={controlsDisabled}
             className={cn(FORM_FIELD_CLASS, newIndexNameError && FIELD_ERROR_CLASS)}
           />
           <Button
             onClick={onCreateIndex}
             disabled={
-              loadingColumns ||
+              controlsDisabled ||
               isBusy('create-index') ||
               !newIndexName.trim() ||
               selectedCreateIndexColumnsCount === 0 ||
@@ -462,6 +496,7 @@ export function EditTableOperationsPanel({
             <Checkbox
               checked={newIndexUnique}
               onCheckedChange={(value) => onNewIndexUniqueChange(!!value)}
+              disabled={controlsDisabled}
             />
             Unique Index
           </label>
@@ -485,6 +520,7 @@ export function EditTableOperationsPanel({
                   <Checkbox
                     checked={newIndexColumns.includes(column.name)}
                     onCheckedChange={() => onToggleIndexColumn(column.name)}
+                    disabled={controlsDisabled}
                   />
                   <span className="font-mono text-foreground">{column.name}</span>
                 </label>
@@ -500,7 +536,7 @@ export function EditTableOperationsPanel({
         )}
       </section>
 
-      <section className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
+      <section className={dangerSectionClass}>
         <div className="mb-3 flex items-center gap-2">
           <Trash2 size={14} className="text-destructive" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-destructive/90">
@@ -514,6 +550,7 @@ export function EditTableOperationsPanel({
               onDropIndexNameChange(value);
               onDropIndexConfirmChange(false);
             }}
+            disabled={controlsDisabled}
           >
             <SelectTrigger className={FORM_FIELD_CLASS}>
               <SelectValue placeholder="Choose index to drop" />
@@ -535,7 +572,7 @@ export function EditTableOperationsPanel({
             <Checkbox
               checked={dropIndexConfirm}
               onCheckedChange={(value) => onDropIndexConfirmChange(!!value)}
-              disabled={!dropIndexName}
+              disabled={controlsDisabled || !dropIndexName}
             />
             Confirm
           </label>
@@ -543,7 +580,7 @@ export function EditTableOperationsPanel({
             variant="destructive"
             onClick={onDropIndex}
             disabled={
-              loadingColumns ||
+              controlsDisabled ||
               isBusy('drop-index') ||
               !dropIndexName.trim() ||
               !dropIndexConfirm
@@ -563,7 +600,7 @@ export function EditTableOperationsPanel({
         )}
       </section>
 
-      <section className="rounded-md border border-destructive/30 bg-destructive/5 p-4">
+      <section className={dangerSectionClass}>
         <div className="mb-3 flex items-center gap-2">
           <Trash2 size={14} className="text-destructive" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-destructive/90">
@@ -571,7 +608,11 @@ export function EditTableOperationsPanel({
           </h3>
         </div>
         <div className="grid gap-2 md:grid-cols-[1fr,auto,auto] md:items-center">
-          <Select value={dropColumnName} onValueChange={onDropColumnNameChange}>
+          <Select
+            value={dropColumnName}
+            onValueChange={onDropColumnNameChange}
+            disabled={controlsDisabled}
+          >
             <SelectTrigger className={FORM_FIELD_CLASS}>
               <SelectValue placeholder="Choose column to drop" />
             </SelectTrigger>
@@ -595,6 +636,7 @@ export function EditTableOperationsPanel({
             <Checkbox
               checked={dropConfirm}
               onCheckedChange={(value) => onDropConfirmChange(!!value)}
+              disabled={controlsDisabled}
             />
             Confirm
           </label>
@@ -602,7 +644,7 @@ export function EditTableOperationsPanel({
             variant="destructive"
             onClick={onDropColumn}
             disabled={
-              loadingColumns ||
+              controlsDisabled ||
               isBusy('drop-column') ||
               !dropColumnName.trim() ||
               !dropConfirm
