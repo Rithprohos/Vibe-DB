@@ -254,6 +254,7 @@ export async function captureViewportCanvas(
   exportStage.append(createExportHeader(borderColor, foregroundColor, secondaryColor), clone);
 
   let fontEmbedCSS: string | undefined;
+  let skipFontEmbedding = false;
 
   try {
     await waitForNextPaint();
@@ -263,6 +264,7 @@ export async function captureViewportCanvas(
         preferredFontFormat: 'woff2',
       });
     } catch (fontError) {
+      skipFontEmbedding = true;
       console.warn('Failed to preload schema screenshot fonts:', fontError);
     }
 
@@ -274,6 +276,7 @@ export async function captureViewportCanvas(
       height: roundedHeight + SCREENSHOT_HEADER_HEIGHT,
       pixelRatio,
       preferredFontFormat: 'woff2',
+      skipFonts: skipFontEmbedding,
       width: roundedWidth,
     });
   } finally {
