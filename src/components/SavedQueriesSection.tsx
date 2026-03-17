@@ -149,7 +149,7 @@ function SavedQueriesSectionComponent() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search saved queries..."
-                className="h-8 border-border/40 bg-background/60 pl-8 text-sm"
+                className="h-8 border-border/35 bg-background pl-8 text-sm font-medium placeholder:text-muted-foreground/40 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>
 

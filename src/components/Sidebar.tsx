@@ -11,7 +11,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Database, LayoutTemplate, Eye, RefreshCw, Plus, Inbox, Pencil, X, Cloud, Server } from 'lucide-react';
+import {
+  Database,
+  LayoutTemplate,
+  Eye,
+  RefreshCw,
+  Plus,
+  Inbox,
+  Pencil,
+  X,
+  Cloud,
+  Server,
+  Search,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
 import SavedQueriesSection from './SavedQueriesSection';
@@ -34,6 +46,8 @@ import {
 import TruncateTableDialog from './TruncateTableDialog';
 import DropTableDialog from './DropTableDialog';
 import { orderPinnedTablesFirst } from '@/lib/sidebarTablePinning';
+
+const DEFAULT_SIDEBAR_WIDTH = 288;
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -70,7 +84,7 @@ export default function Sidebar() {
   const [search, setSearch] = useState('');
   const [tablesOpen, setTablesOpen] = useState(true);
   const [viewsOpen, setViewsOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -82,9 +96,9 @@ export default function Sidebar() {
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
-  const currentWidthRef = useRef(260);
+  const currentWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const rafIdRef = useRef<number | null>(null);
-  const targetWidthRef = useRef(260);
+  const targetWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
   const startResizing = useCallback(() => {
     isResizingRef.current = true;
     setIsResizing(true);
@@ -226,6 +240,31 @@ export default function Sidebar() {
     () => orderPinnedTablesFirst(filteredTables, pinnedTableNameSet),
     [filteredTables, pinnedTableNameSet],
   );
+  const visibleObjectCount = filteredTables.length + filteredViews.length;
+
+  const getConnectionTagClassName = (tag?: string) =>
+    cn(
+      'rounded-sm border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] leading-none whitespace-nowrap',
+      tag === 'production'
+        ? 'border-red-500/40 bg-red-500/15 text-red-400'
+        : tag === 'development'
+          ? 'border-amber-500/40 bg-amber-500/15 text-amber-400'
+          : tag === 'testing'
+            ? 'border-sky-500/40 bg-sky-500/15 text-sky-400'
+            : 'border-primary/40 bg-primary/15 text-primary',
+    );
+
+  const renderConnectionIcon = (type: string, className: string) => {
+    if (type === 'turso') {
+      return <Cloud size={18} className={className} />;
+    }
+
+    if (type === 'postgres') {
+      return <Server size={18} className={className} />;
+    }
+
+    return <Database size={18} className={className} />;
+  };
 
   const handleRefresh = useCallback(async () => {
     if (!activeConnectionConnId || !activeConnectionId || isRefreshing) return;
@@ -345,67 +384,79 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <div 
+    <div
       className={cn(
-        "relative flex flex-col bg-background border-r border-border/50 h-full flex-shrink-0 select-none",
-        !isResizing && "transition-[width] duration-200 ease-out"
+        'relative flex h-full flex-shrink-0 select-none flex-col border-r border-border/40 bg-background',
+        !isResizing && 'transition-[width] duration-200 ease-out',
       )}
       ref={sidebarRef}
-      style={{ 
-        width: sidebarWidth, 
+      style={{
+        width: sidebarWidth,
         minWidth: sidebarWidth,
+        backgroundImage:
+          'radial-gradient(circle at top, rgba(var(--glow-color), 0.1), transparent 28%), linear-gradient(180deg, rgba(var(--glow-color), 0.03), transparent 24%)',
       }}
     >
-      <div className="p-3">
+      <div className="relative z-10 border-b border-border/35 px-3 pb-3 pt-3">
         {isConnected && activeConnection?.connId ? (
-          <>
-            <div 
-              className="relative flex items-center space-x-3 p-3 rounded-md bg-background border border-border cursor-pointer hover:border-primary/50 transition-colors group"
-              onClick={() => setEditDialogOpen(true)}
-            >
-              {activeConnection?.type === 'turso' ? (
-                <Cloud size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
-              ) : activeConnection?.type === 'postgres' ? (
-                <Server size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
-              ) : (
-                <Database size={18} className="text-primary group-hover:neon-text transition-all flex-shrink-0" />
-              )}
-              <div className="flex-1 min-w-0 pr-12">
-                <div className="text-sm font-medium text-foreground truncate leading-tight">
-                  {activeConnection.name}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70">
+                  Active Connection
                 </div>
-                {activeDatabaseName && (
-                  <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.16em] text-primary/80">
-                    {activeDatabaseName}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider flex-shrink-0">{activeConnection.type}</div>
-                  {activeConnection.tag && (
-                    <span className={cn(
-                      "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border flex-shrink-0 whitespace-nowrap",
-                      activeConnection.tag === 'production' 
-                        ? "bg-red-500/20 text-red-400 border-red-500/40" 
-                        : "bg-primary/20 text-primary border-primary/40"
-                    )}>
-                      {activeConnection.tag}
-                    </span>
-                  )}
+                <div className="mt-1 text-[11px] text-muted-foreground/80">
+                  Connected workspace
                 </div>
               </div>
+              {activeConnection.tag && (
+                <span className={getConnectionTagClassName(activeConnection.tag)}>
+                  {activeConnection.tag}
+                </span>
+              )}
+            </div>
 
-              {/* Action Buttons - Absolute positioned to not interfere with text layout */}
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                <button
-                  className="p-1.5 rounded-md hover:bg-primary/10 hover:text-primary text-muted-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditDialogOpen(true);
-                  }}
-                  title="Edit Connection"
-                >
-                  <Pencil size={12} />
-                </button>
+            <div
+              className="group relative cursor-pointer overflow-hidden rounded-md border border-border/40 bg-background/80 shadow-[var(--panel-shadow)] transition-all duration-200 hover:border-primary/25 hover:bg-background/90"
+              onClick={() => setEditDialogOpen(true)}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(var(--glow-color),0.16),transparent_34%)] opacity-70 transition-opacity duration-200 group-hover:opacity-100" />
+              <div className="relative flex items-start gap-3 p-3.5">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-border/35 bg-background/90 shadow-sm shadow-black/10">
+                  {renderConnectionIcon(
+                    activeConnection.type,
+                    'text-primary transition-all group-hover:neon-text',
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 pr-10">
+                  <div className="truncate text-sm font-semibold leading-tight text-foreground">
+                    {activeConnection.name}
+                  </div>
+                  {activeDatabaseName && (
+                    <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-primary/80">
+                      {activeDatabaseName}
+                    </div>
+                  )}
+                  <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary/80" />
+                      {activeConnection.type}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-all duration-200 group-hover:opacity-100">
+                  <button
+                    className="rounded-md border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-primary/20 hover:bg-primary/10 hover:text-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditDialogOpen(true);
+                    }}
+                    title="Edit Connection"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
               </div>
             </div>
             <EditConnectionDialog
@@ -414,14 +465,17 @@ export default function Sidebar() {
               onOpenChange={setEditDialogOpen}
             />
             {showSchemaFilter && (
-              <div className="mt-3">
-                <div className="mb-1.5">
+              <div className="rounded-md border border-border/35 bg-background/50 p-2.5 shadow-sm shadow-black/10">
+                <div className="mb-2 flex items-center justify-between">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
                     Schema
                   </span>
+                  <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">
+                    {schemaOptions.length}
+                  </span>
                 </div>
                 <Select value={selectedSchema} onValueChange={setSelectedSchema}>
-                  <SelectTrigger className="h-8 border-border/40 bg-secondary/10 px-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/90 focus:ring-1 focus:ring-primary/20">
+                  <SelectTrigger className="h-9 rounded-sm border-border/40 bg-background/90 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/90 focus:ring-1 focus:ring-primary/20">
                     <SelectValue placeholder="All schemas" />
                   </SelectTrigger>
                   <SelectContent>
@@ -437,64 +491,63 @@ export default function Sidebar() {
                 </Select>
               </div>
             )}
-          </>
+          </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Connections</div>
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/70">
+                  Connections
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground/80">
+                  Reconnect or add a database
+                </div>
+              </div>
               <button
-                className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                className="rounded-sm border border-border/35 bg-background/75 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:border-primary/25 hover:text-primary"
                 onClick={() => useAppStore.getState().setShowConnectionDialog(true)}
               >
                 + New
               </button>
             </div>
             {connections.length > 0 ? (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {connections.map((conn) => (
                   <div
                     key={conn.id}
-                    className="relative flex items-center space-x-3 p-2.5 rounded-lg border border-border/50 cursor-pointer hover:bg-secondary/50 hover:border-primary/30 transition-all group"
+                    className="group relative cursor-pointer overflow-hidden rounded-md border border-border/35 bg-background/70 p-3 transition-all duration-200 hover:border-primary/20 hover:bg-accent/30"
                     onClick={() => {
                       window.dispatchEvent(
                         new CustomEvent('vibedb:connect', { detail: conn })
                       );
                     }}
                   >
-                    <div className="w-8 h-8 rounded-sm bg-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                        {conn.type === 'turso' ? (
-                          <Cloud size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                        ) : conn.type === 'postgres' ? (
-                          <Server size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                        ) : (
-                          <Database size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                    <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-primary/80 via-primary/30 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                    <div className="flex items-start gap-3 pr-8">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-border/35 bg-background/90 shadow-sm shadow-black/10 transition-colors group-hover:border-primary/20">
+                        {renderConnectionIcon(
+                          conn.type,
+                          'text-muted-foreground transition-colors group-hover:text-primary',
                         )}
                       </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate leading-tight">
-                        {conn.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                          {conn.type}
-                        </span>
-                        {conn.tag && (
-                          <span className={cn(
-                            "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border flex-shrink-0 whitespace-nowrap leading-none",
-                            conn.tag === 'production'
-                              ? "bg-red-500/20 text-red-400 border-red-500/40"
-                              : conn.tag === 'development'
-                                ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                                : "bg-primary/20 text-primary border-primary/40"
-                          )}>
-                            {conn.tag}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium leading-tight text-foreground">
+                          {conn.name}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                            {conn.type}
                           </span>
-                        )}
+                          {conn.tag && (
+                            <span className={getConnectionTagClassName(conn.tag)}>
+                              {conn.tag}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {/* Remove button on hover */}
                     <button
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground/0 group-hover:text-muted-foreground transition-all"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-transparent p-1 text-muted-foreground/0 transition-all duration-200 hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive group-hover:text-muted-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRemoveConnection(conn.id);
@@ -507,8 +560,10 @@ export default function Sidebar() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 px-2">
-                <Database size={20} className="mx-auto text-muted-foreground/40 mb-2" />
+              <div className="rounded-md border border-dashed border-border/40 bg-background/30 px-4 py-7 text-center">
+                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-md border border-border/35 bg-background/80">
+                  <Database size={18} className="text-muted-foreground/50" />
+                </div>
                 <div className="text-xs text-muted-foreground">No saved connections</div>
               </div>
             )}
@@ -517,38 +572,67 @@ export default function Sidebar() {
       </div>
 
       {isConnected && (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex px-3 gap-2 pb-3 border-b border-border">
-            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/30" onClick={handleNewQuery}>
-              <Plus size={14} />
-              <span>Query</span>
-            </Button>
-            <Button variant="outline" size="sm" className="flex-1 space-x-1 border-border/50 bg-background/50 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30" onClick={handleCreateTable}>
-              <Plus size={14} />
-              <span>Table</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="space-x-1 border-border/50 bg-background/50 hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/30 px-2"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
-            </Button>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3">
+          <div className="rounded-md border border-border/35 bg-background/50 p-2.5 shadow-sm shadow-black/10">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                Workbench
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">
+                {visibleObjectCount} objects
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 flex-1 justify-start rounded-sm border-border/35 bg-background/80 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:border-indigo-500/25 hover:bg-indigo-500/10 hover:text-indigo-400"
+                onClick={handleNewQuery}
+              >
+                <Plus size={14} />
+                <span>Query</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 flex-1 justify-start rounded-sm border-border/35 bg-background/80 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:border-emerald-500/25 hover:bg-emerald-500/10 hover:text-emerald-400"
+                onClick={handleCreateTable}
+              >
+                <Plus size={14} />
+                <span>Table</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-sm border-border/35 bg-background/80 px-2.5 hover:border-amber-500/25 hover:bg-amber-500/10 hover:text-amber-400"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw size={14} className={cn(isRefreshing && 'animate-spin')} />
+              </Button>
+            </div>
           </div>
 
-          <div className="p-3">
-            <Input
-              type="text"
-              placeholder={showSchemaFilter ? "Search tables or schemas..." : "Search tables..."}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent border-border/30 placeholder:text-muted-foreground/20 text-sm focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:border-primary/30 h-8"
-            />
+          <div className="mt-3 rounded-md border border-border/35 bg-background/50 p-2.5 shadow-sm shadow-black/10">
+            <div className="relative">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+              />
+              <Input
+                type="text"
+                placeholder={showSchemaFilter ? 'Search tables or schemas...' : 'Search tables...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 rounded-sm border-border/35 bg-background pl-9 pr-16 text-sm font-medium placeholder:text-muted-foreground/40 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
+              />
+              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-sm border border-border/35 bg-background/65 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/70">
+                {visibleObjectCount}
+              </div>
+            </div>
           </div>
 
-          <div className="flex-1 min-h-0 px-3 pb-4">
+          <div className="mt-3 flex-1 min-h-0 rounded-md border border-border/30 bg-background/30 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <SavedQueriesSection />
 
@@ -559,7 +643,7 @@ export default function Sidebar() {
                 onToggle={() => setViewsOpen(!viewsOpen)}
                 onCreate={handleCreateView}
                 createTitle="Create View"
-                createButtonClassName="hover:bg-indigo-500/20 hover:text-indigo-400"
+                createButtonClassName="rounded-sm hover:bg-indigo-500/20 hover:text-indigo-400"
                 itemIcon={Eye}
                 selectedItem={selectedTable}
                 showSchemaBadge={showSchemaBadge}
@@ -575,7 +659,7 @@ export default function Sidebar() {
                 onToggle={() => setTablesOpen(!tablesOpen)}
                 onCreate={handleCreateTable}
                 createTitle="Create Table"
-                createButtonClassName="hover:bg-emerald-500/20 hover:text-emerald-400"
+                createButtonClassName="rounded-sm hover:bg-emerald-500/20 hover:text-emerald-400"
                 itemIcon={LayoutTemplate}
                 selectedItem={selectedTable}
                 showSchemaBadge={showSchemaBadge}
@@ -644,16 +728,17 @@ export default function Sidebar() {
                 )}
               />
 
-              {/* Empty state */}
               {filteredTables.length === 0 && filteredViews.length === 0 && !search && (
-                <div className="text-center py-8 px-4 border border-dashed border-border rounded-lg bg-background/30 mt-4">
-                  <Inbox size={24} className="mx-auto text-muted-foreground mb-2 opacity-50" />
-                  <div className="text-sm font-medium text-foreground mb-1">
+                <div className="mt-4 rounded-md border border-dashed border-border/40 bg-background/35 px-4 py-8 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-md border border-border/35 bg-background/80">
+                    <Inbox size={20} className="text-muted-foreground/55" />
+                  </div>
+                  <div className="mb-1 text-sm font-medium text-foreground">
                     {selectedSchema === ALL_SCHEMAS_VALUE
                       ? 'No tables found'
                       : `No objects in ${selectedSchema}`}
                   </div>
-                  <div className="text-xs text-muted-foreground max-w-[160px] mx-auto">
+                  <div className="mx-auto max-w-[180px] text-xs leading-relaxed text-muted-foreground">
                     {selectedSchema === ALL_SCHEMAS_VALUE
                       ? 'Create a table to get started with VibeDB'
                       : 'Choose another schema or create an object in this schema'}
@@ -662,16 +747,15 @@ export default function Sidebar() {
               )}
             </div>
           </div>
-
         </div>
       )}
 
       {/* Resizer handle */}
       <div
         className={cn(
-          "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary active:bg-primary z-10",
-          !isResizing && "transition-colors",
-          isResizing && "bg-primary glow-shadow"
+          'absolute bottom-0 right-0 top-0 z-20 w-1 cursor-col-resize hover:bg-primary active:bg-primary',
+          !isResizing && 'transition-colors',
+          isResizing && 'bg-primary glow-shadow',
         )}
         onMouseDown={startResizing}
       />

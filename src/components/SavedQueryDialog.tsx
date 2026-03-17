@@ -125,7 +125,7 @@ export default function SavedQueryDialog({
               onChange={(event) => setName(event.target.value)}
               placeholder="weekly revenue audit"
               maxLength={MAX_SAVED_QUERY_NAME_LENGTH}
-              className="h-9 border-border/50 bg-background/60"
+              className="h-9 border-border/35 bg-background text-sm font-medium placeholder:text-muted-foreground/40 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
               autoFocus
             />
           </div>
@@ -135,7 +135,7 @@ export default function SavedQueryDialog({
               <Label className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                 Connection
               </Label>
-              <div className="flex h-9 items-center rounded-sm border border-border/50 bg-background/60 px-3 text-sm text-foreground">
+              <div className="flex h-9 items-center rounded-sm border border-border/35 bg-background px-3 text-sm text-foreground">
                 {connection?.name ?? "No connection"}
               </div>
             </div>
