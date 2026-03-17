@@ -21,7 +21,7 @@
 
 ## Product Story
 
-VibeDB is a desktop database manager built for real working sessions: browsing tables, shaping schemas, editing rows, running SQL, and moving carefully when a connection points at production.
+VibeDB is a desktop database manager built for real working sessions: browsing tables, shaping schemas, editing rows, running SQL, visualizing relationships, generating SQL from plain English, and moving carefully when a connection points at production.
 
 It is designed to feel like a sharp devtool, not a bloated admin panel. Dense layouts, direct interactions, and visible safety rails are part of the product.
 
@@ -36,7 +36,8 @@ It is designed to feel like a sharp devtool, not a bloated admin panel. Dense la
 
 - **Production-aware query policy** - VibeDB sits between unrestricted SQL editors and fully read-only modes. Production-tagged connections remain usable, while destructive statements are blocked or explicitly confirmed.
 - **Transactional editing** - Multi-row changes are staged and committed as a single atomic operation instead of becoming a fragile sequence of ad hoc updates.
-- **Visual schema workflows** - Tables and views can be created through a polished builder with real-time SQL preview, while the schema canvas helps explore relationships quickly.
+- **Visual schema workflows** - Tables and views can be created through a polished builder with real-time SQL preview, while the schema canvas helps explore relationships quickly, adjust zoom, reset the view, and capture shareable screenshots.
+- **Table-aware AI SQL assistant** - The side panel turns natural-language prompts into SQL using the currently selected table schema, then lets you copy the result or insert it into a query tab immediately.
 - **Fast table navigation** - Large results, logs, and sidebar lists stay responsive through virtualization and compact UI patterns.
 - **Pin important tables** - Right-click any table in the sidebar to pin it, keeping critical tables at the top of the list for faster access.
 - **Built-in query workflow** - SQL editing, saved queries, execution results, and schema refresh behavior live in one place instead of being scattered across modal-heavy flows.
@@ -57,6 +58,19 @@ It is designed to feel like a sharp devtool, not a bloated admin panel. Dense la
 - Inline editing and row inspection are built for quick, repeated changes.
 - Selected row deletes use confirmation guardrails for sensitive environments.
 - Schema-changing flows refresh the surrounding context so the app stays aligned with the database.
+
+### See The Schema Clearly
+
+- The schema visualization view renders tables and relationships on a dedicated canvas for fast exploration.
+- Toolbar controls support zoom in, zoom out, and reset view so large schemas stay navigable.
+- Capture creates a schema screenshot preview in memory, and the result can be copied directly to the clipboard without exporting a permanent file first.
+
+### Generate SQL From Plain English
+
+- The AI Assistant opens alongside an active data tab and scopes generation to the currently selected table.
+- Default AI model is `GwenCoder3`, free and unlimited for all users.
+- The panel shows the current table name, column count, and primary-key hints before generation.
+- Generated SQL can be copied or inserted into the current query tab, or into a new `AI Query` tab when no query tab is active.
 
 ### Stay In Flow
 

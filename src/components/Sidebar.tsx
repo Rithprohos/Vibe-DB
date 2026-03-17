@@ -48,6 +48,10 @@ import DropTableDialog from './DropTableDialog';
 import { orderPinnedTablesFirst } from '@/lib/sidebarTablePinning';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
+const SIDEBAR_PANEL_CLASS_NAME =
+  'relative overflow-hidden rounded-md border border-border/35 bg-background/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]';
+const SIDEBAR_FIELD_CLASS_NAME =
+  'rounded-sm border border-border/55 bg-background/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition-[border-color,background-color,box-shadow]';
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -244,14 +248,14 @@ export default function Sidebar() {
 
   const getConnectionTagClassName = (tag?: string) =>
     cn(
-      'rounded-sm border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] leading-none whitespace-nowrap',
+      'inline-flex items-center rounded-sm border px-2 py-1 text-[8px] font-bold uppercase tracking-[0.22em] leading-none whitespace-nowrap shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
       tag === 'production'
-        ? 'border-red-500/40 bg-red-500/15 text-red-400'
+        ? 'border-red-500/30 bg-red-500/14 text-red-400'
         : tag === 'development'
-          ? 'border-amber-500/40 bg-amber-500/15 text-amber-400'
+          ? 'border-amber-500/30 bg-amber-500/14 text-amber-400'
           : tag === 'testing'
-            ? 'border-sky-500/40 bg-sky-500/15 text-sky-400'
-            : 'border-primary/40 bg-primary/15 text-primary',
+            ? 'border-sky-500/30 bg-sky-500/14 text-sky-400'
+            : 'border-primary/30 bg-primary/14 text-primary',
     );
 
   const renderConnectionIcon = (type: string, className: string) => {
@@ -386,7 +390,7 @@ export default function Sidebar() {
   return (
     <div
       className={cn(
-        'relative flex h-full flex-shrink-0 select-none flex-col border-r border-border/40 bg-background',
+        'relative flex h-full flex-shrink-0 select-none flex-col bg-background',
         !isResizing && 'transition-[width] duration-200 ease-out',
       )}
       ref={sidebarRef}
@@ -397,7 +401,8 @@ export default function Sidebar() {
           'radial-gradient(circle at top, rgba(var(--glow-color), 0.1), transparent 28%), linear-gradient(180deg, rgba(var(--glow-color), 0.03), transparent 24%)',
       }}
     >
-      <div className="relative z-10 border-b border-border/35 px-3 pb-3 pt-3">
+      <div className="pointer-events-none absolute inset-y-3 right-0 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
+      <div className="relative z-10 border-b border-border/20 px-3 pb-3 pt-3">
         {isConnected && activeConnection?.connId ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
@@ -417,12 +422,12 @@ export default function Sidebar() {
             </div>
 
             <div
-              className="group relative cursor-pointer overflow-hidden rounded-md border border-border/40 bg-background/80 shadow-[var(--panel-shadow)] transition-all duration-200 hover:border-primary/25 hover:bg-background/90"
+              className="group relative cursor-pointer overflow-hidden rounded-md bg-background/52 shadow-[var(--panel-shadow)] transition-all duration-200 hover:bg-background/74"
               onClick={() => setEditDialogOpen(true)}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(var(--glow-color),0.16),transparent_34%)] opacity-70 transition-opacity duration-200 group-hover:opacity-100" />
               <div className="relative flex items-start gap-3 p-3.5">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-border/35 bg-background/90 shadow-sm shadow-black/10">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-sm bg-background/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                   {renderConnectionIcon(
                     activeConnection.type,
                     'text-primary transition-all group-hover:neon-text',
@@ -437,17 +442,14 @@ export default function Sidebar() {
                       {activeDatabaseName}
                     </div>
                   )}
-                  <div className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary/80" />
-                      {activeConnection.type}
-                    </span>
+                  <div className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    {activeConnection.type}
                   </div>
                 </div>
 
                 <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-all duration-200 group-hover:opacity-100">
                   <button
-                    className="rounded-md border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-primary/20 hover:bg-primary/10 hover:text-primary"
+                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditDialogOpen(true);
@@ -465,8 +467,9 @@ export default function Sidebar() {
               onOpenChange={setEditDialogOpen}
             />
             {showSchemaFilter && (
-              <div className="rounded-md border border-border/35 bg-background/50 p-2.5 shadow-sm shadow-black/10">
-                <div className="mb-2 flex items-center justify-between">
+              <div className={cn(SIDEBAR_PANEL_CLASS_NAME, 'p-2.5')}>
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(var(--glow-color),0.12),transparent_58%)] opacity-70" />
+                <div className="relative mb-2 flex items-center justify-between">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
                     Schema
                   </span>
@@ -475,7 +478,12 @@ export default function Sidebar() {
                   </span>
                 </div>
                 <Select value={selectedSchema} onValueChange={setSelectedSchema}>
-                  <SelectTrigger className="h-9 rounded-sm border-border/40 bg-background/90 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/90 focus:ring-1 focus:ring-primary/20">
+                  <SelectTrigger
+                    className={cn(
+                      SIDEBAR_FIELD_CLASS_NAME,
+                      'h-10 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground/95 hover:border-primary/30 focus:ring-1 focus:ring-primary/20 data-[placeholder]:text-muted-foreground/72',
+                    )}
+                  >
                     <SelectValue placeholder="All schemas" />
                   </SelectTrigger>
                   <SelectContent>
@@ -504,7 +512,7 @@ export default function Sidebar() {
                 </div>
               </div>
               <button
-                className="rounded-sm border border-border/35 bg-background/75 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:border-primary/25 hover:text-primary"
+                className="rounded-sm bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                 onClick={() => useAppStore.getState().setShowConnectionDialog(true)}
               >
                 + New
@@ -515,7 +523,7 @@ export default function Sidebar() {
                 {connections.map((conn) => (
                   <div
                     key={conn.id}
-                    className="group relative cursor-pointer overflow-hidden rounded-md border border-border/35 bg-background/70 p-3 transition-all duration-200 hover:border-primary/20 hover:bg-accent/30"
+                    className="group relative cursor-pointer overflow-hidden rounded-md bg-background/46 p-3 transition-all duration-200 hover:bg-accent/30"
                     onClick={() => {
                       window.dispatchEvent(
                         new CustomEvent('vibedb:connect', { detail: conn })
@@ -524,7 +532,7 @@ export default function Sidebar() {
                   >
                     <div className="absolute inset-y-0 left-0 w-px bg-gradient-to-b from-primary/80 via-primary/30 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                     <div className="flex items-start gap-3 pr-8">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-border/35 bg-background/90 shadow-sm shadow-black/10 transition-colors group-hover:border-primary/20">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm bg-background/84 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors group-hover:bg-background/92">
                         {renderConnectionIcon(
                           conn.type,
                           'text-muted-foreground transition-colors group-hover:text-primary',
@@ -547,7 +555,7 @@ export default function Sidebar() {
                       </div>
                     </div>
                     <button
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-transparent p-1 text-muted-foreground/0 transition-all duration-200 hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive group-hover:text-muted-foreground"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground/0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:text-muted-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRemoveConnection(conn.id);
@@ -560,8 +568,8 @@ export default function Sidebar() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-md border border-dashed border-border/40 bg-background/30 px-4 py-7 text-center">
-                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-md border border-border/35 bg-background/80">
+              <div className="rounded-md bg-background/26 px-4 py-7 text-center">
+                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-sm bg-background/74">
                   <Database size={18} className="text-muted-foreground/50" />
                 </div>
                 <div className="text-xs text-muted-foreground">No saved connections</div>
@@ -573,8 +581,9 @@ export default function Sidebar() {
 
       {isConnected && (
         <div className="relative z-10 flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3">
-          <div className="rounded-md border border-border/35 bg-background/50 p-2.5 shadow-sm shadow-black/10">
-            <div className="mb-2 flex items-center justify-between px-1">
+          <div className={cn(SIDEBAR_PANEL_CLASS_NAME, 'p-2.5')}>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(var(--glow-color),0.1),transparent_60%)] opacity-65" />
+            <div className="relative mb-2 flex items-center justify-between px-1">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
                 Workbench
               </div>
@@ -582,11 +591,11 @@ export default function Sidebar() {
                 {visibleObjectCount} objects
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="relative flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 flex-1 justify-start rounded-sm border-border/35 bg-background/80 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:border-indigo-500/25 hover:bg-indigo-500/10 hover:text-indigo-400"
+                className="h-8 flex-1 justify-start rounded-sm border-transparent bg-background/82 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-indigo-500/10 hover:text-indigo-400"
                 onClick={handleNewQuery}
               >
                 <Plus size={14} />
@@ -595,7 +604,7 @@ export default function Sidebar() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 flex-1 justify-start rounded-sm border-border/35 bg-background/80 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:border-emerald-500/25 hover:bg-emerald-500/10 hover:text-emerald-400"
+                className="h-8 flex-1 justify-start rounded-sm border-transparent bg-background/82 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-emerald-500/10 hover:text-emerald-400"
                 onClick={handleCreateTable}
               >
                 <Plus size={14} />
@@ -604,7 +613,7 @@ export default function Sidebar() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-sm border-border/35 bg-background/80 px-2.5 hover:border-amber-500/25 hover:bg-amber-500/10 hover:text-amber-400"
+                className="h-8 rounded-sm border-transparent bg-background/82 px-2.5 hover:bg-amber-500/10 hover:text-amber-400"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
               >
@@ -613,26 +622,41 @@ export default function Sidebar() {
             </div>
           </div>
 
-          <div className="mt-3 rounded-md border border-border/35 bg-background/50 p-2.5 shadow-sm shadow-black/10">
-            <div className="relative">
+          <div className={cn(SIDEBAR_PANEL_CLASS_NAME, 'mt-3 p-2.5')}>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(var(--glow-color),0.12),transparent_58%)] opacity-70" />
+            <div className="relative mb-2 flex items-center justify-between px-1">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                Object Search
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">
+                {visibleObjectCount}
+              </div>
+            </div>
+            <div
+              className={cn(
+                SIDEBAR_FIELD_CLASS_NAME,
+                'group relative overflow-hidden focus-within:border-primary/55 focus-within:bg-background/94',
+              )}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_left,rgba(var(--glow-color),0.12),transparent_50%)] opacity-60 transition-opacity duration-200 group-focus-within:opacity-100" />
               <Search
                 size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+                className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-primary/70 transition-colors duration-200 group-focus-within:text-primary"
               />
               <Input
                 type="text"
                 placeholder={showSchemaFilter ? 'Search tables or schemas...' : 'Search tables...'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-9 rounded-sm border-border/35 bg-background pl-9 pr-16 text-sm font-medium placeholder:text-muted-foreground/40 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
+                className="h-10 border-0 bg-transparent pl-10 pr-16 text-[13px] font-medium text-foreground placeholder:text-muted-foreground/72 shadow-none focus-visible:ring-0"
               />
-              <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-sm border border-border/35 bg-background/65 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/70">
+              <div className="pointer-events-none absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm border border-border/45 bg-background/82 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.14em] text-foreground/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 {visibleObjectCount}
               </div>
             </div>
           </div>
 
-          <div className="mt-3 flex-1 min-h-0 rounded-md border border-border/30 bg-background/30 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+          <div className="mt-3 flex-1 min-h-0 rounded-md bg-background/22 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <SavedQueriesSection />
 
@@ -729,8 +753,8 @@ export default function Sidebar() {
               />
 
               {filteredTables.length === 0 && filteredViews.length === 0 && !search && (
-                <div className="mt-4 rounded-md border border-dashed border-border/40 bg-background/35 px-4 py-8 text-center">
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-md border border-border/35 bg-background/80">
+                <div className="mt-4 rounded-md bg-background/34 px-4 py-8 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-sm bg-background/78">
                     <Inbox size={20} className="text-muted-foreground/55" />
                   </div>
                   <div className="mb-1 text-sm font-medium text-foreground">
