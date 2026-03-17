@@ -233,13 +233,7 @@ pub async fn get_table_data(
                 result.rows.len(),
                 if has_filters { " with filters" } else { "" }
             );
-            emit_sql_log(
-                &app,
-                query,
-                "success",
-                duration_ms,
-                message,
-            );
+            emit_sql_log(&app, query, "success", duration_ms, message);
             Ok(GetTableDataResponse {
                 result,
                 duration_ms,
