@@ -2,6 +2,7 @@ mod connection;
 mod query;
 mod rows;
 mod schema;
+mod screenshot;
 mod transfer;
 
 pub use connection::{
@@ -14,4 +15,5 @@ pub use schema::{
     drop_table, get_filtered_row_count, get_table_data, get_table_row_count, get_table_structure,
     list_tables, truncate_table,
 };
+pub use screenshot::{copy_schema_screenshot, save_schema_screenshot};
 pub use transfer::{export_table_data, import_table_data};

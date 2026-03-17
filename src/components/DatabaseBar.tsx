@@ -29,6 +29,25 @@ const TAG_STYLES: Record<NonNullable<Connection['tag']>, string> = {
   production: 'border-rose-500/35 bg-rose-500/12 text-rose-300',
 };
 
+function getConnectionTypeIcon(type: Connection['type'], className: string) {
+  if (type === 'turso') {
+    return <Cloud size={18} className={className} />;
+  }
+
+  if (type === 'postgres') {
+    return <Server size={18} className={className} />;
+  }
+
+  return <Database size={18} className={className} />;
+}
+
+function getConnectionTagLabel(tag: NonNullable<Connection['tag']>) {
+  if (tag === 'production') return 'PROD';
+  if (tag === 'development') return 'DEV';
+  if (tag === 'testing') return 'TEST';
+  return 'LOCAL';
+}
+
 export default function DatabaseBar() {
   const connections = useAppStore(selectors.connections);
   const activeSidebarConnectionId = useAppStore(selectors.activeSidebarConnectionId);
@@ -54,9 +73,15 @@ export default function DatabaseBar() {
   if (activeConnections.length === 0) return null;
 
   return (
-    <div className="w-[72px] bg-background border-r border-border/50 flex flex-col items-center py-2 px-1.5 gap-1.5 shrink-0 select-none overflow-y-auto hidden-scrollbar z-10">
+    <div
+      className="relative z-10 hidden-scrollbar flex w-[76px] shrink-0 select-none flex-col items-center gap-1.5 overflow-y-auto border-r border-border/35 bg-background px-1.5 py-2"
+      style={{
+        backgroundImage:
+          'radial-gradient(circle at top, rgba(var(--glow-color), 0.08), transparent 30%), linear-gradient(180deg, rgba(var(--glow-color), 0.025), transparent 22%)',
+      }}
+    >
       <div className="w-full px-1 pb-0.5">
-        <div className="rounded-sm border border-border/60 bg-secondary/20 px-1.5 py-1 text-[8px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80 text-center">
+        <div className="rounded-sm border border-border/35 bg-background/70 px-1.5 py-1 text-center text-[8px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75 shadow-sm shadow-black/10">
           DBs
         </div>
       </div>
@@ -69,69 +94,57 @@ export default function DatabaseBar() {
                   <button
                     onClick={() => handleConnectionClick(conn)}
                     className={cn(
-                      "relative w-full rounded-md border px-1.5 py-1.5 text-left transition-all group overflow-hidden",
-                      activeSidebarConnectionId === conn.id 
-                        ? "border-primary/35 bg-primary/10 text-foreground shadow-[0_0_20px_hsl(var(--primary)/0.10)]"
-                        : "border-border/50 bg-secondary/10 text-muted-foreground hover:border-primary/20 hover:bg-secondary/50 hover:text-foreground"
+                      'group relative w-full overflow-hidden rounded-md border px-1.5 py-2 text-left transition-all duration-200',
+                      activeSidebarConnectionId === conn.id
+                        ? 'border-primary/25 bg-background/85 text-foreground shadow-[0_0_0_1px_rgba(var(--glow-color),0.08),0_14px_24px_rgba(0,0,0,0.22)]'
+                        : 'border-border/30 bg-background/60 text-muted-foreground hover:border-primary/18 hover:bg-background/78 hover:text-foreground',
                     )}
                   >
+                    <div
+                      className={cn(
+                        'absolute inset-0 opacity-0 transition-opacity duration-200',
+                        activeSidebarConnectionId === conn.id
+                          ? 'bg-[radial-gradient(circle_at_top,rgba(var(--glow-color),0.16),transparent_55%)] opacity-100'
+                          : 'bg-[radial-gradient(circle_at_top,rgba(var(--glow-color),0.12),transparent_58%)] group-hover:opacity-100',
+                      )}
+                    />
                     {activeSidebarConnectionId === conn.id && (
-                      <div className="absolute inset-y-2 left-0 w-0.5 bg-primary" />
+                      <>
+                        <div className="absolute inset-y-2 left-0 w-0.5 bg-primary" />
+                        <div className="absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+                      </>
                     )}
 
-                    <div className="flex flex-col items-center gap-1">
+                    <div className="relative flex flex-col items-center gap-1.5">
                       <div
                         className={cn(
-                          "flex h-9 w-9 items-center justify-center rounded-md border transition-all",
+                          'flex h-10 w-10 items-center justify-center rounded-md border transition-all duration-200',
                           activeSidebarConnectionId === conn.id
-                            ? "border-primary/30 bg-primary/15 text-primary"
-                            : "border-border/60 bg-background/80 text-muted-foreground group-hover:border-primary/25 group-hover:text-primary"
+                            ? 'border-primary/22 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+                            : 'border-border/30 bg-background/88 text-muted-foreground shadow-sm shadow-black/10 group-hover:border-primary/18 group-hover:text-primary',
                         )}
                       >
-                        <div className="flex items-center justify-center">
-                          {conn.type === 'turso' ? (
-                            <Cloud
-                              size={18}
-                              className={cn(
-                                "transition-transform",
-                                activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
-                              )}
-                            />
-                          ) : conn.type === 'postgres' ? (
-                            <Server
-                              size={18}
-                              className={cn(
-                                "transition-transform",
-                                activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
-                              )}
-                            />
-                          ) : (
-                            <Database
-                              size={18}
-                              className={cn(
-                                "transition-transform",
-                                activeSidebarConnectionId === conn.id ? "scale-100" : "group-hover:scale-110"
-                              )}
-                            />
-                          )}
-                        </div>
+                        {getConnectionTypeIcon(
+                          conn.type,
+                          cn(
+                            'transition-transform duration-200',
+                            activeSidebarConnectionId === conn.id ? 'scale-100' : 'group-hover:scale-110',
+                          ),
+                        )}
                       </div>
 
-                      <div className="w-full space-y-0.5 pt-0.5 text-center">
-                        <p className="truncate text-[10px] font-medium leading-none text-foreground/90">
+                      <div className="w-full space-y-1 pt-0.5 text-center">
+                        <p className="truncate px-0.5 text-[10px] font-medium leading-none text-foreground/90">
                           {conn.name}
                         </p>
                         {conn.tag && (
                           <span
                             className={cn(
-                              'inline-flex max-w-full items-center rounded-sm border px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.12em]',
-                              TAG_STYLES[conn.tag]
+                              'inline-flex max-w-full items-center rounded-sm border px-1 py-0.5 text-[7px] font-semibold uppercase tracking-[0.14em]',
+                              TAG_STYLES[conn.tag],
                             )}
                           >
-                            {conn.tag === 'production' ? 'PROD' : 
-                             conn.tag === 'development' ? 'DEV' : 
-                             conn.tag === 'testing' ? 'TEST' : 
-                             conn.tag}
+                            {getConnectionTagLabel(conn.tag)}
                           </span>
                         )}
                       </div>
@@ -139,7 +152,7 @@ export default function DatabaseBar() {
                   </button>
                 </TooltipTrigger>
               </ContextMenuTrigger>
-              <TooltipContent side="right" className="bg-popover text-popover-foreground border-border ml-1 px-3 py-1.5 shadow-xl">
+              <TooltipContent side="right" className="ml-1 border-border/60 bg-popover px-3 py-1.5 text-popover-foreground shadow-xl">
                 <p className="font-medium text-sm">{conn.name}</p>
                 {getConnectionDatabaseName(conn) && (
                   <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-primary/80">
@@ -166,24 +179,28 @@ export default function DatabaseBar() {
             </ContextMenuContent>
           </ContextMenu>
         ))}
-        
-        {activeConnections.length > 0 && <div className="w-10 h-px bg-border/70 my-0.5" />}
-        
+
+        {activeConnections.length > 0 && (
+          <div className="my-1 flex w-full justify-center px-1">
+            <div className="h-px w-10 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+          </div>
+        )}
+
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={handleShowConnectionDialog}
-              className="w-full rounded-md border border-dashed border-border/60 bg-secondary/10 px-1.5 py-2 text-muted-foreground hover:border-primary/30 hover:bg-secondary/40 hover:text-foreground transition-all group mt-0.5"
+              className="group mt-0.5 w-full rounded-md border border-dashed border-border/35 bg-background/55 px-1.5 py-2 text-muted-foreground transition-all duration-200 hover:border-primary/22 hover:bg-background/78 hover:text-foreground"
             >
-              <div className="flex flex-col items-center gap-1">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 bg-background/80 group-hover:border-primary/25 group-hover:text-primary">
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border/30 bg-background/88 shadow-sm shadow-black/10 transition-colors group-hover:border-primary/18 group-hover:text-primary">
                   <Plus size={18} className="group-hover:scale-110 transition-transform" />
                 </div>
-                <span className="text-[9px] font-medium uppercase tracking-[0.12em]">New</span>
+                <span className="text-[9px] font-medium uppercase tracking-[0.16em]">New</span>
               </div>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right" className="bg-popover text-popover-foreground border-border ml-1">
+          <TooltipContent side="right" className="ml-1 border-border/60 bg-popover text-popover-foreground">
             <p>New Connection</p>
           </TooltipContent>
         </Tooltip>

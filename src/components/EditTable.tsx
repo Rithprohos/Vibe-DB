@@ -143,6 +143,12 @@ export default function EditTable({ tableName, tabId }: Props) {
     () => getEngineTypeLabel(engineType),
     [engineType],
   );
+  const currentTableBaseName = useMemo(
+    () => splitQualifiedTableName(currentTableName).name,
+    [currentTableName],
+  );
+  const hasConnection = Boolean(connId);
+  const isAnyBusyAction = busyAction !== null;
 
   const refreshStructure = useCallback(async (
     targetTableName = currentTableName,
@@ -280,7 +286,13 @@ export default function EditTable({ tableName, tabId }: Props) {
   }, [connectionId, updateTab]);
 
   const runAlter = useCallback(async (actionKey: string, query: string, successMessage: string) => {
-    if (!connId) return false;
+    if (!connId) {
+      setError(
+        'Connection is unavailable. Re-open this table from the sidebar and try again.',
+      );
+      showToast({ type: 'error', message: 'Connection unavailable' });
+      return false;
+    }
 
     setBusyAction(actionKey);
     setError('');
@@ -300,7 +312,7 @@ export default function EditTable({ tableName, tabId }: Props) {
 
   const handleRenameTable = useCallback(async () => {
     const trimmedNewName = nextTableName.trim();
-    if (!trimmedNewName || trimmedNewName === currentTableName) return;
+    if (!trimmedNewName || trimmedNewName === currentTableBaseName) return;
 
     const nameError = validateTableName(trimmedNewName);
     if (nameError) {
@@ -340,6 +352,7 @@ export default function EditTable({ tableName, tabId }: Props) {
       showToast({ type: 'info', message: 'Renamed, but schema refresh failed' });
     }
   }, [
+    currentTableBaseName,
     currentTableName,
     nextTableName,
     refreshStructure,
@@ -568,32 +581,50 @@ export default function EditTable({ tableName, tabId }: Props) {
 
   const isBusy = useCallback((action: string) => busyAction === action, [busyAction]);
   const handleRefreshSchema = useCallback(() => {
+    if (!hasConnection || isAnyBusyAction) return;
     void refreshStructure(currentTableName);
-  }, [currentTableName, refreshStructure]);
+  }, [currentTableName, hasConnection, isAnyBusyAction, refreshStructure]);
 
   return (
-    <div className="h-full overflow-auto bg-background custom-scrollbar-hide">
-      <div className="mx-auto max-w-7xl p-4 md:p-6 space-y-4">
+    <div className="relative h-full overflow-auto custom-scrollbar-hide">
+      <div
+        className={
+          'pointer-events-none absolute inset-0 ' +
+          'bg-[radial-gradient(120%_90%_at_0%_0%,hsl(var(--primary)/0.08),transparent_55%),' +
+          'radial-gradient(80%_90%_at_100%_0%,hsl(var(--foreground)/0.05),transparent_55%)]'
+        }
+      />
+      <div className="relative mx-auto max-w-7xl space-y-4 p-4 md:p-6">
         <EditTableHeader
           currentTableName={currentTableName}
           loadingColumns={loadingColumns}
+          isAnyBusyAction={isAnyBusyAction}
+          hasConnection={hasConnection}
           columns={columns}
           indexes={indexes}
           connectionName={connection?.name}
+          engineTypeLabel={engineTypeLabel}
           onRefresh={handleRefreshSchema}
         />
 
+        {!hasConnection && (
+          <EditTableErrorBanner
+            error="Connection unavailable. Re-open this table from the sidebar to continue schema edits."
+          />
+        )}
         {error && <EditTableErrorBanner error={error} />}
 
         <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
-        <EditTableOperationsPanel
+          <EditTableOperationsPanel
             loadingColumns={loadingColumns}
+            isAnyBusyAction={isAnyBusyAction}
+            operationsEnabled={hasConnection}
             isBusy={isBusy}
             columns={columns}
             manageableIndexes={manageableIndexes}
-          currentTableName={currentTableName}
-          engineType={engineType}
-          engineTypeLabel={engineTypeLabel}
+            currentTableBaseName={currentTableBaseName}
+            engineType={engineType}
+            engineTypeLabel={engineTypeLabel}
             engineDataTypes={engineDataTypes}
             nextTableName={nextTableName}
             onNextTableNameChange={setNextTableName}

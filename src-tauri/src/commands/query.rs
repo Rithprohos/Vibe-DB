@@ -58,13 +58,7 @@ pub async fn execute_query(
     match engine.execute_query(&query).await {
         Ok(result) => {
             let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
-            emit_sql_log(
-                &app,
-                query,
-                "success",
-                duration_ms,
-                result.message.clone(),
-            );
+            emit_sql_log(&app, query, "success", duration_ms, result.message.clone());
             Ok(ExecuteQueryResponse {
                 result,
                 duration_ms,
