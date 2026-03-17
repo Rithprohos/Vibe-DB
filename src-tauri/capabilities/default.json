@@ -11,6 +11,7 @@
     "dialog:default",
     "store:default",
     "stronghold:default",
+    "clipboard-manager:allow-write-image",
     "core:window:allow-start-dragging",
     "updater:default",
     "process:default",

@@ -64,6 +64,8 @@
     --glass-elevated-bg: rgba(0, 0, 0, 0.6);
     --glow-color: 0, 229, 153;
     --panel-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+    --schema-card-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+    --schema-card-shadow-hover: 0 18px 36px rgba(0, 0, 0, 0.24);
   }
 
   /* Light Theme */
@@ -116,6 +118,8 @@
     --glass-elevated-bg: rgba(255, 255, 255, 0.9);
     --glow-color: 0, 179, 119;
     --panel-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 12px rgba(15, 23, 42, 0.04);
+    --schema-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 10px 24px rgba(15, 23, 42, 0.09);
+    --schema-card-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.72), 0 14px 32px rgba(15, 23, 42, 0.12);
   }
 
   /* Dark Modern Theme */
@@ -168,6 +172,8 @@
     --glass-elevated-bg: rgba(0, 0, 0, 0.6);
     --glow-color: 88, 166, 255;
     --panel-shadow: 0 14px 28px rgba(0, 0, 0, 0.3);
+    --schema-card-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+    --schema-card-shadow-hover: 0 18px 36px rgba(0, 0, 0, 0.26);
   }
 
   /* Purple Solarized Theme */
@@ -220,6 +226,8 @@
     --glass-elevated-bg: rgba(26, 22, 37, 0.8);
     --glow-color: 167, 139, 250;
     --panel-shadow: 0 14px 28px rgba(12, 8, 20, 0.38);
+    --schema-card-shadow: 0 14px 30px rgba(12, 8, 20, 0.24);
+    --schema-card-shadow-hover: 0 18px 36px rgba(12, 8, 20, 0.34);
   }
 
   input:-webkit-autofill,
@@ -354,6 +362,46 @@
 }
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+
+.schema-export-frame .schema-relationship-path,
+.schema-export-frame .schema-relationship-path-glow {
+  animation: none !important;
+  filter: none !important;
+}
+
+.schema-export-frame {
+  background-color: var(--bg-primary);
+}
+
+.schema-export-frame .schema-table-card {
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.schema-table-card {
+  box-shadow: var(--schema-card-shadow, 0 14px 30px rgba(0, 0, 0, 0.16));
+}
+
+.schema-table-card:hover {
+  box-shadow: var(--schema-card-shadow-hover, 0 18px 36px rgba(0, 0, 0, 0.24));
+}
+
+.schema-export-frame .schema-helper-chip,
+.schema-screenshot-preview-card {
+  background-color: var(--card) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  opacity: 1 !important;
+}
+
+.schema-screenshot-preview-header,
+.schema-screenshot-preview-body {
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 @keyframes schema-dash-flow {

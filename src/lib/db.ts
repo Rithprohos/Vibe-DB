@@ -1,4 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { desktopDir, join } from "@tauri-apps/api/path";
 import type { ColumnDef, ForeignKeyConstraint, CheckConstraint } from "./createTableConstants";
 import type { QueryExecutionSurface } from "./queryGuard";
 import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
@@ -15,6 +16,16 @@ import {
   hasStoredAiApiKey,
   saveStoredAiApiKey,
 } from "./aiKeyStore";
+
+export interface SaveSchemaScreenshotInput {
+  destinationPath: string;
+  pngBytes: number[];
+}
+
+export interface SaveSchemaScreenshotResult {
+  path: string;
+  message: string;
+}
 
 export interface QueryFilter {
   field: string;
@@ -372,5 +383,38 @@ export async function dropTable(
 ): Promise<QueryResult> {
   return measureDevFetch("drop_table", () =>
     invoke<QueryResult>("drop_table", { tableName, connId }),
+  );
+}
+
+function formatScreenshotPart(value: number): string {
+  return value.toString().padStart(2, "0");
+}
+
+export function buildSchemaScreenshotFileName(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = formatScreenshotPart(date.getMonth() + 1);
+  const day = formatScreenshotPart(date.getDate());
+  const hour = formatScreenshotPart(date.getHours());
+  const minute = formatScreenshotPart(date.getMinutes());
+  const second = formatScreenshotPart(date.getSeconds());
+  return `schema-${year}-${month}-${day}-${hour}-${minute}-${second}.png`;
+}
+
+export async function buildSchemaScreenshotDesktopPath(
+  date = new Date(),
+): Promise<string> {
+  if (!isTauri()) {
+    throw new Error("Desktop auto-save is only available in the desktop app");
+  }
+
+  const desktopPath = await desktopDir();
+  return join(desktopPath, buildSchemaScreenshotFileName(date));
+}
+
+export async function saveSchemaScreenshot(
+  input: SaveSchemaScreenshotInput,
+): Promise<SaveSchemaScreenshotResult> {
+  return measureDevFetch("save_schema_screenshot", () =>
+    invoke<SaveSchemaScreenshotResult>("save_schema_screenshot", { input }),
   );
 }

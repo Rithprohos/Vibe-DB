@@ -13,10 +13,11 @@ use ai::config::AI_STRONGHOLD_PASSWORD_SALT;
 use ai::{generate_sql, get_default_ai_provider_config, ping_ai_provider};
 use app_state::AppState;
 use commands::{
-    connect_database, create_database, delete_rows, disconnect_database, drop_table, execute_query,
-    execute_transaction, export_table_data, get_database_version, get_filtered_row_count,
-    get_table_data, get_table_row_count, get_table_structure, import_table_data, insert_rows,
-    list_tables, set_active_connection, truncate_table, update_connection_tag, update_rows,
+    connect_database, copy_schema_screenshot, create_database, delete_rows, disconnect_database,
+    drop_table, execute_query, execute_transaction, export_table_data, get_database_version,
+    get_filtered_row_count, get_table_data, get_table_row_count, get_table_structure,
+    import_table_data, insert_rows, list_tables, save_schema_screenshot, set_active_connection,
+    truncate_table, update_connection_tag, update_rows,
 };
 use menu::setup_menu;
 use sql_helpers::{build_create_table_sql, build_create_view_sql};
@@ -50,6 +51,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             connect_database,
@@ -72,6 +74,8 @@ pub fn run() {
             insert_rows,
             import_table_data,
             export_table_data,
+            save_schema_screenshot,
+            copy_schema_screenshot,
             update_rows,
             truncate_table,
             get_default_ai_provider_config,
