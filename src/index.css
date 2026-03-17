@@ -290,7 +290,12 @@
   }
 
   .schema-relationship-path {
-    animation: schema-dash-flow 1s linear infinite;
+    animation: schema-dash-flow 0.9s linear infinite;
+    filter: drop-shadow(0 0 1px color-mix(in srgb, var(--foreground) 28%, transparent));
+  }
+
+  .schema-relationship-path-glow {
+    filter: blur(0.2px);
   }
 }
 
@@ -357,7 +362,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .schema-relationship-path {
+  .schema-relationship-path,
+  .schema-relationship-path-glow {
     animation: none;
   }
 }

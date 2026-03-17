@@ -71,6 +71,12 @@ interface VisualRelationship {
   targetColumnIndex: number;
 }
 
+interface VisualRelationshipGeometry {
+  path: string;
+  sourcePoint: VisualizationPoint;
+  targetPoint: VisualizationPoint;
+}
+
 type InteractionState =
   | {
       mode: 'pan';
@@ -237,6 +243,10 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const relationshipRefs = useRef<Record<string, SVGPathElement | null>>({});
+  const relationshipGlowRefs = useRef<Record<string, SVGPathElement | null>>({});
+  const relationshipEndpointRefs = useRef<
+    Record<string, { source: SVGCircleElement | null; target: SVGCircleElement | null }>
+  >({});
   const defaultPositionsRef = useRef<Record<string, VisualizationPoint>>({});
   const persistedPositionsRef = useRef<Record<string, VisualizationPoint>>({});
   const interactionRef = useRef<InteractionState | null>(null);
@@ -446,7 +456,7 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
     );
   }, []);
 
-  const buildRelationshipPath = useCallback((relationship: VisualRelationship): string => {
+  const buildRelationshipGeometry = useCallback((relationship: VisualRelationship): VisualRelationshipGeometry => {
     const sourcePosition = getResolvedPosition(relationship.sourceTableName);
     const targetPosition = getResolvedPosition(relationship.targetTableName);
 
@@ -489,17 +499,36 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
     const horizontalGap = Math.max(Math.abs(targetX - sourceX) / 2, 40);
     const midX = sourceOnLeft ? sourceX + horizontalGap : sourceX - horizontalGap;
 
-    return `M ${sourceX} ${sourceY} L ${midX} ${sourceY} L ${midX} ${targetY} L ${targetX} ${targetY}`;
+    return {
+      path: `M ${sourceX} ${sourceY} L ${midX} ${sourceY} L ${midX} ${targetY} L ${targetX} ${targetY}`,
+      sourcePoint: { x: sourceX, y: sourceY },
+      targetPoint: { x: targetX, y: targetY },
+    };
   }, [getResolvedPosition]);
 
   const applyRelationshipPath = useCallback((relationship: VisualRelationship) => {
+    const geometry = buildRelationshipGeometry(relationship);
+
     const pathNode = relationshipRefs.current[relationship.key];
-    if (!pathNode) {
-      return;
+    if (pathNode) {
+      pathNode.setAttribute('d', geometry.path);
     }
 
-    pathNode.setAttribute('d', buildRelationshipPath(relationship));
-  }, [buildRelationshipPath]);
+    const glowNode = relationshipGlowRefs.current[relationship.key];
+    if (glowNode) {
+      glowNode.setAttribute('d', geometry.path);
+    }
+
+    const endpointNodes = relationshipEndpointRefs.current[relationship.key];
+    if (endpointNodes?.source) {
+      endpointNodes.source.setAttribute('cx', geometry.sourcePoint.x.toString());
+      endpointNodes.source.setAttribute('cy', geometry.sourcePoint.y.toString());
+    }
+    if (endpointNodes?.target) {
+      endpointNodes.target.setAttribute('cx', geometry.targetPoint.x.toString());
+      endpointNodes.target.setAttribute('cy', geometry.targetPoint.y.toString());
+    }
+  }, [buildRelationshipGeometry]);
 
   const applyRelationshipPathsForTable = useCallback((tableName: string) => {
     relationships.forEach((relationship) => {
@@ -828,6 +857,8 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
           <div className="mt-1 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
             <span>{tables.length} tables</span>
             <span className="text-border">/</span>
+            <span>{relationships.length} links</span>
+            <span className="text-border">/</span>
             <span>{canvasZoom.toFixed(2)}x zoom</span>
             {connection?.type === 'postgres' && (
               <>
@@ -925,6 +956,13 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
             backgroundSize: '24px 24px',
           }}
         />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-80"
+          style={{
+            background:
+              'radial-gradient(960px circle at 10% 8%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 62%), radial-gradient(960px circle at 92% 88%, color-mix(in srgb, var(--accent-secondary) 12%, transparent), transparent 60%)',
+          }}
+        />
 
         <div className="pointer-events-none absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-sm border border-border/70 bg-card px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground shadow-lg shadow-black/10">
           <Move size={12} className="text-primary" />
@@ -966,21 +1004,79 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
             width="2400"
             height="2400"
           >
-            {relationships.map((relationship) => (
-              <path
-                key={relationship.key}
-                ref={(node) => {
-                  relationshipRefs.current[relationship.key] = node;
-                }}
-                className="schema-relationship-path"
-                d={buildRelationshipPath(relationship)}
-                fill="none"
-                stroke="var(--border-primary)"
-                strokeWidth="1.5"
-                strokeDasharray="8 8"
-                opacity="0.85"
-              />
-            ))}
+            {relationships.map((relationship) => {
+              const geometry = buildRelationshipGeometry(relationship);
+
+              return (
+                <g key={relationship.key}>
+                  <path
+                    ref={(node) => {
+                      relationshipGlowRefs.current[relationship.key] = node;
+                    }}
+                    className="schema-relationship-path-glow"
+                    d={geometry.path}
+                    fill="none"
+                    stroke="color-mix(in srgb, var(--primary) 62%, var(--foreground) 38%)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                    opacity="0.24"
+                  />
+                  <path
+                    ref={(node) => {
+                      relationshipRefs.current[relationship.key] = node;
+                    }}
+                    className="schema-relationship-path"
+                    d={geometry.path}
+                    fill="none"
+                    stroke="color-mix(in srgb, var(--foreground) 76%, var(--primary) 24%)"
+                    strokeWidth="2.25"
+                    strokeDasharray="9 7"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                    opacity="0.97"
+                  />
+                  <circle
+                    ref={(node) => {
+                      const currentEndpoints =
+                        relationshipEndpointRefs.current[relationship.key] ??
+                        { source: null, target: null };
+                      relationshipEndpointRefs.current[relationship.key] = {
+                        ...currentEndpoints,
+                        source: node,
+                      };
+                    }}
+                    cx={geometry.sourcePoint.x}
+                    cy={geometry.sourcePoint.y}
+                    r="3.25"
+                    fill="var(--primary)"
+                    stroke="var(--bg-primary)"
+                    strokeWidth="1.25"
+                    vectorEffect="non-scaling-stroke"
+                    opacity="0.95"
+                  />
+                  <circle
+                    ref={(node) => {
+                      const currentEndpoints =
+                        relationshipEndpointRefs.current[relationship.key] ??
+                        { source: null, target: null };
+                      relationshipEndpointRefs.current[relationship.key] = {
+                        ...currentEndpoints,
+                        target: node,
+                      };
+                    }}
+                    cx={geometry.targetPoint.x}
+                    cy={geometry.targetPoint.y}
+                    r="2.75"
+                    fill="color-mix(in srgb, var(--foreground) 90%, var(--primary) 10%)"
+                    stroke="var(--bg-primary)"
+                    strokeWidth="1.2"
+                    vectorEffect="non-scaling-stroke"
+                    opacity="0.9"
+                  />
+                </g>
+              );
+            })}
           </svg>
 
           {tables.map((table) => {
@@ -995,7 +1091,7 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
                 ref={(node) => {
                   cardRefs.current[table.qualifiedName] = node;
                 }}
-                className="absolute w-[280px] select-none overflow-hidden rounded-sm border border-border/70 bg-card shadow-lg shadow-black/10"
+                className="absolute w-[280px] select-none overflow-hidden rounded-sm border border-border/80 bg-card/95 shadow-[0_14px_30px_rgba(0,0,0,0.16)] backdrop-blur-[2px] transition-shadow duration-200 hover:shadow-[0_18px_36px_rgba(0,0,0,0.24)]"
                 style={{
                   transform: `translate(${position.x}px, ${position.y}px)`,
                   willChange: 'transform',
@@ -1029,7 +1125,14 @@ export default function SchemaVisualization({ tabId }: SchemaVisualizationProps)
                       ref={(node) => {
                         rowRefs.current[`${table.qualifiedName}:${columnIndex}`] = node;
                       }}
-                      className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-4 py-2.5 text-sm"
+                      className={cn(
+                        'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-4 py-2.5 text-sm',
+                        column.isPrimaryKey
+                          ? 'bg-primary/[0.07]'
+                          : column.isForeignKey
+                            ? 'bg-primary/[0.045]'
+                            : '',
+                      )}
                     >
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         {column.isPrimaryKey ? (
