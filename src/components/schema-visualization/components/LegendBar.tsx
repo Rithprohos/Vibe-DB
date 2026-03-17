@@ -4,7 +4,7 @@ import { ConstraintDot } from './ConstraintDot';
 
 export function LegendBar() {
   return (
-    <div className="flex items-center gap-5 border-b border-border/60 bg-card px-4 py-2 text-[11px] text-muted-foreground">
+    <div className="flex select-none items-center gap-5 border-b border-border/60 bg-card px-4 py-2 text-[11px] text-muted-foreground">
       <span className="inline-flex items-center gap-1.5">
         <Key size={11} className="text-primary" />
         Primary key
