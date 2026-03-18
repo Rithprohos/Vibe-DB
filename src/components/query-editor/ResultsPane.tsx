@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, CheckCircle2, ChevronsLeftRightEllipsis, Play, Rows3, WrapText } from 'lucide-react';
 
@@ -10,6 +10,8 @@ import type { QueryResult } from '@/store/useAppStore';
 import type { SelectedCell } from './types';
 
 const VIRTUALIZATION_ROW_THRESHOLD = 100;
+const DEFAULT_COLUMN_WIDTH = 240;
+const MIN_COLUMN_WIDTH = 140;
 
 interface FormattedCell {
   text: string;
@@ -21,6 +23,7 @@ interface TableCellProps {
   text: string;
   className: string;
   isNumeric: boolean;
+  width: number;
   rowIdx: number;
   cellIdx: number;
   isActive: boolean;
@@ -32,21 +35,20 @@ const TableCell = memo(function TableCell({
   text,
   className,
   isNumeric,
+  width,
   rowIdx,
   cellIdx,
   isActive,
   wrapCells,
   onSelect,
 }: TableCellProps) {
-  const isFirstColumn = cellIdx === 0;
-
   return (
     <td
       className={cn(
         'overflow-hidden border-b border-r border-border/50 px-4 py-2.5 align-top last:border-r-0',
-        isFirstColumn ? 'w-[80px] min-w-[80px] max-w-[80px]' : 'w-[220px] min-w-[220px] max-w-[220px]',
         isActive && 'bg-primary/10 outline outline-1 outline-primary/40 -outline-offset-1'
       )}
+      style={{ width, minWidth: width, maxWidth: width }}
     >
       <button
         type="button"
@@ -73,6 +75,7 @@ const TableCell = memo(function TableCell({
 
 interface TableRowProps {
   row: FormattedCell[];
+  columnWidths: number[];
   rowIdx: number;
   selectedColumnIndex: number | null;
   wrapCells: boolean;
@@ -82,6 +85,7 @@ interface TableRowProps {
 
 const TableRow = memo(function TableRow({
   row,
+  columnWidths,
   rowIdx,
   selectedColumnIndex,
   wrapCells,
@@ -103,6 +107,7 @@ const TableRow = memo(function TableRow({
           text={cell.text}
           className={cell.className}
           isNumeric={cell.isNumeric}
+          width={columnWidths[cellIdx] ?? DEFAULT_COLUMN_WIDTH}
           rowIdx={rowIdx}
           cellIdx={cellIdx}
           isActive={selectedColumnIndex === cellIdx}
@@ -134,6 +139,10 @@ export const QueryResultsPane = memo(function QueryResultsPane({
   onToggleWrapCells,
 }: QueryResultsPaneProps) {
   const resultsScrollRef = useRef<HTMLDivElement>(null);
+  const [columnWidths, setColumnWidths] = useState<number[]>([]);
+  const resizeStateRef = useRef<{ columnIndex: number; startX: number; startWidth: number } | null>(null);
+  const [resizingColumnIndex, setResizingColumnIndex] = useState<number | null>(null);
+  const columnKey = result?.columns.join('\u0000') ?? '';
 
   const selectedCellDetails = useMemo(() => {
     if (!result || !selectedCell) return null;
@@ -191,6 +200,66 @@ export const QueryResultsPane = memo(function QueryResultsPane({
     }
   }, [wrapCells]);
 
+  useEffect(() => {
+    setColumnWidths(result?.columns.map(() => DEFAULT_COLUMN_WIDTH) ?? []);
+  }, [columnKey]);
+
+  useEffect(() => {
+    if (wrapCells && shouldVirtualizeRows) {
+      rowVirtualizer.measure();
+    }
+  }, [columnWidths, rowVirtualizer, shouldVirtualizeRows, wrapCells]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState) return;
+
+      const nextWidth = Math.max(MIN_COLUMN_WIDTH, resizeState.startWidth + event.clientX - resizeState.startX);
+
+      setColumnWidths((currentWidths) => {
+        if (currentWidths[resizeState.columnIndex] === nextWidth) {
+          return currentWidths;
+        }
+
+        const nextWidths = [...currentWidths];
+        nextWidths[resizeState.columnIndex] = nextWidth;
+        return nextWidths;
+      });
+    };
+
+    const stopResizing = () => {
+      resizeStateRef.current = null;
+      setResizingColumnIndex(null);
+      document.body.classList.remove('select-none', 'cursor-col-resize');
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopResizing);
+    window.addEventListener('pointercancel', stopResizing);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResizing);
+      window.removeEventListener('pointercancel', stopResizing);
+      document.body.classList.remove('select-none', 'cursor-col-resize');
+    };
+  }, []);
+
+  const handleResizeStart = useCallback((columnIndex: number, event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentWidth = columnWidths[columnIndex] ?? DEFAULT_COLUMN_WIDTH;
+    resizeStateRef.current = {
+      columnIndex,
+      startX: event.clientX,
+      startWidth: currentWidth,
+    };
+    setResizingColumnIndex(columnIndex);
+    document.body.classList.add('select-none', 'cursor-col-resize');
+  }, [columnWidths]);
+
   const virtualRows = shouldVirtualizeRows ? rowVirtualizer.getVirtualItems() : [];
   const virtualPaddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
   const virtualPaddingBottom =
@@ -200,6 +269,7 @@ export const QueryResultsPane = memo(function QueryResultsPane({
   const visibleRowIndexes = shouldVirtualizeRows
     ? virtualRows.map((virtualRow) => virtualRow.index)
     : formattedRows.map((_, index) => index);
+  const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-background relative z-0">
@@ -263,20 +333,37 @@ export const QueryResultsPane = memo(function QueryResultsPane({
                 </div>
 
                 <div ref={resultsScrollRef} className="flex-1 min-h-0 min-w-0 overflow-auto bg-background">
-                  <table className="border-separate border-spacing-0 text-left" style={{ width: `${80 + (columnCount - 1) * 220}px` }}>
+                  <table
+                    className="border-separate border-spacing-0 text-left"
+                    style={{ width: tableWidth > 0 ? `${tableWidth}px` : undefined }}
+                  >
                     <thead className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_var(--border-primary)]">
                       <tr className="border-b border-border">
                         {result.columns.map((col, idx) => (
                           <th
                             key={idx}
                             className={cn(
-                              'h-11 overflow-hidden border-b border-r border-border bg-background px-4 text-left text-[12px] font-semibold tracking-[0.04em] text-foreground last:border-r-0',
-                              idx === 0 ? 'w-[80px] min-w-[80px] max-w-[80px]' : 'w-[220px] min-w-[220px] max-w-[220px]'
+                              'relative h-11 overflow-hidden border-b border-r border-border bg-background px-4 pr-6 text-left text-[12px] font-semibold tracking-[0.04em] text-foreground last:border-r-0'
                             )}
+                            style={{
+                              width: columnWidths[idx] ?? DEFAULT_COLUMN_WIDTH,
+                              minWidth: columnWidths[idx] ?? DEFAULT_COLUMN_WIDTH,
+                              maxWidth: columnWidths[idx] ?? DEFAULT_COLUMN_WIDTH,
+                            }}
                           >
                             <span className="block overflow-hidden text-ellipsis whitespace-nowrap leading-5">
                               {col}
                             </span>
+                            <div
+                              role="separator"
+                              aria-label={`Resize ${col} column`}
+                              aria-orientation="vertical"
+                              onPointerDown={(event) => handleResizeStart(idx, event)}
+                              className={cn(
+                                'absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none transition-colors',
+                                resizingColumnIndex === idx ? 'bg-primary/70' : 'hover:bg-primary/40'
+                              )}
+                            />
                           </th>
                         ))}
                       </tr>
@@ -294,6 +381,7 @@ export const QueryResultsPane = memo(function QueryResultsPane({
                           <TableRow
                             key={rowIdx}
                             row={formattedRows[rowIdx]}
+                            columnWidths={columnWidths}
                             rowIdx={rowIdx}
                             selectedColumnIndex={isRowSelected ? selectedCell.columnIndex : null}
                             wrapCells={wrapCells}
