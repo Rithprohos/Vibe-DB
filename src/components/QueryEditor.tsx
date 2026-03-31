@@ -12,6 +12,7 @@ import {
 } from '@/lib/queryGuard';
 import { buildSavedQueryDefaultName } from '@/lib/savedQueries';
 import { useDevRenderCounter } from '@/lib/dev-performance';
+import { getCodeMirrorTheme } from '@/lib/codemirrorTheme';
 import { useAppStore, MAX_RESULT_ROWS } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,6 +75,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const connectionId = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.connectionId ?? '', [tabId]));
   const title = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.title ?? '', [tabId]));
   const query = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.query ?? '', [tabId]));
+  const theme = useAppStore(s => s.theme);
   const result = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.result ?? null, [tabId]));
   const error = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.error ?? '', [tabId]));
   const savedQueryId = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.savedQueryId ?? null, [tabId]));
@@ -448,6 +450,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     () => (wrapEditor ? [sql({ schema }), EditorView.lineWrapping, runKeymap] : [sql({ schema }), runKeymap]),
     [schema, runKeymap, wrapEditor],
   );
+  const editorTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
 
   const canRun = Boolean(activeConnectionConnId) && !running;
   const confirmationStatements = pendingConfirmation?.policy.confirmStatements.join(', ') ?? '';
@@ -465,6 +468,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         saveButtonLabel={saveButtonLabel}
         query={query}
         editorExtensions={editorExtensions}
+        editorTheme={editorTheme}
         wrapEditor={wrapEditor}
         isProductionConnection={isProductionConnection}
         basicSetup={BASIC_SETUP}
