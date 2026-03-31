@@ -3,7 +3,6 @@ import { useAppStore } from '../store/useAppStore';
 import { listTables } from '../lib/db';
 import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -22,7 +21,6 @@ import {
   X,
   Cloud,
   Server,
-  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
@@ -85,7 +83,6 @@ export default function Sidebar() {
     ? (tablesByConnection[activeSidebarConnectionId] || []) 
     : [];
 
-  const [search, setSearch] = useState('');
   const [tablesOpen, setTablesOpen] = useState(true);
   const [viewsOpen, setViewsOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
@@ -153,7 +150,6 @@ export default function Sidebar() {
     };
   }, [isResizing, resize, stopResizing]);
 
-  const normalizedSearch = useMemo(() => search.trim().toLowerCase(), [search]);
   const isPostgresConnection = activeConnection?.type === 'postgres';
   const activeDatabaseName = useMemo(
     () => (activeConnection ? getConnectionDatabaseName(activeConnection) : null),
@@ -226,11 +222,6 @@ export default function Sidebar() {
         return;
       }
 
-      const haystack = `${table.name} ${schemaName ?? ''}`.toLowerCase();
-      if (normalizedSearch && !haystack.includes(normalizedSearch)) {
-        return;
-      }
-
       if (table.table_type === 'view') {
         nextViews.push(table);
       } else if (table.table_type === 'table') {
@@ -239,7 +230,7 @@ export default function Sidebar() {
     });
 
     return { filteredTables: nextTables, filteredViews: nextViews };
-  }, [tables, normalizedSearch, selectedSchema, showSchemaFilter]);
+  }, [tables, selectedSchema, showSchemaFilter]);
   const orderedFilteredTables = useMemo(
     () => orderPinnedTablesFirst(filteredTables, pinnedTableNameSet),
     [filteredTables, pinnedTableNameSet],
@@ -402,7 +393,7 @@ export default function Sidebar() {
       }}
     >
       <div className="pointer-events-none absolute inset-y-3 right-0 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
-      <div className="relative z-10 border-b border-border/20 px-3 pb-3 pt-3">
+      <div className="relative z-10 px-3 pb-2 pt-3">
         {isConnected && activeConnection?.connId ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
@@ -580,7 +571,7 @@ export default function Sidebar() {
       </div>
 
       {isConnected && (
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col px-3 pb-4 pt-2">
           <div className={cn(SIDEBAR_PANEL_CLASS_NAME, 'p-2.5')}>
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(var(--glow-color),0.1),transparent_60%)] opacity-65" />
             <div className="relative mb-2 flex items-center justify-between px-1">
@@ -619,40 +610,6 @@ export default function Sidebar() {
               >
                 <RefreshCw size={14} className={cn(isRefreshing && 'animate-spin')} />
               </Button>
-            </div>
-          </div>
-
-          <div className={cn(SIDEBAR_PANEL_CLASS_NAME, 'mt-3 p-2.5')}>
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(var(--glow-color),0.12),transparent_58%)] opacity-70" />
-            <div className="relative mb-2 flex items-center justify-between px-1">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
-                Object Search
-              </div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground/60">
-                {visibleObjectCount}
-              </div>
-            </div>
-            <div
-              className={cn(
-                SIDEBAR_FIELD_CLASS_NAME,
-                'group relative overflow-hidden focus-within:border-primary/55 focus-within:bg-background/94',
-              )}
-            >
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_left,rgba(var(--glow-color),0.12),transparent_50%)] opacity-60 transition-opacity duration-200 group-focus-within:opacity-100" />
-              <Search
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-primary/70 transition-colors duration-200 group-focus-within:text-primary"
-              />
-              <Input
-                type="text"
-                placeholder={showSchemaFilter ? 'Search tables or schemas...' : 'Search tables...'}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 border-0 bg-transparent pl-10 pr-16 text-[13px] font-medium text-foreground placeholder:text-muted-foreground/72 shadow-none focus-visible:ring-0"
-              />
-              <div className="pointer-events-none absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-sm border border-border/45 bg-background/82 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.14em] text-foreground/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                {visibleObjectCount}
-              </div>
             </div>
           </div>
 
@@ -752,7 +709,7 @@ export default function Sidebar() {
                 )}
               />
 
-              {filteredTables.length === 0 && filteredViews.length === 0 && !search && (
+              {filteredTables.length === 0 && filteredViews.length === 0 && (
                 <div className="mt-4 rounded-md bg-background/34 px-4 py-8 text-center">
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-sm bg-background/78">
                     <Inbox size={20} className="text-muted-foreground/55" />
