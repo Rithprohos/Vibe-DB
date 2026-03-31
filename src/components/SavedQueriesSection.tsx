@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, FileCode2, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileCode2, Trash2 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { getSavedQueriesForConnection, getSavedQuerySortValue } from "@/lib/savedQueries";
@@ -21,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { Input } from "./ui/input";
 
 interface RenameState {
   id: string;
@@ -43,31 +42,25 @@ function SavedQueriesSectionComponent() {
   const deleteSavedQuery = useAppStore((state) => state.deleteSavedQuery);
   const showToast = useAppStore((state) => state.showToast);
 
-  const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [renameState, setRenameState] = useState<RenameState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedQuery | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const normalizedSearch = useMemo(() => search.trim().toLocaleLowerCase(), [search]);
   const scopedSavedQueries = useMemo(
     () => getSavedQueriesForConnection(savedQueries, activeSidebarConnectionId),
     [activeSidebarConnectionId, savedQueries],
   );
 
-  const filteredSavedQueries = useMemo(
+  const sortedSavedQueries = useMemo(
     () =>
       [...scopedSavedQueries]
-        .sort((left, right) => getSavedQuerySortValue(right) - getSavedQuerySortValue(left))
-        .filter((savedQuery) => {
-          if (!normalizedSearch) return true;
-          return savedQuery.name.toLocaleLowerCase().includes(normalizedSearch);
-        }),
-    [normalizedSearch, scopedSavedQueries],
+        .sort((left, right) => getSavedQuerySortValue(right) - getSavedQuerySortValue(left)),
+    [scopedSavedQueries],
   );
 
   const virtualizer = useVirtualizer({
-    count: open ? filteredSavedQueries.length : 0,
+    count: open ? sortedSavedQueries.length : 0,
     getScrollElement: () => listRef.current,
     estimateSize: () => 42,
     overscan: 10,
@@ -140,95 +133,78 @@ function SavedQueriesSectionComponent() {
         >
           <div className="min-h-0 overflow-hidden">
             <div className="flex min-h-0 flex-1 flex-col gap-3 pt-2">
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60"
-              />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search saved queries..."
-                className="h-8 border-border/35 bg-background pl-8 text-sm font-medium placeholder:text-muted-foreground/40 focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
-              />
+              {scopedSavedQueries.length === 0 ? (
+                <div className="rounded-sm border border-dashed border-border/70 bg-background/30 px-4 py-6 text-center">
+                  <FileCode2 size={18} className="mx-auto mb-2 text-muted-foreground/50" />
+                  <div className="text-sm font-medium text-foreground">No saved queries</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Save SQL from a query tab to keep reusable snippets here.
+                  </div>
+                </div>
+              ) : (
+                <div ref={listRef} className="min-h-0 flex-1 overflow-auto pr-1">
+                  <div
+                    style={{
+                      height: `${virtualizer.getTotalSize()}px`,
+                      position: "relative",
+                    }}
+                  >
+                    {virtualizer.getVirtualItems().map((virtualItem) => {
+                      const savedQuery = sortedSavedQueries[virtualItem.index];
+                      return (
+                        <div
+                          key={savedQuery.id}
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            transform: `translateY(${virtualItem.start}px)`,
+                            paddingBottom: "4px",
+                          }}
+                        >
+                          <ContextMenu modal={false}>
+                            <ContextMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 rounded-sm border border-transparent bg-background/40 px-2 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent hover:text-foreground"
+                                onClick={() => handleOpenSavedQuery(savedQuery)}
+                              >
+                                <FileCode2 size={14} className="shrink-0 text-primary/80" />
+                                <span className="min-w-0 flex-1 truncate font-medium">
+                                  {savedQuery.name}
+                                </span>
+                              </button>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent className="w-44">
+                              <ContextMenuItem onClick={() => handleOpenSavedQuery(savedQuery)}>
+                                Open in New Tab
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onClick={() =>
+                                  setRenameState({
+                                    id: savedQuery.id,
+                                    initialName: savedQuery.name,
+                                  })
+                                }
+                              >
+                                Rename
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteTarget(savedQuery)}
+                              >
+                                Delete
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-
-            {scopedSavedQueries.length === 0 ? (
-              <div className="rounded-sm border border-dashed border-border/70 bg-background/30 px-4 py-6 text-center">
-                <FileCode2 size={18} className="mx-auto mb-2 text-muted-foreground/50" />
-                <div className="text-sm font-medium text-foreground">No saved queries</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Save SQL from a query tab to keep reusable snippets here.
-                </div>
-              </div>
-            ) : filteredSavedQueries.length === 0 ? (
-              <div className="rounded-sm border border-border/60 bg-background/30 px-4 py-5 text-center text-sm text-muted-foreground">
-                No saved queries match this search.
-              </div>
-            ) : (
-              <div ref={listRef} className="min-h-0 flex-1 overflow-auto pr-1">
-                <div
-                  style={{
-                    height: `${virtualizer.getTotalSize()}px`,
-                    position: "relative",
-                  }}
-                >
-                  {virtualizer.getVirtualItems().map((virtualItem) => {
-                    const savedQuery = filteredSavedQueries[virtualItem.index];
-                    return (
-                      <div
-                        key={savedQuery.id}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: "100%",
-                          transform: `translateY(${virtualItem.start}px)`,
-                          paddingBottom: "4px",
-                        }}
-                      >
-                        <ContextMenu modal={false}>
-                          <ContextMenuTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-sm border border-transparent bg-background/40 px-2 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent hover:text-foreground"
-                              onClick={() => handleOpenSavedQuery(savedQuery)}
-                            >
-                              <FileCode2 size={14} className="shrink-0 text-primary/80" />
-                              <span className="min-w-0 flex-1 truncate font-medium">
-                                {savedQuery.name}
-                              </span>
-                            </button>
-                          </ContextMenuTrigger>
-                          <ContextMenuContent className="w-44">
-                            <ContextMenuItem onClick={() => handleOpenSavedQuery(savedQuery)}>
-                              Open in New Tab
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              onClick={() =>
-                                setRenameState({
-                                  id: savedQuery.id,
-                                  initialName: savedQuery.name,
-                                })
-                              }
-                            >
-                              Rename
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteTarget(savedQuery)}
-                            >
-                              Delete
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
           </div>
         </div>
       </div>
