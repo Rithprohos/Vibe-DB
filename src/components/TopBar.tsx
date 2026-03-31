@@ -66,6 +66,15 @@ export default function TopBar() {
 
     return navigator.platform.toLowerCase().includes('mac') ? 'Cmd+K' : 'Ctrl+K';
   }, []);
+  const quickSearchShortcutKeys = useMemo(() => {
+    if (typeof navigator === 'undefined') {
+      return { modifier: 'Ctrl', key: 'K' };
+    }
+
+    return navigator.platform.toLowerCase().includes('mac')
+      ? { modifier: '⌘', key: 'K' }
+      : { modifier: 'Ctrl', key: 'K' };
+  }, []);
 
   return (
     <div
@@ -77,8 +86,8 @@ export default function TopBar() {
       </div>
 
       {/* Center: Title */}
-      <div 
-        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-[12px] font-medium text-muted-foreground/80 gap-1.5" 
+      <div
+        className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-[12px] font-medium text-muted-foreground/80 gap-1.5"
         data-tauri-drag-region
       >
         <span>Vibe DB {activeConnection ? `— ${activeConnection.name}` : ''}</span>
@@ -109,14 +118,19 @@ export default function TopBar() {
         )}
         <button
           onClick={openQuickSearch}
-          className="p-1.5 rounded hover:bg-secondary transition-colors"
+          className="flex items-center gap-1.5 rounded border border-border/70 bg-secondary/45 px-2 py-1 text-foreground/90 transition-colors hover:bg-secondary/80"
           title={`Quick Search (${quickSearchShortcutLabel})`}
           aria-label={`Open quick search (${quickSearchShortcutLabel})`}
           aria-keyshortcuts="Meta+K Control+K"
         >
           <Search size={15} />
+          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm leading-none">
+            <span>{quickSearchShortcutKeys.modifier}</span>
+            <span>+</span>
+            <span>{quickSearchShortcutKeys.key}</span>
+          </span>
         </button>
-        <button 
+        <button
           onClick={openSettings}
           className="p-1.5 rounded hover:bg-secondary transition-colors"
         >
