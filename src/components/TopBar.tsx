@@ -59,6 +59,13 @@ export default function TopBar() {
     () => (databaseVersion ? formatDatabaseVersion(databaseVersion) : ''),
     [databaseVersion]
   );
+  const quickSearchShortcutLabel = useMemo(() => {
+    if (typeof navigator === 'undefined') {
+      return 'Ctrl+K';
+    }
+
+    return navigator.platform.toLowerCase().includes('mac') ? 'Cmd+K' : 'Ctrl+K';
+  }, []);
 
   return (
     <div
@@ -103,8 +110,9 @@ export default function TopBar() {
         <button
           onClick={openQuickSearch}
           className="p-1.5 rounded hover:bg-secondary transition-colors"
-          title="Quick Search"
-          aria-label="Open quick search"
+          title={`Quick Search (${quickSearchShortcutLabel})`}
+          aria-label={`Open quick search (${quickSearchShortcutLabel})`}
+          aria-keyshortcuts="Meta+K Control+K"
         >
           <Search size={15} />
         </button>
