@@ -12,6 +12,8 @@ import {
 } from "@/lib/db";
 import type { QueryResult, TableStructureData } from "@/store/useAppStore";
 
+const EMPTY_FILTERS: QueryFilter[] = [];
+
 export const useTableData = (tableName: string, tabId: string) => {
   const cachedState = useMemo(
     () => useAppStore.getState().tableViewStateByTabId[tabId],
@@ -19,7 +21,7 @@ export const useTableData = (tableName: string, tabId: string) => {
   );
   const tab = useAppStore((s) => s.tabs.find((t) => t.id === tabId));
   const appliedFilterState = useAppStore(
-    (s) => s.tableViewStateByTabId[tabId]?.appliedFilters ?? [],
+    (s) => s.tableViewStateByTabId[tabId]?.appliedFilters ?? EMPTY_FILTERS,
   );
   const activeConnection = useAppStore((s) =>
     s.connections.find((c) => c.id === tab?.connectionId),

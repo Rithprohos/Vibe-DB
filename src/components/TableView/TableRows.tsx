@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useMemo, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { CheckedState } from '@radix-ui/react-checkbox';
 import { formatCellValue } from '@/lib/formatters';
@@ -22,7 +22,7 @@ interface VirtualCellProps {
   allowNull: boolean;
   isRowChecked: boolean;
   hasActiveEditingCell: boolean;
-  editValue: string;
+  editValue?: string;
   saving: boolean;
   onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
   onSaveCell: (rowIndex: number, colName: string, value: string) => void;
@@ -88,7 +88,7 @@ const VirtualCell = memo(function VirtualCell({
       {isEditing ? (
         <CellInput
           key={`${rowIndex}:${colName}`}
-          initialValue={editValue}
+          initialValue={editValue ?? ''}
           onValueChange={onEditValueChange}
           onSave={(val) => onSaveCell(rowIndex, colName, val)}
           onCancel={onCancelEdit}
@@ -117,10 +117,11 @@ interface VirtualRowProps {
   gridCols: string[];
   isSelected: boolean;
   isChecked: boolean;
-  editingCell: EditingCellState | null;
-  editValue: string;
+  editingColName: string | null;
+  activeEditValue: string;
+  hasActiveEditingCell: boolean;
   saving: boolean;
-  columnInfoByName: Record<string, ColumnInfo>;
+  columnRenderMetaByName: Record<string, ColumnRenderMeta>;
   getPendingCellValue: (rowIndex: number, colName: string) => unknown;
   isCellPending: (rowIndex: number, colName: string) => boolean;
   onBeginEdit: (rowIndex: number, colName: string, value: unknown) => void;
@@ -131,16 +132,24 @@ interface VirtualRowProps {
   onToggleRowChecked: (rowIndex: number, nextChecked: boolean) => void;
 }
 
+interface ColumnRenderMeta {
+  isDateCol: boolean;
+  enumOptions: string[];
+  allowNull: boolean;
+  isRowNum: boolean;
+}
+
 export const VirtualRow = memo(function VirtualRow({
   rowIndex,
   rowData,
   gridCols,
   isSelected,
   isChecked,
-  editingCell,
-  editValue,
+  editingColName,
+  activeEditValue,
+  hasActiveEditingCell,
   saving,
-  columnInfoByName,
+  columnRenderMetaByName,
   getPendingCellValue,
   isCellPending,
   onBeginEdit,
@@ -184,13 +193,8 @@ export const VirtualRow = memo(function VirtualRow({
         </div>
       </td>
       {gridCols.map((colName) => {
-        const isEditing =
-          editingCell?.rowIndex === rowIndex && editingCell?.colName === colName;
-        const columnInfo = columnInfoByName[colName];
-        const colType = columnInfo?.col_type.toLowerCase() || 'text';
-        const isDateCol = colType.includes('date') || colType.includes('time');
-        const enumOptions = isEnumColumn(columnInfo) ? columnInfo?.enum_values ?? [] : [];
-        const allowNull = !columnInfo?.notnull;
+        const isEditing = editingColName === colName;
+        const renderMeta = columnRenderMetaByName[colName];
 
         return (
           <VirtualCell
@@ -201,13 +205,13 @@ export const VirtualRow = memo(function VirtualRow({
             pendingValue={getPendingCellValue(rowIndex, colName)}
             hasPendingEdit={isCellPending(rowIndex, colName)}
             isEditing={isEditing}
-            isRowNum={colName === 'rowNum'}
-            isDateCol={isDateCol}
-            enumOptions={enumOptions}
-            allowNull={allowNull}
+            isRowNum={renderMeta?.isRowNum ?? false}
+            isDateCol={renderMeta?.isDateCol ?? false}
+            enumOptions={renderMeta?.enumOptions ?? []}
+            allowNull={renderMeta?.allowNull ?? true}
             isRowChecked={isChecked}
-            hasActiveEditingCell={Boolean(editingCell)}
-            editValue={editValue}
+            hasActiveEditingCell={hasActiveEditingCell}
+            editValue={isEditing ? activeEditValue : undefined}
             saving={saving}
             onBeginEdit={onBeginEdit}
             onSaveCell={onSaveCell}
@@ -263,17 +267,28 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
   onSelectRow,
   onToggleRowChecked,
 }: VirtualizedTableBodyProps) {
+  const hasActiveEditingCell = editingCell !== null;
   const keyColumns = useMemo(() => {
     const pkColumns = gridCols.filter((colName) => columnInfoByName[colName]?.pk);
     if (pkColumns.length > 0) return pkColumns;
     if (gridCols.includes('rowNum')) return ['rowNum'];
     return [];
   }, [columnInfoByName, gridCols]);
-
-  const getScrollElement = useCallback(() => scrollElement, [scrollElement]);
-  const estimateSize = useCallback(() => 34, []);
-  const getItemKey = useCallback((index: number) => {
-    const row = tableData[index];
+  const columnRenderMetaByName = useMemo<Record<string, ColumnRenderMeta>>(() => {
+    const meta: Record<string, ColumnRenderMeta> = {};
+    gridCols.forEach((colName) => {
+      const columnInfo = columnInfoByName[colName];
+      const colType = columnInfo?.col_type.toLowerCase() || 'text';
+      meta[colName] = {
+        isDateCol: colType.includes('date') || colType.includes('time'),
+        enumOptions: isEnumColumn(columnInfo) ? columnInfo?.enum_values ?? [] : [],
+        allowNull: !columnInfo?.notnull,
+        isRowNum: colName === 'rowNum',
+      };
+    });
+    return meta;
+  }, [columnInfoByName, gridCols]);
+  const rowKeys = useMemo(() => tableData.map((row, index) => {
     if (!row || typeof row !== 'object') return index;
 
     if (keyColumns.length > 0) {
@@ -288,19 +303,20 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
     const rowNum = row.rowNum;
     if (rowNum != null) return `rowNum:${String(rowNum)}`;
     return index;
-  }, [keyColumns, tableData]);
+  }), [keyColumns, tableData]);
+
+  const getScrollElement = useCallback(() => scrollElement, [scrollElement]);
+  const estimateSize = useCallback(() => 34, []);
+  const getItemKey = useCallback((index: number) => rowKeys[index] ?? index, [rowKeys]);
+  const overscan = gridCols.length > 20 ? 2 : 3;
 
   const rowVirtualizer = useVirtualizer({
     count: tableData.length,
     getScrollElement,
     estimateSize,
-    overscan: 4,
+    overscan,
     getItemKey,
   });
-
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [rowVirtualizer, scrollElement, tableData.length]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
@@ -333,10 +349,15 @@ export const VirtualizedTableBody = memo(function VirtualizedTableBody({
           gridCols={gridCols}
           isSelected={selectedRowIndex === virtualRow.index}
           isChecked={checkedRowIndices.has(virtualRow.index)}
-          editingCell={editingCell}
-          editValue={editValue}
+          editingColName={
+            editingCell?.rowIndex === virtualRow.index ? editingCell.colName : null
+          }
+          activeEditValue={
+            editingCell?.rowIndex === virtualRow.index ? editValue : ''
+          }
+          hasActiveEditingCell={hasActiveEditingCell}
           saving={saving}
-          columnInfoByName={columnInfoByName}
+          columnRenderMetaByName={columnRenderMetaByName}
           getPendingCellValue={getPendingCellValue}
           isCellPending={isCellPending}
           onBeginEdit={onBeginEdit}
