@@ -7,11 +7,13 @@ import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { executeQuery, listTables } from '../lib/db';
 import {
   analyzeQueryExecutionPolicy,
+  getSqlStatementAtCursor,
   getBlockedQueryEditorMessage,
   type QueryExecutionPolicy,
 } from '@/lib/queryGuard';
 import { buildSavedQueryDefaultName } from '@/lib/savedQueries';
 import { useDevRenderCounter } from '@/lib/dev-performance';
+import { getCodeMirrorTheme } from '@/lib/codemirrorTheme';
 import { useAppStore, MAX_RESULT_ROWS } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,6 +76,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const connectionId = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.connectionId ?? '', [tabId]));
   const title = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.title ?? '', [tabId]));
   const query = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.query ?? '', [tabId]));
+  const theme = useAppStore(s => s.theme);
   const result = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.result ?? null, [tabId]));
   const error = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.error ?? '', [tabId]));
   const savedQueryId = useAppStore(useCallback(s => s.tabs.find(t => t.id === tabId)?.savedQueryId ?? null, [tabId]));
@@ -131,10 +134,12 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
   const saveButtonLabel = linkedSavedQuery ? 'Update' : 'Save';
   const canSave = !running;
 
-  const getQueryToRun = useCallback((editorView?: EditorViewLike) => {
+  const getQueryToRun = useCallback((editorView?: EditorViewLike, runAll = false) => {
     const store = useAppStore.getState();
     const currentTab = store.tabs.find(t => t.id === tabId);
-    let queryToRun = (currentTab?.query || '').trim();
+    const fullQuery = currentTab?.query ?? '';
+    const fullQueryTrimmed = fullQuery.trim();
+    if (runAll) return fullQueryTrimmed;
 
     const refView = editorRef.current?.view;
     const view = isEditorViewLike(editorView)
@@ -143,14 +148,21 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         ? refView
         : null;
 
-    if (view) {
-      const selection = view.state.selection.main;
-      if (!selection.empty) {
-        queryToRun = view.state.sliceDoc(selection.from, selection.to).trim();
-      }
+    if (!view) {
+      return fullQueryTrimmed;
     }
 
-    return queryToRun;
+    const selection = view.state.selection.main;
+    if (!selection.empty) {
+      return view.state.sliceDoc(selection.from, selection.to).trim();
+    }
+
+    const statementAtCursor = getSqlStatementAtCursor(fullQuery, selection.from);
+    if (statementAtCursor) {
+      return statementAtCursor.sql;
+    }
+
+    return '';
   }, [tabId]);
 
   // On failed queries, Tauri can emit the SQL log a tick after the promise rejects.
@@ -380,9 +392,23 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     }
   }, [activeConnectionConnId, activeConnectionId, getLoggedDuration, tabId]);
 
-  const handleRun = useCallback(async (editorView?: EditorViewLike) => {
-    const queryToRun = getQueryToRun(editorView);
-    if (!queryToRun) return;
+  const handleRun = useCallback(async (
+    editorView?: EditorViewLike,
+    options?: {
+      runAll?: boolean;
+    },
+  ) => {
+    const runAll = options?.runAll === true;
+    const queryToRun = getQueryToRun(editorView, runAll);
+    if (!queryToRun) {
+      if (!runAll) {
+        showToast({
+          type: 'info',
+          message: 'No SQL statement found at cursor',
+        });
+      }
+      return;
+    }
 
     const policy = analyzeQueryExecutionPolicy(queryToRun, {
       connectionTag: activeConnection?.tag,
@@ -403,7 +429,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     }
 
     await runQuery(queryToRun, policy);
-  }, [activeConnection?.tag, getQueryToRun, runQuery, tabId]);
+  }, [activeConnection?.tag, getQueryToRun, runQuery, showToast, tabId]);
 
   const handleRunRef = useRef(handleRun);
   handleRunRef.current = handleRun;
@@ -420,6 +446,13 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
             key: 'Mod-Enter',
             run: (view) => {
               handleRunRef.current(view);
+              return true;
+            },
+          },
+          {
+            key: 'Mod-Shift-Enter',
+            run: (view) => {
+              handleRunRef.current(view, { runAll: true });
               return true;
             },
           },
@@ -448,6 +481,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
     () => (wrapEditor ? [sql({ schema }), EditorView.lineWrapping, runKeymap] : [sql({ schema }), runKeymap]),
     [schema, runKeymap, wrapEditor],
   );
+  const editorTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
 
   const canRun = Boolean(activeConnectionConnId) && !running;
   const confirmationStatements = pendingConfirmation?.policy.confirmStatements.join(', ') ?? '';
@@ -465,6 +499,7 @@ const QueryEditor = memo(function QueryEditor({ tabId }: Props) {
         saveButtonLabel={saveButtonLabel}
         query={query}
         editorExtensions={editorExtensions}
+        editorTheme={editorTheme}
         wrapEditor={wrapEditor}
         isProductionConnection={isProductionConnection}
         basicSetup={BASIC_SETUP}

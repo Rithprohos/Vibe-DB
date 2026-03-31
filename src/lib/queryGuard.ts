@@ -27,6 +27,12 @@ export interface QueryExecutionPolicy {
   shouldRefreshSchema: boolean;
 }
 
+export interface SqlStatementSpan {
+  sql: string;
+  from: number;
+  to: number;
+}
+
 export interface GuidedMutationPolicy {
   requiresConfirmation: boolean;
   title: string;
@@ -156,7 +162,31 @@ export function getBlockedQueryEditorMessage(blockedStatements: string[]): strin
 }
 
 export function splitSqlStatements(query: string): string[] {
-  const statements: string[] = [];
+  return parseSqlStatementSpans(query).map((statement) => statement.sql);
+}
+
+export function getSqlStatementAtCursor(query: string, cursor: number): SqlStatementSpan | null {
+  const statements = parseSqlStatementSpans(query);
+  if (statements.length === 0) return null;
+
+  const normalizedCursor = Math.max(0, Math.min(cursor, query.length));
+  const directMatch = statements.find(
+    ({ from, to }) => normalizedCursor >= from && normalizedCursor < to,
+  );
+  if (directMatch) return directMatch;
+
+  for (let index = statements.length - 1; index >= 0; index -= 1) {
+    const statement = statements[index];
+    if (statement.to <= normalizedCursor) {
+      return statement;
+    }
+  }
+
+  return statements.find(({ from }) => from >= normalizedCursor) ?? null;
+}
+
+function parseSqlStatementSpans(query: string): SqlStatementSpan[] {
+  const statements: SqlStatementSpan[] = [];
   let start = 0;
   let inSingle = false;
   let inDouble = false;
@@ -224,16 +254,37 @@ export function splitSqlStatements(query: string): string[] {
     }
 
     if (char === ';') {
-      const statement = query.slice(start, index).trim();
+      const statement = createSqlStatementSpan(query, start, index);
       if (statement) statements.push(statement);
       start = index + 1;
     }
   }
 
-  const trailing = query.slice(start).trim();
+  const trailing = createSqlStatementSpan(query, start, query.length);
   if (trailing) statements.push(trailing);
 
   return statements;
+}
+
+function createSqlStatementSpan(query: string, from: number, to: number): SqlStatementSpan | null {
+  let start = from;
+  let end = to;
+
+  while (start < end && isWhitespace(query[start])) {
+    start += 1;
+  }
+
+  while (end > start && isWhitespace(query[end - 1])) {
+    end -= 1;
+  }
+
+  if (start >= end) return null;
+
+  return {
+    sql: query.slice(start, end),
+    from: start,
+    to: end,
+  };
 }
 
 function getLeadingKeyword(statement: string): string | null {
@@ -427,4 +478,8 @@ function isAsciiWordChar(value: string): boolean {
     (code >= 48 && code <= 57) ||
     code === 95
   );
+}
+
+function isWhitespace(value: string): boolean {
+  return /\s/.test(value);
 }

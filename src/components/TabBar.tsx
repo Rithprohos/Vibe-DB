@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { splitQualifiedTableName } from '@/lib/databaseObjects';
+import type { Tab } from '@/store/useAppStore';
 import {
   Database,
   Wrench,
@@ -25,6 +27,41 @@ type TabMeta = {
   icon: LucideIcon;
   label: string;
 };
+
+function middleTruncate(value: string, maxLength: number): string {
+  const text = value.trim();
+  if (text.length <= maxLength) return text;
+  const keep = Math.max(6, maxLength - 1);
+  const start = Math.ceil(keep / 2);
+  const end = Math.floor(keep / 2);
+  return `${text.slice(0, start)}…${text.slice(-end)}`;
+}
+
+function getTabTitleLabel(tab: Tab): { compact: string; full: string } {
+  if (tab.tableName) {
+    const { schema, name } = splitQualifiedTableName(tab.tableName);
+    const full = schema ? `${schema}.${name}` : name;
+    return {
+      full,
+      compact: middleTruncate(name, 20),
+    };
+  }
+
+  if (tab.type === 'visualize') {
+    const scope = tab.schemaName?.trim() || 'all schemas';
+    const full = `visualize · ${scope}`;
+    return {
+      full,
+      compact: middleTruncate(full, 24),
+    };
+  }
+
+  const full = tab.title;
+  return {
+    full,
+    compact: middleTruncate(full, 24),
+  };
+}
 
 function getTabMeta(type: string): TabMeta {
   switch (type) {
@@ -101,16 +138,18 @@ export default function TabBar() {
         const isActive = activeTabId === tab.id;
         const meta = getTabMeta(tab.type);
         const Icon = meta.icon;
+        const tabTitle = getTabTitleLabel(tab);
 
         return (
           <ContextMenu key={tab.id}>
             <ContextMenuTrigger asChild>
               <div
                 className={cn(
-                  'group relative flex h-[34px] min-w-[156px] max-w-[236px] cursor-pointer items-center gap-2 overflow-hidden rounded-t-md border border-b-0 px-3 transition-all duration-200',
+                  'group relative flex h-[34px] min-w-[156px] cursor-pointer items-center gap-2 overflow-hidden rounded-t-md border border-b-0 px-3 transition-all duration-200',
+                  isActive ? 'w-max max-w-none' : 'max-w-[236px]',
                   isActive
                     ? 'border-border/35 bg-background text-foreground shadow-[0_-1px_0_rgba(255,255,255,0.02)]'
-                    : 'border-transparent bg-background/35 text-muted-foreground hover:border-border/18 hover:bg-background/58 hover:text-foreground',
+                    : 'border-transparent bg-background/45 text-foreground/75 hover:border-border/22 hover:bg-background/62 hover:text-foreground',
                 )}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -133,7 +172,7 @@ export default function TabBar() {
                     'relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-sm border transition-all duration-200',
                     isActive
                       ? 'border-border/28 bg-background/90 text-foreground'
-                      : 'border-border/18 bg-background/82 text-muted-foreground group-hover:border-border/28 group-hover:text-foreground',
+                      : 'border-border/22 bg-background/82 text-foreground/70 group-hover:border-border/30 group-hover:text-foreground',
                   )}
                 >
                   <Icon
@@ -145,16 +184,22 @@ export default function TabBar() {
                   />
                 </span>
 
-                <span className="relative min-w-0 flex-1 truncate text-[12px] font-medium leading-none">
-                  {tab.title}
+                <span
+                  className={cn(
+                    'relative whitespace-nowrap text-[12px] font-semibold leading-none text-foreground/95',
+                    isActive ? '' : 'min-w-0 flex-1 overflow-hidden',
+                  )}
+                  title={tabTitle.full}
+                >
+                  {isActive ? tabTitle.full : tabTitle.compact}
                 </span>
 
                 <span
                   className={cn(
-                    'relative hidden rounded-sm border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] md:inline-flex',
+                    'relative hidden rounded-sm border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] md:inline-flex',
                     isActive
-                      ? 'border-border/25 bg-background/78 text-muted-foreground/80'
-                      : 'border-transparent bg-transparent text-muted-foreground/50 group-hover:text-muted-foreground/70',
+                      ? 'border-border/30 bg-background/82 text-foreground/85'
+                      : 'border-border/10 bg-background/35 text-foreground/60 group-hover:border-border/20 group-hover:text-foreground/82',
                   )}
                 >
                   {meta.label}

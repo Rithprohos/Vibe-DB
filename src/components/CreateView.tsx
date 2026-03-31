@@ -9,13 +9,13 @@ import { validateViewName } from "../lib/tableName";
 import { copyToClipboard } from "../lib/copy";
 import { formatCellValue } from "../lib/formatters";
 import { highlightSQL } from "../lib/highlightSQL";
+import { getCodeMirrorTheme } from "@/lib/codemirrorTheme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql } from "@codemirror/lang-sql";
-import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import {
   AlertCircle,
   Copy,
@@ -100,6 +100,7 @@ export default function CreateView({ tabId }: Props) {
   const openTableTab = useAppStore((s) => s.openTableTab);
   const closeTab = useAppStore((s) => s.closeTab);
   const showToast = useAppStore((s) => s.showToast);
+  const theme = useAppStore((s) => s.theme);
 
   const tab = useMemo(() => tabs.find((t) => t.id === tabId), [tabs, tabId]);
   const activeConnection = useMemo(
@@ -136,6 +137,7 @@ export default function CreateView({ tabId }: Props) {
     });
     return nextSchema;
   }, [tables]);
+  const editorTheme = useMemo(() => getCodeMirrorTheme(theme), [theme]);
 
   useEffect(() => {
     createViewDraftCache.set(tabId, draft);
@@ -454,7 +456,7 @@ export default function CreateView({ tabId }: Props) {
                   value={sourceSql}
                   height="220px"
                   extensions={[sql({ schema })]}
-                  theme={vscodeDark}
+                  theme={editorTheme}
                   onChange={(value) => {
                     updateCreateViewDraft({ sourceSql: value });
                     setError("");

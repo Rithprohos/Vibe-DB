@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { updateRows, type RowUpdateInput } from "@/lib/db";
 import { isJsonColumn } from "@/lib/sql/columnTypes";
 import {
@@ -83,15 +83,15 @@ export const useCellEditing = (
     [pendingEdits],
   );
 
-  const getPendingCellValue = (rowIndex: number, colName: string): string | null => {
+  const getPendingCellValue = useCallback((rowIndex: number, colName: string): string | null => {
     const edit = pendingEdits[getCellKey(rowIndex, colName)];
     return edit ? edit.newValue : null;
-  };
+  }, [pendingEdits]);
 
-  const isCellPending = (rowIndex: number, colName: string): boolean =>
-    Boolean(pendingEdits[getCellKey(rowIndex, colName)]);
+  const isCellPending = useCallback((rowIndex: number, colName: string): boolean =>
+    Boolean(pendingEdits[getCellKey(rowIndex, colName)]), [pendingEdits]);
 
-  const stageCellEdit = (
+  const stageCellEdit = useCallback((
     rowIndex: number,
     colName: string,
     valueToSave: string,
@@ -121,9 +121,9 @@ export const useCellEditing = (
         },
       };
     });
-  };
+  }, [tableData]);
 
-  const handleSaveCell = async (
+  const handleSaveCell = useCallback(async (
     rowIndex: number,
     colName: string,
     valueToSave: string,
@@ -143,23 +143,23 @@ export const useCellEditing = (
     stageCellEdit(rowIndex, colName, normalizedValue);
     setError("");
     setEditingCell(null);
-  };
+  }, [columnInfoByName, stageCellEdit]);
 
-  const discardPendingCellEdit = (rowIndex: number, colName: string) => {
+  const discardPendingCellEdit = useCallback((rowIndex: number, colName: string) => {
     const key = getCellKey(rowIndex, colName);
     setPendingEdits((current) => {
       if (!current[key]) return current;
       const { [key]: _, ...rest } = current;
       return rest;
     });
-  };
+  }, []);
 
-  const clearPendingEdits = () => {
+  const clearPendingEdits = useCallback(() => {
     setPendingEdits({});
     setError("");
-  };
+  }, []);
 
-  const buildWorkingEdits = (
+  const buildWorkingEdits = useCallback((
     activeEdit?: ActiveEditPayload,
   ): PendingCellEdits => {
     if (!activeEdit) {
@@ -195,9 +195,9 @@ export const useCellEditing = (
         newValue: normalizedActiveValue,
       },
     };
-  };
+  }, [columnInfoByName, pendingEdits, tableData]);
 
-  const handleCommitPendingEdits = async (
+  const handleCommitPendingEdits = useCallback(async (
     activeEdit?: ActiveEditPayload,
   ): Promise<boolean> => {
     if (!activeConnection?.connId) return false;
@@ -266,7 +266,15 @@ export const useCellEditing = (
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    activeConnection?.connId,
+    buildWorkingEdits,
+    columnInfoByName,
+    fetchData,
+    structure,
+    tableData,
+    tableName,
+  ]);
 
   return {
     editingCell,

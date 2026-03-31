@@ -277,6 +277,11 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
   const saving = savingNewRow || savingCell;
   const error = newRowError || cellError;
+  const editValueRef = useRef(editValue);
+
+  useEffect(() => {
+    editValueRef.current = editValue;
+  }, [editValue]);
 
   const selectedRowData = useMemo(
     () => (selectedRowIndex !== null ? tableData[selectedRowIndex] ?? null : null),
@@ -462,13 +467,13 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
         editingCell &&
         (editingCell.rowIndex !== rowIndex || editingCell.colName !== colName)
       ) {
-        await handleSaveCell(editingCell.rowIndex, editingCell.colName, editValue);
+        await handleSaveCell(editingCell.rowIndex, editingCell.colName, editValueRef.current);
       }
 
       setEditingCell({ rowIndex, colName });
       setEditValue(value == null ? '' : stringifyCellValue(value));
     },
-    [editingCell, editValue, handleSaveCell, newRowData, saving, setEditingCell, setEditValue],
+    [editingCell, handleSaveCell, newRowData, saving, setEditingCell, setEditValue],
   );
 
   const handleBeginCellEdit = useCallback((rowIndex: number, colName: string, value: unknown) => {
@@ -657,7 +662,7 @@ export default function TableView({ tableName, tabId }: TableViewProps) {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [newRowData, editingCell, saving, editValue, showFilterPanel, pendingEditCount, handleDiscardNewRow, handleSaveCell, commitPendingWithFeedback, setEditingCell, setShowFilterPanel]);
+  }, [newRowData, editingCell, saving, showFilterPanel, pendingEditCount, handleDiscardNewRow, commitPendingWithFeedback, setEditingCell, setShowFilterPanel]);
 
   if (loading && !data) {
     return (

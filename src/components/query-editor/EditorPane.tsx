@@ -1,7 +1,6 @@
 import { memo, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import type { Extension } from '@codemirror/state';
 import CodeMirror from '@uiw/react-codemirror';
-import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { Copy, Loader2, Play, Save, ShieldAlert, WrapText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ interface QueryEditorPaneProps {
   saveButtonLabel: string;
   query: string;
   editorExtensions: Extension[];
+  editorTheme: Extension;
   wrapEditor: boolean;
   isProductionConnection: boolean;
   basicSetup: Record<string, boolean>;
@@ -40,6 +40,7 @@ export const QueryEditorPane = memo(function QueryEditorPane({
   saveButtonLabel,
   query,
   editorExtensions,
+  editorTheme,
   wrapEditor,
   isProductionConnection,
   basicSetup,
@@ -108,6 +109,9 @@ export const QueryEditorPane = memo(function QueryEditorPane({
             ⌘ + Enter
           </span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+            ⌘ + ⇧ + Enter
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
             ⌘ + S
           </span>
         </div>
@@ -140,7 +144,7 @@ export const QueryEditorPane = memo(function QueryEditorPane({
           value={query}
           height="100%"
           extensions={editorExtensions}
-          theme={vscodeDark}
+          theme={editorTheme}
           onChange={onQueryChange}
           className="h-full w-full overflow-hidden bg-background text-[14px] custom-scrollbar-hide focus-within:ring-inset focus-within:ring-1 focus-within:ring-primary/20 cm-editor-wrapper"
           basicSetup={basicSetup}

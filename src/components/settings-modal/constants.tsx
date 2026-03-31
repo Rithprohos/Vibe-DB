@@ -58,6 +58,7 @@ export const shortcuts: ShortcutDefinition[] = [
   { keys: ['Cmd', 'N'], action: 'New Connection' },
   { keys: ['Cmd', 'W'], action: 'Close Tab' },
   { keys: ['Cmd', 'T'], action: 'New Query Tab' },
+  { keys: ['Cmd', 'K'], action: 'Quick Search' },
   { keys: ['Cmd', 'L'], action: 'Toggle Logs' },
   { keys: ['Cmd', ','], action: 'Open Settings' },
   { keys: ['Cmd', 'Enter'], action: 'Execute Query' },

@@ -32,13 +32,15 @@ export function useGlobalKeybindings(): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-
-      if (isEditableTarget(target) && event.key !== ',' && event.key !== 'l') {
-        return;
-      }
-
       const isMod = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
+
+      if (
+        isEditableTarget(target) &&
+        !(isMod && (key === 'k' || key === 'l' || key === ','))
+      ) {
+        return;
+      }
 
       if (isMod && key === 'k') {
         event.preventDefault();
