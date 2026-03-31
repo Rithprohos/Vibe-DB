@@ -109,6 +109,9 @@ export const QueryEditorPane = memo(function QueryEditorPane({
             ⌘ + Enter
           </span>
           <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+            ⌘ + ⇧ + Enter
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
             ⌘ + S
           </span>
         </div>
