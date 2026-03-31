@@ -51,6 +51,9 @@ export const QueryEditorPane = memo(function QueryEditorPane({
   onQueryChange,
   onPointerDownResizer,
 }: QueryEditorPaneProps) {
+  const shortcutBadgeClass =
+    'text-[10px] font-mono font-semibold text-foreground/90 uppercase tracking-wider bg-secondary/80 px-2 py-1 border border-border/80 rounded shadow-sm';
+
   return (
     <div
       ref={editorPaneRef}
@@ -105,13 +108,13 @@ export const QueryEditorPane = memo(function QueryEditorPane({
             <WrapText size={13} />
             {wrapEditor ? 'Wrapped' : 'No Wrap'}
           </Button>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+          <span className={shortcutBadgeClass}>
             ⌘ + Enter
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+          <span className={shortcutBadgeClass}>
             ⌘ + ⇧ + Enter
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider bg-background/50 px-2 py-1 border border-border rounded shadow-sm">
+          <span className={shortcutBadgeClass}>
             ⌘ + S
           </span>
         </div>
