@@ -12,6 +12,7 @@ import {
   Table as TableIcon,
   Eye,
   Orbit,
+  List,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,14 @@ function getTabTitleLabel(tab: Tab): { compact: string; full: string } {
     return {
       full,
       compact: middleTruncate(name, 20),
+    };
+  }
+
+  if (tab.type === 'enum-detail' && tab.enumName) {
+    const full = tab.enumSchema ? `${tab.enumSchema}.${tab.enumName}` : tab.enumName;
+    return {
+      full,
+      compact: middleTruncate(full, 24),
     };
   }
 
@@ -99,6 +108,16 @@ function getTabMeta(type: string): TabMeta {
       return {
         icon: Eye,
         label: 'VIEW',
+      };
+    case 'create-enum':
+      return {
+        icon: List,
+        label: 'ENUM',
+      };
+    case 'enum-detail':
+      return {
+        icon: List,
+        label: 'ENUM',
       };
     default:
       return {

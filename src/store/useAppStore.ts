@@ -18,6 +18,7 @@ export type {
   AppState,
   ColumnInfo,
   Connection,
+  EnumInfo,
   CreateViewDraft,
   ForeignKeyInfo,
   IndexInfo,

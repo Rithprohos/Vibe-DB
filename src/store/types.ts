@@ -25,6 +25,11 @@ export interface TableInfo {
   schema?: string;
 }
 
+export interface EnumInfo {
+  name: string;
+  schema?: string | null;
+}
+
 export interface ColumnInfo {
   cid: number;
   name: string;
@@ -147,7 +152,9 @@ export type TabType =
   | "query"
   | "create-table"
   | "edit-table"
-  | "create-view";
+  | "create-view"
+  | "create-enum"
+  | "enum-detail";
 
 export type Theme = "dark" | "dark-modern" | "light" | "purple";
 export type AiProviderMode = "default" | "custom";
@@ -188,6 +195,8 @@ export interface Tab {
   type: TabType;
   title: string;
   tableName?: string;
+  enumName?: string;
+  enumSchema?: string | null;
   schemaName?: string | null;
   visualizeSourceTable?: string | null;
   query?: string;
@@ -207,6 +216,7 @@ export interface AppState {
 
   // Database objects
   tablesByConnection: Record<string, TableInfo[]>;
+  enumsByConnection: Record<string, EnumInfo[]>;
   pinnedTablesByConnection: Record<string, string[]>;
   selectedTable: string | null;
 
@@ -278,6 +288,7 @@ export interface AppState {
   setIsConnected: (val: boolean) => void;
   setShowConnectionDialog: (val: boolean) => void;
   setTables: (connectionId: string, tables: TableInfo[]) => void;
+  setEnums: (connectionId: string, enums: EnumInfo[]) => void;
   togglePinnedTable: (connectionId: string, tableName: string) => void;
   setSelectedTable: (name: string | null) => void;
 
@@ -301,6 +312,11 @@ export interface AppState {
     connectionId: string;
     schemaName?: string | null;
     sourceTable?: string | null;
+  }) => void;
+  openEnumDetailTab: (input: {
+    connectionId: string;
+    enumName: string;
+    enumSchema?: string | null;
   }) => void;
   updateVisualizationState: (
     tabId: string,

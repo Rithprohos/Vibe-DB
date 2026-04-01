@@ -1,8 +1,8 @@
 use super::{
     CheckConstraintInput, CreateTableColumnInput, ForeignKeyConstraintInput, RowDataInput,
-    RowIdentifierInput, RowUpdateInput, TypeParams, build_create_table_sql, build_create_view_sql,
-    build_delete_queries, build_insert_queries, build_insert_query, build_update_queries,
-    build_where_clause_for_row, quote_qualified_identifier,
+    RowIdentifierInput, RowUpdateInput, TypeParams, build_create_enum_sql, build_create_table_sql,
+    build_create_view_sql, build_delete_queries, build_insert_queries, build_insert_query,
+    build_update_queries, build_where_clause_for_row, quote_qualified_identifier,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -227,6 +227,88 @@ fn build_create_view_sql_rejects_multi_statement_query() {
     .expect_err("expected single statement error");
 
     assert_eq!(error, "View query must contain a single SELECT statement");
+}
+
+#[test]
+fn build_create_enum_sql_basic() {
+    let sql = build_create_enum_sql(
+        "status".to_string(),
+        vec![
+            "pending".to_string(),
+            "active".to_string(),
+            "archived".to_string(),
+        ],
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert_eq!(
+        sql,
+        "CREATE TYPE \"status\" AS ENUM ('pending', 'active', 'archived');"
+    );
+}
+
+#[test]
+fn build_create_enum_sql_escapes_single_quotes() {
+    let sql = build_create_enum_sql(
+        "book_state".to_string(),
+        vec!["author's pick".to_string()],
+        Some("postgres".to_string()),
+    )
+    .expect("expected SQL");
+
+    assert_eq!(
+        sql,
+        "CREATE TYPE \"book_state\" AS ENUM ('author''s pick');"
+    );
+}
+
+#[test]
+fn build_create_enum_sql_rejects_non_postgres_engine() {
+    let error = build_create_enum_sql(
+        "status".to_string(),
+        vec!["pending".to_string()],
+        Some("sqlite".to_string()),
+    )
+    .expect_err("expected unsupported engine error");
+
+    assert_eq!(error, "Unsupported database engine for CREATE ENUM: sqlite");
+}
+
+#[test]
+fn build_create_enum_sql_rejects_empty_enum_name() {
+    let error = build_create_enum_sql(
+        "   ".to_string(),
+        vec!["pending".to_string()],
+        Some("postgres".to_string()),
+    )
+    .expect_err("expected enum name validation error");
+
+    assert_eq!(error, "Enum name is required");
+}
+
+#[test]
+fn build_create_enum_sql_rejects_empty_value() {
+    let error = build_create_enum_sql(
+        "status".to_string(),
+        vec!["pending".to_string(), " ".to_string()],
+        Some("postgres".to_string()),
+    )
+    .expect_err("expected enum value validation error");
+
+    assert_eq!(error, "Enum value #2 is required");
+}
+
+#[test]
+fn build_create_enum_sql_rejects_duplicate_values() {
+    let error = build_create_enum_sql(
+        "status".to_string(),
+        vec!["pending".to_string(), "pending".to_string()],
+        Some("postgres".to_string()),
+    )
+    .expect_err("expected duplicate enum value error");
+
+    assert_eq!(error, "Duplicate enum value: \"pending\"");
 }
 
 #[test]

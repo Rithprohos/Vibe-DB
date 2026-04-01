@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { listTables } from '../lib/db';
+import { listEnums, listTables } from '../lib/db';
 import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
+import type { EnumInfo, TableInfo } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -16,11 +17,13 @@ import {
   Eye,
   RefreshCw,
   Plus,
+  Zap,
   Inbox,
   Pencil,
   X,
   Cloud,
   Server,
+  List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EditConnectionDialog from './EditConnectionDialog';
@@ -32,6 +35,7 @@ import { useDevRenderCounter } from '@/lib/dev-performance';
 import {
   ALL_SCHEMAS_VALUE,
   getSchemaName,
+  splitQualifiedTableName,
 } from '@/lib/databaseObjects';
 import { getConnectionDatabaseName } from '@/lib/connectionDisplay';
 import {
@@ -41,6 +45,13 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from '@/components/ui/context-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import TruncateTableDialog from './TruncateTableDialog';
 import DropTableDialog from './DropTableDialog';
 import { orderPinnedTablesFirst } from '@/lib/sidebarTablePinning';
@@ -50,18 +61,56 @@ const SIDEBAR_PANEL_CLASS_NAME =
   'relative overflow-hidden rounded-md border border-border/35 bg-background/38 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]';
 const SIDEBAR_FIELD_CLASS_NAME =
   'rounded-sm border border-border/55 bg-background/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition-[border-color,background-color,box-shadow]';
+type ObjectListMode = 'table' | 'enum' | 'view';
+const EMPTY_TABLES: TableInfo[] = [];
+const EMPTY_ENUMS: EnumInfo[] = [];
+const EMPTY_PINNED_TABLES: string[] = [];
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
   const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
   const connections = useAppStore(s => s.connections);
   const isConnected = useAppStore(s => s.isConnected);
-  const tablesByConnection = useAppStore(s => s.tablesByConnection);
-  const pinnedTablesByConnection = useAppStore(s => s.pinnedTablesByConnection);
+  const tables = useAppStore((state) =>
+    activeSidebarConnectionId
+      ? (state.tablesByConnection[activeSidebarConnectionId] ?? EMPTY_TABLES)
+      : EMPTY_TABLES,
+  );
+  const enums = useAppStore((state) =>
+    activeSidebarConnectionId
+      ? (state.enumsByConnection[activeSidebarConnectionId] ?? EMPTY_ENUMS)
+      : EMPTY_ENUMS,
+  );
+  const pinnedTableNames = useAppStore((state) =>
+    activeSidebarConnectionId
+      ? (state.pinnedTablesByConnection[activeSidebarConnectionId] ?? EMPTY_PINNED_TABLES)
+      : EMPTY_PINNED_TABLES,
+  );
   const selectedTable = useAppStore(s => s.selectedTable);
+  const selectedEnum = useAppStore((state) => {
+    if (!activeSidebarConnectionId || !state.activeTabId) {
+      return null;
+    }
+
+    const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+    if (
+      !activeTab ||
+      activeTab.type !== 'enum-detail' ||
+      activeTab.connectionId !== activeSidebarConnectionId ||
+      !activeTab.enumName
+    ) {
+      return null;
+    }
+
+    return activeTab.enumSchema
+      ? `${activeTab.enumSchema}.${activeTab.enumName}`
+      : activeTab.enumName;
+  });
   const setTables = useAppStore(s => s.setTables);
+  const setEnums = useAppStore(s => s.setEnums);
   const togglePinnedTable = useAppStore(s => s.togglePinnedTable);
   const openTableTab = useAppStore(s => s.openTableTab);
+  const openEnumDetailTab = useAppStore(s => s.openEnumDetailTab);
   const openVisualizationTab = useAppStore(s => s.openVisualizationTab);
   const addTab = useAppStore(s => s.addTab);
   const closeTab = useAppStore(s => s.closeTab);
@@ -79,12 +128,9 @@ export default function Sidebar() {
   } = useTableTransfer(activeConnection);
   const activeConnectionId = activeConnection?.id;
   const activeConnectionConnId = activeConnection?.connId;
-  const tables = activeSidebarConnectionId 
-    ? (tablesByConnection[activeSidebarConnectionId] || []) 
-    : [];
 
-  const [tablesOpen, setTablesOpen] = useState(true);
-  const [viewsOpen, setViewsOpen] = useState(true);
+  const [objectsOpen, setObjectsOpen] = useState(true);
+  const [activeObjectMode, setActiveObjectMode] = useState<ObjectListMode>('table');
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -177,10 +223,6 @@ export default function Sidebar() {
   }, [tables]);
   const showSchemaFilter = isPostgresConnection && schemaOptions.length > 0;
   const showSchemaBadge = isPostgresConnection && schemaOptions.length > 1;
-  const pinnedTableNames = useMemo(
-    () => (activeConnectionId ? (pinnedTablesByConnection[activeConnectionId] ?? []) : []),
-    [activeConnectionId, pinnedTablesByConnection],
-  );
   const pinnedTableNameSet = useMemo(
     () => new Set(pinnedTableNames),
     [pinnedTableNames],
@@ -208,9 +250,16 @@ export default function Sidebar() {
     }
   }, [defaultSchemaValue, schemaOptions, selectedSchema]);
 
-  const { filteredTables, filteredViews } = useMemo(() => {
+  useEffect(() => {
+    if (!isPostgresConnection && activeObjectMode === 'enum') {
+      setActiveObjectMode('table');
+    }
+  }, [activeObjectMode, isPostgresConnection]);
+
+  const { filteredTables, filteredViews, filteredEnums } = useMemo(() => {
     const nextTables: typeof tables = [];
     const nextViews: typeof tables = [];
+    const nextEnums: typeof enums = [];
 
     tables.forEach((table) => {
       const schemaName = getSchemaName(table);
@@ -229,13 +278,62 @@ export default function Sidebar() {
       }
     });
 
-    return { filteredTables: nextTables, filteredViews: nextViews };
-  }, [tables, selectedSchema, showSchemaFilter]);
+    enums.forEach((enumInfo) => {
+      const schemaName = enumInfo.schema?.trim() || null;
+      if (
+        showSchemaFilter &&
+        selectedSchema !== ALL_SCHEMAS_VALUE &&
+        schemaName !== selectedSchema
+      ) {
+        return;
+      }
+      nextEnums.push(enumInfo);
+    });
+
+    return { filteredTables: nextTables, filteredViews: nextViews, filteredEnums: nextEnums };
+  }, [enums, tables, selectedSchema, showSchemaFilter]);
   const orderedFilteredTables = useMemo(
     () => orderPinnedTablesFirst(filteredTables, pinnedTableNameSet),
     [filteredTables, pinnedTableNameSet],
   );
-  const visibleObjectCount = filteredTables.length + filteredViews.length;
+  const visibleObjectCount =
+    filteredTables.length + filteredViews.length + filteredEnums.length;
+
+  const objectModeOptions = useMemo(
+    () => {
+      const base: Array<{ mode: ObjectListMode; label: string; count: number }> = [
+        { mode: 'table', label: 'Tables', count: filteredTables.length },
+        { mode: 'view', label: 'Views', count: filteredViews.length },
+      ];
+      if (isPostgresConnection) {
+        base.splice(1, 0, { mode: 'enum', label: 'Enums', count: filteredEnums.length });
+      }
+      return base;
+    },
+    [filteredEnums.length, filteredTables.length, filteredViews.length, isPostgresConnection],
+  );
+
+  const activeModeLabel = useMemo(
+    () => objectModeOptions.find((option) => option.mode === activeObjectMode)?.label ?? 'Objects',
+    [activeObjectMode, objectModeOptions],
+  );
+
+  const activeObjectItems = useMemo(() => {
+    if (activeObjectMode === 'table') {
+      return orderedFilteredTables;
+    }
+    if (activeObjectMode === 'enum') {
+      return filteredEnums;
+    }
+    return filteredViews;
+  }, [activeObjectMode, filteredEnums, filteredViews, orderedFilteredTables]);
+
+  const activeObjectSelectedItem = useMemo(() => {
+    if (activeObjectMode === 'enum') {
+      return selectedEnum;
+    }
+    return selectedTable;
+  }, [activeObjectMode, selectedEnum, selectedTable]);
 
   const getConnectionTagClassName = (tag?: string) =>
     cn(
@@ -265,14 +363,27 @@ export default function Sidebar() {
     if (!activeConnectionConnId || !activeConnectionId || isRefreshing) return;
     setIsRefreshing(true);
     try {
-      const result = await listTables(activeConnectionConnId);
-      setTables(activeConnectionId, result);
+      const [tableResult, enumResult] = await Promise.all([
+        listTables(activeConnectionConnId),
+        activeConnection?.type === 'postgres'
+          ? listEnums(activeConnectionConnId)
+          : Promise.resolve([]),
+      ]);
+      setTables(activeConnectionId, tableResult);
+      setEnums(activeConnectionId, enumResult);
     } catch (e) {
       console.error('Failed to refresh:', e);
     } finally {
       setIsRefreshing(false);
     }
-  }, [activeConnectionConnId, activeConnectionId, isRefreshing, setTables]);
+  }, [
+    activeConnection?.type,
+    activeConnectionConnId,
+    activeConnectionId,
+    isRefreshing,
+    setEnums,
+    setTables,
+  ]);
 
   const handleDropSuccess = useCallback((tableName: string) => {
     if (!activeConnectionId) return;
@@ -329,6 +440,17 @@ export default function Sidebar() {
     });
   };
 
+  const handleCreateEnum = () => {
+    if (!activeConnection || activeConnection.type !== 'postgres') return;
+    const id = `create-enum-${Date.now()}`;
+    addTab({
+      id,
+      connectionId: activeConnection.id,
+      type: 'create-enum',
+      title: 'Create Enum',
+    });
+  };
+
   const handleEditTable = useCallback((tableName: string) => {
     if (!activeConnection) return;
     openTableTab(activeConnection.id, tableName, 'edit-table');
@@ -367,6 +489,18 @@ export default function Sidebar() {
       sourceTable: tableName,
     });
   }, [activeConnection, openVisualizationTab, selectedSchema]);
+
+  const handleOpenEnumDetail = useCallback((qualifiedEnumName: string) => {
+    if (!activeConnection) return;
+    const { schema, name } = splitQualifiedTableName(qualifiedEnumName);
+    if (!name) return;
+
+    openEnumDetailTab({
+      connectionId: activeConnection.id,
+      enumName: name,
+      enumSchema: schema,
+    });
+  }, [activeConnection, openEnumDetailTab]);
 
   const handleRemoveConnection = useCallback(async (connectionId: string) => {
     try {
@@ -582,31 +716,49 @@ export default function Sidebar() {
                 {visibleObjectCount} objects
               </div>
             </div>
-            <div className="relative flex gap-2">
+            <div className="relative flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 flex-1 justify-start rounded-sm border-transparent bg-background/82 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-primary/10 hover:text-primary"
+                    title="Add object"
+                  >
+                    <Plus size={14} />
+                    <span>Add</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem onSelect={handleNewQuery}>
+                    <Zap size={14} />
+                    <span>New Query</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleCreateTable}>
+                    <LayoutTemplate size={14} />
+                    <span>Create Table</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleCreateView}>
+                    <Eye size={14} />
+                    <span>Create View</span>
+                  </DropdownMenuItem>
+                  {isPostgresConnection && (
+                    <DropdownMenuItem onSelect={handleCreateEnum}>
+                      <List size={14} />
+                      <span>Create Enum</span>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 flex-1 justify-start rounded-sm border-transparent bg-background/82 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-indigo-500/10 hover:text-indigo-400"
-                onClick={handleNewQuery}
-              >
-                <Plus size={14} />
-                <span>Query</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 flex-1 justify-start rounded-sm border-transparent bg-background/82 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-emerald-500/10 hover:text-emerald-400"
-                onClick={handleCreateTable}
-              >
-                <Plus size={14} />
-                <span>Table</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-sm border-transparent bg-background/82 px-2.5 hover:bg-amber-500/10 hover:text-amber-400"
+                className="h-8 w-8 rounded-sm border-transparent bg-background/82 px-0 hover:bg-amber-500/10 hover:text-amber-400"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
+                title="Refresh objects"
               >
                 <RefreshCw size={14} className={cn(isRefreshing && 'animate-spin')} />
               </Button>
@@ -617,111 +769,165 @@ export default function Sidebar() {
             <div className="flex h-full min-h-0 flex-col space-y-4">
               <SavedQueriesSection />
 
-              <SidebarObjectSection
-                title="Views"
-                items={filteredViews}
-                open={viewsOpen}
-                onToggle={() => setViewsOpen(!viewsOpen)}
-                onCreate={handleCreateView}
-                createTitle="Create View"
-                createButtonClassName="rounded-sm hover:bg-indigo-500/20 hover:text-indigo-400"
-                itemIcon={Eye}
-                selectedItem={selectedTable}
-                showSchemaBadge={showSchemaBadge}
-                listClassName="max-h-80 overflow-auto pr-1"
-                onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
-                onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
-              />
+              <div className="flex min-h-0 flex-1 flex-col space-y-2">
+                <div className="space-y-1 px-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+                    Objects
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {objectModeOptions.map((option) => {
+                      const isActive = activeObjectMode === option.mode;
+                      return (
+                        <button
+                          key={option.mode}
+                          type="button"
+                          className={cn(
+                            'inline-flex min-w-[74px] items-center justify-between gap-2 rounded-sm border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors',
+                            isActive
+                              ? 'border-primary/45 bg-primary/16 text-primary'
+                              : 'border-border/65 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground',
+                          )}
+                          onClick={() => setActiveObjectMode(option.mode)}
+                        >
+                          <span>{option.label}</span>
+                          <span className="font-mono text-[9px]">{option.count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              <SidebarObjectSection
-                title="Tables"
-                items={orderedFilteredTables}
-                open={tablesOpen}
-                onToggle={() => setTablesOpen(!tablesOpen)}
-                onCreate={handleCreateTable}
-                createTitle="Create Table"
-                createButtonClassName="rounded-sm hover:bg-emerald-500/20 hover:text-emerald-400"
-                itemIcon={LayoutTemplate}
-                selectedItem={selectedTable}
-                showSchemaBadge={showSchemaBadge}
-                isItemPinned={(qualifiedName) => pinnedTableNameSet.has(qualifiedName)}
-                listClassName="flex-1 min-h-0 overflow-auto pr-1"
-                containerClassName="flex min-h-0 flex-1 flex-col"
-                onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
-                onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
-                renderMenuItems={(qualifiedName) => (
-                  <>
-                    <ContextMenuItem onClick={() => handleOpenVisualize(qualifiedName)}>
-                      Open Table Visualize
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuSub>
-                      <ContextMenuSubTrigger disabled={isTransferPending}>
-                        Export...
-                      </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-44">
-                        <ContextMenuItem onClick={() => void exportTable(qualifiedName, 'csv')}>
-                          Export as CSV
+                {activeObjectMode === 'table' && (
+                  <SidebarObjectSection
+                    title={activeModeLabel}
+                    items={activeObjectItems}
+                    open={objectsOpen}
+                    onToggle={() => setObjectsOpen(!objectsOpen)}
+                    itemIcon={LayoutTemplate}
+                    selectedItem={activeObjectSelectedItem}
+                    showSchemaBadge={showSchemaBadge}
+                    isItemPinned={(qualifiedName) => pinnedTableNameSet.has(qualifiedName)}
+                    listClassName="flex-1 min-h-0 overflow-auto pr-1"
+                    containerClassName="flex min-h-0 flex-1 flex-col"
+                    onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                    onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
+                    renderMenuItems={(qualifiedName) => (
+                      <>
+                        <ContextMenuItem onClick={() => handleOpenVisualize(qualifiedName)}>
+                          Open Table Visualize
                         </ContextMenuItem>
-                        <ContextMenuItem onClick={() => void exportTable(qualifiedName, 'json')}>
-                          Export as JSON
+                        <ContextMenuSeparator />
+                        <ContextMenuSub>
+                          <ContextMenuSubTrigger disabled={isTransferPending}>
+                            Export...
+                          </ContextMenuSubTrigger>
+                          <ContextMenuSubContent className="w-44">
+                            <ContextMenuItem onClick={() => void exportTable(qualifiedName, 'csv')}>
+                              Export as CSV
+                            </ContextMenuItem>
+                            <ContextMenuItem onClick={() => void exportTable(qualifiedName, 'json')}>
+                              Export as JSON
+                            </ContextMenuItem>
+                            <ContextMenuItem onClick={() => void exportTable(qualifiedName, 'sql')}>
+                              Export as SQL
+                            </ContextMenuItem>
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
+                        <ContextMenuSub>
+                          <ContextMenuSubTrigger disabled={isTransferPending}>
+                            Import...
+                          </ContextMenuSubTrigger>
+                          <ContextMenuSubContent className="w-44">
+                            <ContextMenuItem onClick={() => void importTable(qualifiedName, 'csv')}>
+                              Import CSV
+                            </ContextMenuItem>
+                            <ContextMenuItem onClick={() => void importTable(qualifiedName, 'json')}>
+                              Import JSON
+                            </ContextMenuItem>
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onClick={() => handleTogglePinnedTable(qualifiedName)}>
+                          {pinnedTableNameSet.has(qualifiedName) ? 'Unpin Table' : 'Pin Table'}
                         </ContextMenuItem>
-                        <ContextMenuItem onClick={() => void exportTable(qualifiedName, 'sql')}>
-                          Export as SQL
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onClick={() => handleEditTable(qualifiedName)}>
+                          Edit Table
                         </ContextMenuItem>
-                      </ContextMenuSubContent>
-                    </ContextMenuSub>
-                    <ContextMenuSub>
-                      <ContextMenuSubTrigger disabled={isTransferPending}>
-                        Import...
-                      </ContextMenuSubTrigger>
-                      <ContextMenuSubContent className="w-44">
-                        <ContextMenuItem onClick={() => void importTable(qualifiedName, 'csv')}>
-                          Import CSV
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          onClick={() => handleTruncateTable(qualifiedName)}
+                          className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                        >
+                          Truncate Table
                         </ContextMenuItem>
-                        <ContextMenuItem onClick={() => void importTable(qualifiedName, 'json')}>
-                          Import JSON
+                        <ContextMenuItem
+                          onClick={() => handleDropTable(qualifiedName)}
+                          className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                        >
+                          Drop Table
                         </ContextMenuItem>
-                      </ContextMenuSubContent>
-                    </ContextMenuSub>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={() => handleTogglePinnedTable(qualifiedName)}>
-                      {pinnedTableNameSet.has(qualifiedName) ? 'Unpin Table' : 'Pin Table'}
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={() => handleEditTable(qualifiedName)}>
-                      Edit Table
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      onClick={() => handleTruncateTable(qualifiedName)}
-                      className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
-                    >
-                      Truncate Table
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onClick={() => handleDropTable(qualifiedName)}
-                      className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
-                    >
-                      Drop Table
-                    </ContextMenuItem>
-                  </>
+                      </>
+                    )}
+                  />
                 )}
-              />
 
-              {filteredTables.length === 0 && filteredViews.length === 0 && (
+                {activeObjectMode === 'enum' && (
+                  <SidebarObjectSection
+                    title={activeModeLabel}
+                    items={activeObjectItems}
+                    open={objectsOpen}
+                    onToggle={() => setObjectsOpen(!objectsOpen)}
+                    itemIcon={List}
+                    selectedItem={activeObjectSelectedItem}
+                    showSchemaBadge={showSchemaBadge}
+                    listClassName="flex-1 min-h-0 overflow-auto pr-1"
+                    containerClassName="flex min-h-0 flex-1 flex-col"
+                    onOpenData={handleOpenEnumDetail}
+                    openDataLabel="Open Enum"
+                  />
+                )}
+
+                {activeObjectMode === 'view' && (
+                  <SidebarObjectSection
+                    title={activeModeLabel}
+                    items={activeObjectItems}
+                    open={objectsOpen}
+                    onToggle={() => setObjectsOpen(!objectsOpen)}
+                    itemIcon={Eye}
+                    selectedItem={activeObjectSelectedItem}
+                    showSchemaBadge={showSchemaBadge}
+                    listClassName="flex-1 min-h-0 overflow-auto pr-1"
+                    containerClassName="flex min-h-0 flex-1 flex-col"
+                    onOpenData={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'data')}
+                    onOpenStructure={(qualifiedName) => openTableTab(activeConnection!.id, qualifiedName, 'structure')}
+                  />
+                )}
+
+                {activeObjectItems.length === 0 && visibleObjectCount > 0 && (
+                  <div className="rounded-md bg-background/30 px-3 py-3 text-[11px] text-muted-foreground">
+                    {selectedSchema === ALL_SCHEMAS_VALUE
+                      ? `No ${activeModeLabel.toLowerCase()} in this database`
+                      : `No ${activeModeLabel.toLowerCase()} in ${selectedSchema}`}
+                  </div>
+                )}
+              </div>
+
+              {filteredTables.length === 0 &&
+                filteredViews.length === 0 &&
+                filteredEnums.length === 0 && (
                 <div className="mt-4 rounded-md bg-background/34 px-4 py-8 text-center">
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-sm bg-background/78">
                     <Inbox size={20} className="text-muted-foreground/55" />
                   </div>
                   <div className="mb-1 text-sm font-medium text-foreground">
                     {selectedSchema === ALL_SCHEMAS_VALUE
-                      ? 'No tables found'
+                      ? 'No objects found'
                       : `No objects in ${selectedSchema}`}
                   </div>
                   <div className="mx-auto max-w-[180px] text-xs leading-relaxed text-muted-foreground">
                     {selectedSchema === ALL_SCHEMAS_VALUE
-                      ? 'Create a table to get started with VibeDB'
+                      ? 'Create a query, table, view, or enum to get started'
                       : 'Choose another schema or create an object in this schema'}
                   </div>
                 </div>

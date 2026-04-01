@@ -32,6 +32,7 @@ type TabsSlice = Pick<
   | "updateTableViewState"
   | "openTableTab"
   | "openVisualizationTab"
+  | "openEnumDetailTab"
   | "updateVisualizationState"
   | "setVisualizationTablePosition"
 >;
@@ -282,6 +283,52 @@ export function createTabsSlice(set: AppSet, get: AppGet): TabsSlice {
         title,
         schemaName: schemaName?.trim() ? schemaName.trim() : null,
         visualizeSourceTable: sourceTable?.trim() ? sourceTable.trim() : null,
+      };
+
+      set((currentState) => ({
+        tabs: [...currentState.tabs, tab].slice(-MAX_TABS),
+        activeTabId: id,
+        selectedTable: null,
+      }));
+    },
+
+    openEnumDetailTab: ({ connectionId, enumName, enumSchema }) => {
+      const trimmedEnumName = enumName.trim();
+      if (!trimmedEnumName) {
+        return;
+      }
+
+      const trimmedEnumSchema = enumSchema?.trim() ? enumSchema.trim() : null;
+      const fullName = trimmedEnumSchema
+        ? `${trimmedEnumSchema}.${trimmedEnumName}`
+        : trimmedEnumName;
+      const title = `${fullName} (Enum)`;
+
+      const state = get();
+      const existing = state.tabs.find(
+        (tab) =>
+          tab.connectionId === connectionId &&
+          tab.type === "enum-detail" &&
+          tab.enumName === trimmedEnumName &&
+          (tab.enumSchema?.trim() || null) === trimmedEnumSchema,
+      );
+
+      if (existing) {
+        set({
+          activeTabId: existing.id,
+          selectedTable: null,
+        });
+        return;
+      }
+
+      const id = `enum-${++tabCounter}-${Date.now()}`;
+      const tab = {
+        id,
+        connectionId,
+        type: "enum-detail" as const,
+        title,
+        enumName: trimmedEnumName,
+        enumSchema: trimmedEnumSchema,
       };
 
       set((currentState) => ({

@@ -25,24 +25,22 @@ function formatDatabaseVersion(version: string): string {
 }
 
 export default function TopBar() {
-  const connections = useAppStore(s => s.connections);
-  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
+  const activeConnectionName = useAppStore(
+    (state) =>
+      state.connections.find((connection) => connection.id === state.activeSidebarConnectionId)?.name
+        ?? null,
+  );
   const databaseVersion = useAppStore(s => s.databaseVersion);
   const isAiPanelOpen = useAppStore(s => s.isAiPanelOpen);
   const setIsAiPanelOpen = useAppStore(s => s.setIsAiPanelOpen);
   const setShowSettingsModal = useAppStore(s => s.setShowSettingsModal);
   const setIsQuickSearchOpen = useAppStore(s => s.setIsQuickSearchOpen);
-  const tabs = useAppStore(s => s.tabs);
-  const activeTabId = useAppStore(s => s.activeTabId);
-
-  const activeConnection = useMemo(
-    () => connections.find(c => c.id === activeSidebarConnectionId),
-    [connections, activeSidebarConnectionId]
+  const activeTabType = useAppStore((state) =>
+    state.activeTabId
+      ? (state.tabs.find((tab) => tab.id === state.activeTabId)?.type ?? null)
+      : null,
   );
-  const isDataTabActive = useMemo(
-    () => tabs.find(t => t.id === activeTabId)?.type === 'data',
-    [tabs, activeTabId]
-  );
+  const isDataTabActive = activeTabType === 'data';
   const toggleAiPanel = useCallback(
     () => setIsAiPanelOpen(!isAiPanelOpen),
     [setIsAiPanelOpen, isAiPanelOpen]
@@ -90,7 +88,7 @@ export default function TopBar() {
         className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-[12px] font-medium text-muted-foreground/80 gap-1.5"
         data-tauri-drag-region
       >
-        <span>Vibe DB {activeConnection ? `— ${activeConnection.name}` : ''}</span>
+        <span>Vibe DB {activeConnectionName ? `— ${activeConnectionName}` : ''}</span>
         {databaseVersion && (
           <span
             title={databaseVersion}

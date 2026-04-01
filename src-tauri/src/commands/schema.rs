@@ -1,12 +1,13 @@
 use crate::app_state::AppState;
 use crate::commands::get_connection_id;
-use crate::engines::{QueryResult, TableInfo, TableStructure};
+use crate::engines::{EngineType, QueryResult, TableInfo, TableStructure};
 use crate::sql_helpers::{
     FilterConditionInput, build_where_clause, extract_count, normalize_order_dir, quote_identifier,
-    quote_qualified_identifier,
+    quote_qualified_identifier, validate_identifier,
 };
 use crate::sql_logging::emit_sql_log;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
@@ -31,6 +32,40 @@ pub struct GetTableDataResponse {
     pub duration_ms: f64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnumInfo {
+    pub name: String,
+    pub schema: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnumDetail {
+    pub name: String,
+    pub schema: Option<String>,
+    pub values: Vec<String>,
+}
+
+fn find_column_index(columns: &[String], expected: &str) -> Result<usize, String> {
+    columns
+        .iter()
+        .position(|col| col.eq_ignore_ascii_case(expected))
+        .ok_or_else(|| format!("Missing '{expected}' column in enum query result"))
+}
+
+fn value_as_string(value: &Value) -> Option<String> {
+    match value {
+        Value::Null => None,
+        Value::String(text) => Some(text.clone()),
+        other => Some(other.to_string()),
+    }
+}
+
+fn quote_sql_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
 /// Lists all tables in the database.
 #[tauri::command]
 pub async fn list_tables(
@@ -47,6 +82,156 @@ pub async fn list_tables(
         .list_tables()
         .await
         .map_err(|error| error.to_string())
+}
+
+/// Lists PostgreSQL enum types for the active connection.
+#[tauri::command]
+pub async fn list_enums(
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+) -> Result<Vec<EnumInfo>, String> {
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine_type = state
+        .registry
+        .get_connection_type(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+    if engine_type != EngineType::Postgres {
+        return Ok(Vec::new());
+    }
+
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let result = engine
+        .execute_query(
+            r#"
+            SELECT
+                n.nspname AS schema,
+                t.typname AS name
+            FROM pg_catalog.pg_type t
+            JOIN pg_catalog.pg_namespace n
+              ON n.oid = t.typnamespace
+            WHERE t.typtype = 'e'
+              AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY n.nspname, t.typname
+            "#,
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let schema_idx = find_column_index(&result.columns, "schema")?;
+    let name_idx = find_column_index(&result.columns, "name")?;
+
+    let enums = result
+        .rows
+        .iter()
+        .filter_map(|row| {
+            let name = row.get(name_idx).and_then(value_as_string)?;
+            if name.trim().is_empty() {
+                return None;
+            }
+            let schema = row.get(schema_idx).and_then(value_as_string);
+            Some(EnumInfo { name, schema })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(enums)
+}
+
+/// Fetches ordered enum labels for a PostgreSQL enum type.
+#[tauri::command]
+pub async fn get_enum_detail(
+    state: tauri::State<'_, Arc<AppState>>,
+    conn_id: Option<String>,
+    enum_name: String,
+    enum_schema: Option<String>,
+) -> Result<EnumDetail, String> {
+    let id = get_connection_id(&state, conn_id).await?;
+    let engine_type = state
+        .registry
+        .get_connection_type(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+    if engine_type != EngineType::Postgres {
+        return Err("Enum introspection is only supported for PostgreSQL".to_string());
+    }
+
+    let trimmed_enum_name = enum_name.trim();
+    validate_identifier(trimmed_enum_name, "Enum")?;
+
+    let trimmed_enum_schema = enum_schema
+        .as_deref()
+        .unwrap_or("public")
+        .trim()
+        .to_string();
+    validate_identifier(&trimmed_enum_schema, "Schema")?;
+
+    let engine = state
+        .registry
+        .get_engine(&id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let query = format!(
+        "
+        SELECT
+            n.nspname AS schema,
+            t.typname AS name,
+            e.enumlabel AS value
+        FROM pg_catalog.pg_type t
+        JOIN pg_catalog.pg_namespace n
+          ON n.oid = t.typnamespace
+        JOIN pg_catalog.pg_enum e
+          ON e.enumtypid = t.oid
+        WHERE n.nspname = {}
+          AND t.typname = {}
+        ORDER BY e.enumsortorder
+        ",
+        quote_sql_literal(&trimmed_enum_schema),
+        quote_sql_literal(trimmed_enum_name),
+    );
+
+    let result = engine
+        .execute_query(&query)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let schema_idx = find_column_index(&result.columns, "schema")?;
+    let name_idx = find_column_index(&result.columns, "name")?;
+    let value_idx = find_column_index(&result.columns, "value")?;
+
+    let mut resolved_schema = None;
+    let mut resolved_name = None;
+    let mut values = Vec::new();
+
+    for row in &result.rows {
+        if resolved_schema.is_none() {
+            resolved_schema = row.get(schema_idx).and_then(value_as_string);
+        }
+        if resolved_name.is_none() {
+            resolved_name = row.get(name_idx).and_then(value_as_string);
+        }
+        if let Some(value) = row.get(value_idx).and_then(value_as_string) {
+            values.push(value);
+        }
+    }
+
+    if values.is_empty() {
+        return Err(format!(
+            "Enum not found: {}.{}",
+            trimmed_enum_schema, trimmed_enum_name
+        ));
+    }
+
+    Ok(EnumDetail {
+        name: resolved_name.unwrap_or_else(|| trimmed_enum_name.to_string()),
+        schema: resolved_schema.or(Some(trimmed_enum_schema)),
+        values,
+    })
 }
 
 /// Gets the complete structure of a table including columns, indexes, and foreign keys.

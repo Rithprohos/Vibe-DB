@@ -6,9 +6,15 @@ import { useUpdater } from '@/hooks/useUpdater';
 import { listen } from '@tauri-apps/api/event';
 
 export default function StatusBar() {
-  const connections = useAppStore(s => s.connections);
-  const activeSidebarConnectionId = useAppStore(s => s.activeSidebarConnectionId);
-  const tablesByConnection = useAppStore(s => s.tablesByConnection);
+  const activeConnection = useAppStore(
+    (state) => state.connections.find((connection) => connection.id === state.activeSidebarConnectionId) ?? null,
+  );
+  const tableCount = useAppStore((state) => {
+    if (!state.activeSidebarConnectionId) {
+      return 0;
+    }
+    return state.tablesByConnection[state.activeSidebarConnectionId]?.length ?? 0;
+  });
   const showLogDrawer = useAppStore(s => s.showLogDrawer);
   const setShowLogDrawer = useAppStore(s => s.setShowLogDrawer);
   const logCount = useAppStore(s => s.logs.length);
@@ -22,15 +28,6 @@ export default function StatusBar() {
     downloadAndInstall
   } = useUpdater();
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
-
-  const activeConnection = useMemo(
-    () => connections.find(c => c.id === activeSidebarConnectionId),
-    [connections, activeSidebarConnectionId]
-  );
-  const tableCount = useMemo(
-    () => activeConnection ? (tablesByConnection[activeConnection.id] || []).length : 0,
-    [activeConnection, tablesByConnection]
-  );
   const toggleLogDrawer = useCallback(
     () => setShowLogDrawer((prev) => !prev),
     [setShowLogDrawer]

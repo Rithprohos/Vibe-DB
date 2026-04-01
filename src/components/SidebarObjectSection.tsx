@@ -4,7 +4,6 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 
 import { cn } from '@/lib/utils';
 import { getQualifiedTableName, getSchemaName } from '@/lib/databaseObjects';
-import type { TableInfo } from '@/store/useAppStore';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -12,9 +11,14 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 
+interface SidebarObjectInfo {
+  name: string;
+  schema?: string | null;
+}
+
 interface SidebarObjectSectionProps {
   title: string;
-  items: TableInfo[];
+  items: SidebarObjectInfo[];
   open: boolean;
   onToggle: () => void;
   onCreate?: () => void;
@@ -27,7 +31,9 @@ interface SidebarObjectSectionProps {
   listClassName: string;
   containerClassName?: string;
   onOpenData: (qualifiedName: string) => void;
-  onOpenStructure: (qualifiedName: string) => void;
+  onOpenStructure?: (qualifiedName: string) => void;
+  openDataLabel?: string;
+  openStructureLabel?: string;
   renderMenuItems?: (qualifiedName: string) => ReactNode;
 }
 
@@ -47,6 +53,8 @@ export default function SidebarObjectSection({
   containerClassName,
   onOpenData,
   onOpenStructure,
+  openDataLabel = 'Open Data',
+  openStructureLabel = 'Open Structure',
   renderMenuItems,
 }: SidebarObjectSectionProps) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -93,22 +101,18 @@ export default function SidebarObjectSection({
           </div>
         </div>
 
-        <div
-          className={cn(
-            'grid min-h-0 flex-1 transition-[grid-template-rows,opacity] duration-200 ease-out',
-            open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
-          )}
-        >
+        {open ? (
           <div className="flex min-h-0 flex-1 overflow-hidden">
-            <div
-              ref={listRef}
-              className={cn(listClassName, !open && 'pointer-events-none')}
-            >
+            <div ref={listRef} className={cn('min-w-0 flex-1', listClassName)}>
               <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
                 {virtualizer.getVirtualItems().map((virtualItem) => {
                   const item = items[virtualItem.index];
-                  const qualifiedName = getQualifiedTableName(item);
-                  const schemaName = getSchemaName(item);
+                  const normalizedItem = {
+                    name: item.name,
+                    schema: item.schema ?? undefined,
+                  };
+                  const qualifiedName = getQualifiedTableName(normalizedItem);
+                  const schemaName = getSchemaName(normalizedItem);
                   const isSelected = selectedItem === qualifiedName;
                   const pinned = isItemPinned?.(qualifiedName) ?? false;
 
@@ -134,7 +138,11 @@ export default function SidebarObjectSection({
                                 : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                             )}
                             onClick={() => onOpenData(qualifiedName)}
-                            onDoubleClick={() => onOpenStructure(qualifiedName)}
+                            onDoubleClick={() =>
+                              onOpenStructure
+                                ? onOpenStructure(qualifiedName)
+                                : onOpenData(qualifiedName)
+                            }
                           >
                             <ItemIcon
                               size={14}
@@ -161,11 +169,13 @@ export default function SidebarObjectSection({
                         </ContextMenuTrigger>
                         <ContextMenuContent className="w-48">
                           <ContextMenuItem onClick={() => onOpenData(qualifiedName)}>
-                            Open Data
+                            {openDataLabel}
                           </ContextMenuItem>
-                          <ContextMenuItem onClick={() => onOpenStructure(qualifiedName)}>
-                            Open Structure
-                          </ContextMenuItem>
+                          {onOpenStructure && (
+                            <ContextMenuItem onClick={() => onOpenStructure(qualifiedName)}>
+                              {openStructureLabel}
+                            </ContextMenuItem>
+                          )}
                           {renderMenuItems?.(qualifiedName)}
                         </ContextMenuContent>
                       </ContextMenu>
@@ -175,7 +185,7 @@ export default function SidebarObjectSection({
               </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </>
   );

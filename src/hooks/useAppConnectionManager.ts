@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { connectDatabase, getDatabaseVersion, listTables } from '../lib/db';
+import { connectDatabase, getDatabaseVersion, listEnums, listTables, type EnumInfo } from '../lib/db';
 import {
   getStoredConnectionAuthToken,
   getStoredConnectionPassword,
@@ -25,6 +25,7 @@ const selectSetActiveSidebarConnection = (state: AppState) => state.setActiveSid
 const selectSetDatabaseVersion = (state: AppState) => state.setDatabaseVersion;
 const selectSetIsConnected = (state: AppState) => state.setIsConnected;
 const selectSetTables = (state: AppState) => state.setTables;
+const selectSetEnums = (state: AppState) => state.setEnums;
 const selectUpdateConnection = (state: AppState) => state.updateConnection;
 
 function isRemoteTursoConnection(connection: Connection): boolean {
@@ -42,6 +43,7 @@ export function useAppConnectionManager() {
   const setDatabaseVersion = useAppStore(selectSetDatabaseVersion);
   const setIsConnected = useAppStore(selectSetIsConnected);
   const setTables = useAppStore(selectSetTables);
+  const setEnums = useAppStore(selectSetEnums);
   const updateConnection = useAppStore(selectUpdateConnection);
   const autoConnectAttempted = useRef(false);
   const tokenMigrationAttempted = useRef(false);
@@ -180,8 +182,17 @@ export function useAppConnectionManager() {
         }
 
         setConnectionProgress({ ...progressBase, step: 'loading-schema' });
-        const tables = await listTables(connId);
+        const [tables, enums] = await Promise.all([
+          listTables(connId),
+          connection.type === 'postgres'
+            ? listEnums(connId).catch((error) => {
+                console.error('Failed to load enums:', error);
+                return [] as EnumInfo[];
+              })
+            : Promise.resolve([] as EnumInfo[]),
+        ]);
         setTables(connection.id, tables);
+        setEnums(connection.id, enums);
         setIsConnected(true);
         setActiveSidebarConnection(connection.id);
 
@@ -219,6 +230,7 @@ export function useAppConnectionManager() {
       setDatabaseVersion,
       setIsConnected,
       setTables,
+      setEnums,
       updateConnection,
     ],
   );

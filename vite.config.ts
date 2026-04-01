@@ -13,6 +13,35 @@ export default defineConfig(async () => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+
+          if (id.includes("@codemirror") || id.includes("@uiw")) {
+            return "vendor-codemirror";
+          }
+
+          if (id.includes("@radix-ui")) {
+            return "vendor-radix";
+          }
+
+          if (id.includes("@tauri-apps")) {
+            return "vendor-tauri";
+          }
+
+          if (id.includes("@tanstack")) {
+            return "vendor-tanstack";
+          }
+
+          return "vendor";
+        },
+      },
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
