@@ -15,12 +15,13 @@ use app_state::AppState;
 use commands::{
     connect_database, copy_schema_screenshot, create_database, delete_rows, disconnect_database,
     drop_table, execute_query, execute_transaction, export_table_data, get_database_version,
-    get_filtered_row_count, get_table_data, get_table_row_count, get_table_structure,
-    import_table_data, insert_rows, list_tables, save_schema_screenshot, set_active_connection,
-    truncate_table, update_connection_tag, update_rows,
+    get_enum_detail, get_filtered_row_count, get_table_data, get_table_row_count,
+    get_table_structure, import_table_data, insert_rows, list_enums, list_tables,
+    save_schema_screenshot, set_active_connection, truncate_table, update_connection_tag,
+    update_rows,
 };
 use menu::setup_menu;
-use sql_helpers::{build_create_table_sql, build_create_view_sql};
+use sql_helpers::{build_create_enum_sql, build_create_table_sql, build_create_view_sql};
 use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -58,9 +59,12 @@ pub fn run() {
             disconnect_database,
             set_active_connection,
             update_connection_tag,
+            build_create_enum_sql,
             build_create_table_sql,
             build_create_view_sql,
             list_tables,
+            list_enums,
+            get_enum_detail,
             get_table_structure,
             execute_query,
             execute_transaction,

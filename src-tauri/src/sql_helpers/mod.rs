@@ -1,4 +1,5 @@
 mod counts;
+mod create_enum;
 mod create_table;
 mod create_view;
 mod filters;
@@ -7,10 +8,11 @@ mod rows;
 mod values;
 
 pub use counts::extract_count;
+pub use create_enum::build_create_enum_sql;
 pub use create_table::build_create_table_sql;
 pub use create_view::build_create_view_sql;
 pub use filters::{FilterConditionInput, build_where_clause, normalize_order_dir};
-pub use identifiers::{quote_identifier, quote_qualified_identifier};
+pub use identifiers::{quote_identifier, quote_qualified_identifier, validate_identifier};
 pub use rows::{
     RowDataInput, RowIdentifierInput, RowUpdateInput, build_delete_queries, build_insert_queries,
     build_update_queries,

@@ -3,7 +3,7 @@ const SQLITE_RESERVED_PREFIX = "sqlite_";
 
 function validateIdentifier(
   value: string,
-  label: "Table" | "Column" | "View",
+  label: "Table" | "Column" | "View" | "Enum",
 ): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -35,4 +35,8 @@ export function validateViewName(value: string): string | null {
     return "View name cannot start with 'sqlite_'";
   }
   return error;
+}
+
+export function validateEnumName(value: string): string | null {
+  return validateIdentifier(value, "Enum");
 }

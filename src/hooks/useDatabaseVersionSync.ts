@@ -2,28 +2,28 @@ import { useEffect } from 'react';
 import { getDatabaseVersion } from '../lib/db';
 import { useAppStore, type AppState } from '../store/useAppStore';
 
-const selectActiveSidebarConnectionId = (state: AppState) => state.activeSidebarConnectionId;
-const selectActiveConnectionConnId = (state: AppState) =>
-  state.connections.find((connection) => connection.id === state.activeSidebarConnectionId)?.connId
-    ?? null;
-const selectSetDatabaseVersion = (state: AppState) => state.setDatabaseVersion;
+function getActiveConnectionConnId(state: AppState): string | null {
+  return (
+    state.connections.find((connection) => connection.id === state.activeSidebarConnectionId)?.connId
+      ?? null
+  );
+}
 
 export function useDatabaseVersionSync(): void {
-  const activeSidebarConnectionId = useAppStore(selectActiveSidebarConnectionId);
-  const activeConnectionConnId = useAppStore(selectActiveConnectionConnId);
-  const setDatabaseVersion = useAppStore(selectSetDatabaseVersion);
-
   useEffect(() => {
     let cancelled = false;
+    let lastConnId: string | null = null;
 
-    const syncActiveDatabaseVersion = async () => {
-      if (!activeConnectionConnId) {
+    const setDatabaseVersion = useAppStore.getState().setDatabaseVersion;
+
+    const syncActiveDatabaseVersion = async (connId: string | null) => {
+      if (!connId) {
         setDatabaseVersion(null);
         return;
       }
 
       try {
-        const version = await getDatabaseVersion(activeConnectionConnId);
+        const version = await getDatabaseVersion(connId);
         if (!cancelled) {
           setDatabaseVersion(version);
         }
@@ -34,10 +34,23 @@ export function useDatabaseVersionSync(): void {
       }
     };
 
-    void syncActiveDatabaseVersion();
+    const initialState = useAppStore.getState();
+    lastConnId = getActiveConnectionConnId(initialState);
+    void syncActiveDatabaseVersion(lastConnId);
+
+    const unsubscribe = useAppStore.subscribe((state) => {
+      const nextConnId = getActiveConnectionConnId(state);
+      if (nextConnId === lastConnId) {
+        return;
+      }
+
+      lastConnId = nextConnId;
+      void syncActiveDatabaseVersion(nextConnId);
+    });
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, [activeConnectionConnId, activeSidebarConnectionId, setDatabaseVersion]);
+  }, []);
 }

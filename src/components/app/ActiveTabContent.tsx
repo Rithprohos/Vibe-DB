@@ -9,6 +9,8 @@ const TableView = lazy(() => import('../TableView/index'));
 const QueryEditor = lazy(() => import('../QueryEditor'));
 const CreateTable = lazy(() => import('../CreateTable'));
 const CreateView = lazy(() => import('../CreateView'));
+const CreateEnum = lazy(() => import('../CreateEnum'));
+const EnumDetail = lazy(() => import('../EnumDetail'));
 const EditTable = lazy(() => import('../EditTable'));
 const TableStructure = lazy(() => import('../TableStructure'));
 const SchemaVisualization = lazy(() => import('../SchemaVisualization'));
@@ -86,6 +88,10 @@ export default function ActiveTabContent({
       return renderLazyView(<CreateTable key={activeTab.id} tabId={activeTab.id} />);
     case 'create-view':
       return renderLazyView(<CreateView key={activeTab.id} tabId={activeTab.id} />);
+    case 'create-enum':
+      return renderLazyView(<CreateEnum key={activeTab.id} tabId={activeTab.id} />);
+    case 'enum-detail':
+      return renderLazyView(<EnumDetail key={activeTab.id} tabId={activeTab.id} />);
     case 'edit-table':
       return activeTab.tableName
         ? renderLazyView(

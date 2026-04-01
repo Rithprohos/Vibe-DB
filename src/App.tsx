@@ -1,10 +1,9 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import DatabaseBar from './components/DatabaseBar';
 import Sidebar from './components/Sidebar';
 import TabBar from './components/TabBar';
 import StatusBar from './components/StatusBar';
 import TopBar from './components/TopBar';
-import QuickSearch from './components/QuickSearch';
 import ActiveTabContent from './components/app/ActiveTabContent';
 import {
   useConnectEventListener,
@@ -26,19 +25,31 @@ const LogDrawer = lazy(() => import('./components/LogDrawer'));
 const AiPanel = lazy(() => import('./components/AiPanel'));
 const AlertModal = lazy(() => import('./components/AlertModal'));
 const ToastViewport = lazy(() => import('./components/ToastViewport'));
+const QuickSearch = lazy(() => import('./components/QuickSearch'));
 
 const selectShowConnectionDialog = (state: AppState) => state.showConnectionDialog;
 const selectShowSettingsModal = (state: AppState) => state.showSettingsModal;
 const selectTheme = (state: AppState) => state.theme;
+const selectIsAiPanelOpen = (state: AppState) => state.isAiPanelOpen;
+const selectIsQuickSearchOpen = (state: AppState) => state.isQuickSearchOpen;
 
 export default function App() {
   useDevRenderCounter('App');
 
   const showConnectionDialog = useAppStore(selectShowConnectionDialog);
   const showSettingsModal = useAppStore(selectShowSettingsModal);
+  const isAiPanelOpen = useAppStore(selectIsAiPanelOpen);
+  const isQuickSearchOpen = useAppStore(selectIsQuickSearchOpen);
   const theme = useAppStore(selectTheme);
+  const [hasLoadedQuickSearch, setHasLoadedQuickSearch] = useState(false);
   const { connectionProgress, handleConnect, startupRestoreChecked } = useAppConnectionManager();
   const hasLoadedLogDrawer = useLogDrawerPreload();
+
+  useEffect(() => {
+    if (isQuickSearchOpen) {
+      setHasLoadedQuickSearch(true);
+    }
+  }, [isQuickSearchOpen]);
 
   useThemeSync(theme);
   useProductionContextMenuGuard();
@@ -62,12 +73,18 @@ export default function App() {
             />
           </div>
         </div>
-        <Suspense fallback={null}>
-          <AiPanel />
-        </Suspense>
+        {isAiPanelOpen && (
+          <Suspense fallback={null}>
+            <AiPanel />
+          </Suspense>
+        )}
       </div>
       <StatusBar />
-      <QuickSearch />
+      {hasLoadedQuickSearch && (
+        <Suspense fallback={null}>
+          <QuickSearch />
+        </Suspense>
+      )}
       {showConnectionDialog && (
         <Suspense fallback={null}>
           <ConnectionDialog />

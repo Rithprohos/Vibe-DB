@@ -61,6 +61,17 @@ export interface SchemaTable {
   columns: SchemaColumn[];
 }
 
+export interface EnumInfo {
+  name: string;
+  schema?: string | null;
+}
+
+export interface EnumDetail {
+  name: string;
+  schema?: string | null;
+  values: string[];
+}
+
 export interface GenerateSqlRequest {
   prompt: string;
   schema: SchemaTable[];
@@ -166,6 +177,26 @@ export async function updateConnectionTag(
 export async function listTables(connId?: string): Promise<TableInfo[]> {
   return measureDevFetch("list_tables", () =>
     invoke<TableInfo[]>("list_tables", { connId }),
+  );
+}
+
+export async function listEnums(connId?: string): Promise<EnumInfo[]> {
+  return measureDevFetch("list_enums", () =>
+    invoke<EnumInfo[]>("list_enums", { connId }),
+  );
+}
+
+export async function getEnumDetail(
+  enumName: string,
+  enumSchema?: string | null,
+  connId?: string,
+): Promise<EnumDetail> {
+  return measureDevFetch("get_enum_detail", () =>
+    invoke<EnumDetail>("get_enum_detail", {
+      enumName,
+      enumSchema,
+      connId,
+    }),
   );
 }
 
@@ -302,6 +333,20 @@ export async function buildCreateViewSQL(
       selectSql,
       ifNotExists,
       temporary,
+    }),
+  );
+}
+
+export async function buildCreateEnumSQL(
+  enumName: string,
+  values: string[],
+  engineType: "sqlite" | "turso" | "postgres" = "postgres",
+): Promise<string> {
+  return measureDevFetch("build_create_enum_sql", () =>
+    invoke<string>("build_create_enum_sql", {
+      enumName,
+      values,
+      engineType,
     }),
   );
 }

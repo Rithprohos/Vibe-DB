@@ -10,6 +10,7 @@ type ConnectionSlice = Pick<
   | "isConnected"
   | "showConnectionDialog"
   | "tablesByConnection"
+  | "enumsByConnection"
   | "pinnedTablesByConnection"
   | "selectedTable"
   | "addConnection"
@@ -22,6 +23,7 @@ type ConnectionSlice = Pick<
   | "setIsConnected"
   | "setShowConnectionDialog"
   | "setTables"
+  | "setEnums"
   | "togglePinnedTable"
   | "setSelectedTable"
 >;
@@ -116,6 +118,7 @@ export function createConnectionSlice(set: AppSet): ConnectionSlice {
     isConnected: false,
     showConnectionDialog: false,
     tablesByConnection: {},
+    enumsByConnection: {},
     pinnedTablesByConnection: {},
     selectedTable: null,
 
@@ -230,6 +233,14 @@ export function createConnectionSlice(set: AppSet): ConnectionSlice {
           connectionId,
           tables,
         ),
+      })),
+
+    setEnums: (connectionId, enums) =>
+      set((state) => ({
+        enumsByConnection: {
+          ...state.enumsByConnection,
+          [connectionId]: enums,
+        },
       })),
 
     togglePinnedTable: (connectionId, tableName) =>
