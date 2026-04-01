@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { listEnums, listTables } from '../lib/db';
 import { clearStoredConnectionAuthToken } from '../lib/connectionTokenStore';
+import type { EnumInfo, TableInfo } from '../store/useAppStore';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -61,6 +62,9 @@ const SIDEBAR_PANEL_CLASS_NAME =
 const SIDEBAR_FIELD_CLASS_NAME =
   'rounded-sm border border-border/55 bg-background/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition-[border-color,background-color,box-shadow]';
 type ObjectListMode = 'table' | 'enum' | 'view';
+const EMPTY_TABLES: TableInfo[] = [];
+const EMPTY_ENUMS: EnumInfo[] = [];
+const EMPTY_PINNED_TABLES: string[] = [];
 
 export default function Sidebar() {
   useDevRenderCounter('Sidebar');
@@ -69,18 +73,18 @@ export default function Sidebar() {
   const isConnected = useAppStore(s => s.isConnected);
   const tables = useAppStore((state) =>
     activeSidebarConnectionId
-      ? (state.tablesByConnection[activeSidebarConnectionId] ?? [])
-      : [],
+      ? (state.tablesByConnection[activeSidebarConnectionId] ?? EMPTY_TABLES)
+      : EMPTY_TABLES,
   );
   const enums = useAppStore((state) =>
     activeSidebarConnectionId
-      ? (state.enumsByConnection[activeSidebarConnectionId] ?? [])
-      : [],
+      ? (state.enumsByConnection[activeSidebarConnectionId] ?? EMPTY_ENUMS)
+      : EMPTY_ENUMS,
   );
   const pinnedTableNames = useAppStore((state) =>
     activeSidebarConnectionId
-      ? (state.pinnedTablesByConnection[activeSidebarConnectionId] ?? [])
-      : [],
+      ? (state.pinnedTablesByConnection[activeSidebarConnectionId] ?? EMPTY_PINNED_TABLES)
+      : EMPTY_PINNED_TABLES,
   );
   const selectedTable = useAppStore(s => s.selectedTable);
   const selectedEnum = useAppStore((state) => {
