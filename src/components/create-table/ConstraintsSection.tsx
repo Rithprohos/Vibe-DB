@@ -1,6 +1,7 @@
 import {
   ChevronDown,
   ChevronRight,
+  Hash,
   Link2,
   Plus,
   ShieldCheck,
@@ -9,6 +10,7 @@ import {
 import type {
   CheckConstraint,
   ColumnDef,
+  CreateTableIndex,
   ForeignKeyConstraint,
   SupportedEngine,
 } from '../../lib/createTableConstants';
@@ -17,8 +19,10 @@ import {
   FK_ACTION_OPTIONS,
   getCheckConstraintOperatorOptions,
   getCheckConstraintValuePlaceholder,
+  getPostgresIndexMethodOptions,
 } from '../../lib/createTableConstants';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -29,6 +33,7 @@ import {
 } from '@/components/ui/select';
 
 export interface ExpandedConstraintSections {
+  indexes: boolean;
   foreignKeys: boolean;
   checkConstraints: boolean;
 }
@@ -42,6 +47,7 @@ interface ConstraintsSectionProps {
   tableName: string;
   engineType: SupportedEngine;
   columns: ColumnDef[];
+  indexes: CreateTableIndex[];
   foreignKeys: ForeignKeyConstraint[];
   checkConstraints: CheckConstraint[];
   referenceTableOptions: ReferenceTableOption[];
@@ -49,6 +55,10 @@ interface ConstraintsSectionProps {
   loadingReferenceColumnsByTable: Record<string, boolean>;
   expandedSections: ExpandedConstraintSections;
   onToggleSection: (section: keyof ExpandedConstraintSections) => void;
+  onAddIndex: () => void;
+  onUpdateIndex: (id: string, updates: Partial<CreateTableIndex>) => void;
+  onToggleIndexColumn: (id: string, columnName: string) => void;
+  onRemoveIndex: (id: string) => void;
   onAddForeignKey: () => void;
   onUpdateForeignKey: (id: string, updates: Partial<ForeignKeyConstraint>) => void;
   onRemoveForeignKey: (id: string) => void;
@@ -61,6 +71,7 @@ export function ConstraintsSection({
   tableName,
   engineType,
   columns,
+  indexes,
   foreignKeys,
   checkConstraints,
   referenceTableOptions,
@@ -68,6 +79,10 @@ export function ConstraintsSection({
   loadingReferenceColumnsByTable,
   expandedSections,
   onToggleSection,
+  onAddIndex,
+  onUpdateIndex,
+  onToggleIndexColumn,
+  onRemoveIndex,
   onAddForeignKey,
   onUpdateForeignKey,
   onRemoveForeignKey,
@@ -76,15 +91,200 @@ export function ConstraintsSection({
   onRemoveCheckConstraint,
 }: ConstraintsSectionProps) {
   const UNSET_SELECT_VALUE = '__vibedb_none__';
+  const DEFAULT_POSTGRES_METHOD_VALUE = '__vibedb_default_index_method__';
   const FK_LABEL_CLASS =
     'text-[10px] uppercase tracking-wider text-muted-foreground mb-1 h-8 flex items-end';
+  const indexableColumns = columns
+    .map((column) => column.name.trim())
+    .filter(Boolean);
   const checkConstraintColumns = Array.from(
     new Set(columns.map((column) => column.name.trim()).filter(Boolean)),
   );
   const checkConstraintOperatorOptions = getCheckConstraintOperatorOptions(engineType);
+  const postgresIndexMethodOptions = getPostgresIndexMethodOptions();
 
   return (
     <div className="mt-8 space-y-4">
+      <div className="rounded-md border border-border bg-surface/[0.3] overflow-hidden glass-panel panel-shadow">
+        <button
+          type="button"
+          onClick={() => onToggleSection('indexes')}
+          className="w-full flex items-center justify-between px-4 py-3 bg-secondary/40 hover:bg-secondary/60 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Hash size={16} className="text-primary" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+              Indexes
+            </span>
+            <span className="bg-secondary px-1.5 py-0.5 rounded text-[10px] font-mono border border-border text-muted-foreground">
+              {indexes.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddIndex();
+              }}
+              className="h-6 px-2 text-xs hover:bg-primary/20 hover:text-primary"
+            >
+              <Plus size={12} className="mr-1" />
+              Add
+            </Button>
+            {expandedSections.indexes ? (
+              <ChevronDown size={16} className="text-muted-foreground" />
+            ) : (
+              <ChevronRight size={16} className="text-muted-foreground" />
+            )}
+          </div>
+        </button>
+
+        {expandedSections.indexes && (
+          <div className="p-4 space-y-3">
+            {indexes.length === 0 ? (
+              <div className="text-xs text-muted-foreground/60 text-center py-4">
+                No indexes defined. Click "Add" to create one.
+              </div>
+            ) : (
+              indexes.map((indexDef, indexPosition) => {
+                const selectedMethod =
+                  (indexDef.method
+                    ? postgresIndexMethodOptions.find((option) => option.value === indexDef.method)
+                    : undefined) ??
+                  postgresIndexMethodOptions.find((option) => option.value === 'btree');
+
+                return (
+                  <div
+                    key={indexDef.id}
+                    className="p-3 rounded-sm bg-background/50 border border-border/50 space-y-3"
+                  >
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                      <div className="md:col-span-6">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                          Index Name
+                        </label>
+                        <Input
+                          type="text"
+                          value={indexDef.name}
+                          onChange={(event) =>
+                            onUpdateIndex(indexDef.id, {
+                              name: event.target.value,
+                            })
+                          }
+                          placeholder={`idx_${tableName || 'table'}_${indexPosition + 1}`}
+                          className="h-8 bg-transparent border-border/50 text-xs"
+                        />
+                      </div>
+
+                      <div className="md:col-span-3">
+                        <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                          Uniqueness
+                        </label>
+                        <label className="inline-flex h-8 items-center gap-2 rounded-sm border border-border/50 px-2.5 text-xs text-muted-foreground">
+                          <Checkbox
+                            checked={indexDef.unique}
+                            onCheckedChange={(value: boolean | 'indeterminate') =>
+                              onUpdateIndex(indexDef.id, {
+                                unique: !!value,
+                              })
+                            }
+                          />
+                          Unique Index
+                        </label>
+                      </div>
+
+                      {engineType === 'postgres' && (
+                        <div className="md:col-span-2">
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                            Method
+                          </label>
+                          <Select
+                            value={indexDef.method ?? DEFAULT_POSTGRES_METHOD_VALUE}
+                            onValueChange={(value) =>
+                              onUpdateIndex(indexDef.id, {
+                                method:
+                                  value === DEFAULT_POSTGRES_METHOD_VALUE
+                                    ? undefined
+                                    : (value as CreateTableIndex['method']),
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 bg-transparent border-border/50 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={DEFAULT_POSTGRES_METHOD_VALUE}>
+                                Default (BTREE)
+                              </SelectItem>
+                              {postgresIndexMethodOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      <div className="md:col-span-1 md:pt-5 md:flex md:justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRemoveIndex(indexDef.id)}
+                          className="w-7 h-7 p-0 hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 block">
+                        Index Columns
+                      </p>
+                      {indexableColumns.length === 0 ? (
+                        <div className="text-xs text-muted-foreground/60">
+                          Add named columns first.
+                        </div>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {indexableColumns.map((columnName) => (
+                            <label
+                              key={`${indexDef.id}-${columnName}`}
+                              className={
+                                'inline-flex items-center gap-2 rounded-md border ' +
+                                'border-border/70 bg-background/30 px-2.5 py-2 text-xs text-muted-foreground'
+                              }
+                            >
+                              <Checkbox
+                                checked={indexDef.columns.includes(columnName)}
+                                onCheckedChange={() =>
+                                  onToggleIndexColumn(indexDef.id, columnName)
+                                }
+                              />
+                              <span className="font-mono text-foreground">{columnName}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {engineType === 'postgres' && selectedMethod && (
+                      <p className="text-[10px] text-muted-foreground/80">
+                        <span className="font-semibold">{selectedMethod.label}:</span>{' '}
+                        {selectedMethod.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="rounded-md border border-border bg-surface/[0.3] overflow-hidden glass-panel panel-shadow">
         <button
           type="button"

@@ -312,6 +312,7 @@ impl DatabaseEngine for TursoEngine {
                         name: index_name,
                         unique: unique != 0,
                         columns: index_columns,
+                        method: None,
                     });
                 }
                 Ok(None) => break,

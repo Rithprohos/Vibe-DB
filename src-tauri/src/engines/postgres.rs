@@ -557,6 +557,26 @@ impl DatabaseEngine for PostgresEngine {
             // Parse index definition to extract column names
             // CREATE [UNIQUE] INDEX name ON schema.table USING method (col1, col2, ...)
             let is_unique = index_def.contains(" UNIQUE INDEX ");
+            let method = {
+                let upper = index_def.to_ascii_uppercase();
+                let prefix_end = index_def.find('(').unwrap_or(index_def.len());
+                let upper_prefix = &upper[..prefix_end];
+                upper_prefix.rfind(" USING ").and_then(|using_pos| {
+                    let after_using = &index_def[using_pos + " USING ".len()..prefix_end];
+                    let raw_method = after_using
+                        .trim_start()
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or("")
+                        .trim_matches('"')
+                        .to_ascii_lowercase();
+                    if raw_method.is_empty() {
+                        None
+                    } else {
+                        Some(raw_method)
+                    }
+                })
+            };
 
             // Extract columns from parentheses
             let columns = if let Some(start) = index_def.find('(') {
@@ -577,6 +597,7 @@ impl DatabaseEngine for PostgresEngine {
                 name: index_name,
                 unique: is_unique,
                 columns,
+                method,
             });
         }
 

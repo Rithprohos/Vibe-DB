@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Save, Loader2, AlertCircle, TableIcon } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import {
+  buildCreateIndexesSQL,
   buildCreateTableSQL,
   executeQuery,
   getTableStructure,
@@ -15,12 +16,14 @@ import {
   createEmptyCheckConstraint,
   createEmptyColumn,
   createEmptyForeignKey,
+  createEmptyTableIndex,
   DEFAULT_TABLE_NAME,
   getDataTypesForEngine,
   getEngineTypeLabel,
   normalizeTypeParams,
   type CheckConstraint,
   type ColumnDef,
+  type CreateTableIndex,
   type ForeignKeyConstraint,
 } from '../lib/createTableConstants';
 import { ColumnsSection } from './create-table/ColumnsSection';
@@ -52,9 +55,18 @@ interface ReferenceTableOption {
 }
 
 const DEFAULT_EXPANDED_SECTIONS: ExpandedConstraintSections = {
+  indexes: false,
   foreignKeys: false,
   checkConstraints: false,
 };
+
+function getIndexNameFromCreateIndexSql(sql: string): string | null {
+  const match = sql.match(/\bINDEX\s+"((?:[^"]|"")+)"\s+ON\b/i);
+  if (!match?.[1]) {
+    return null;
+  }
+  return match[1].replace(/""/g, '"');
+}
 
 export default function CreateTable({ tabId }: Props) {
   const tabs = useAppStore((state) => state.tabs);
@@ -81,6 +93,7 @@ export default function CreateTable({ tabId }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [indexes, setIndexes] = useState<CreateTableIndex[]>([]);
   const [foreignKeys, setForeignKeys] = useState<ForeignKeyConstraint[]>([]);
   const [checkConstraints, setCheckConstraints] = useState<CheckConstraint[]>([]);
   const [referenceColumnsByTable, setReferenceColumnsByTable] = useState<
@@ -144,11 +157,12 @@ export default function CreateTable({ tabId }: Props) {
     () =>
       getLiveConstraintError({
         engineType,
+        indexes,
         foreignKeys,
         checkConstraints,
         namedColumnNames,
       }),
-    [engineType, foreignKeys, checkConstraints, namedColumnNames],
+    [engineType, indexes, foreignKeys, checkConstraints, namedColumnNames],
   );
 
   const sql = useCreateTableSqlPreview({
@@ -157,6 +171,7 @@ export default function CreateTable({ tabId }: Props) {
     columns,
     ifNotExists,
     engineType,
+    indexes,
     foreignKeys,
     checkConstraints,
     liveConstraintError,
@@ -219,6 +234,43 @@ export default function CreateTable({ tabId }: Props) {
 
   const toggleSection = useCallback((section: keyof ExpandedConstraintSections) => {
     setExpandedSections((previous) => ({ ...previous, [section]: !previous[section] }));
+  }, []);
+
+  const addIndex = useCallback(() => {
+    setIndexes((previous) => [...previous, createEmptyTableIndex()]);
+    setExpandedSections((previous) => ({ ...previous, indexes: true }));
+  }, []);
+
+  const updateIndex = useCallback((id: string, updates: Partial<CreateTableIndex>) => {
+    setIndexes((previous) =>
+      previous.map((index) => {
+        if (index.id !== id) {
+          return index;
+        }
+        return { ...index, ...updates };
+      }),
+    );
+  }, []);
+
+  const removeIndex = useCallback((id: string) => {
+    setIndexes((previous) => previous.filter((index) => index.id !== id));
+  }, []);
+
+  const toggleIndexColumn = useCallback((id: string, columnName: string) => {
+    setIndexes((previous) =>
+      previous.map((index) => {
+        if (index.id !== id) {
+          return index;
+        }
+        const trimmed = columnName.trim();
+        if (!trimmed) {
+          return index;
+        }
+        return index.columns.includes(trimmed)
+          ? { ...index, columns: index.columns.filter((column) => column !== trimmed) }
+          : { ...index, columns: [...index.columns, trimmed] };
+      }),
+    );
   }, []);
 
   const addForeignKey = useCallback(() => {
@@ -443,6 +495,36 @@ export default function CreateTable({ tabId }: Props) {
     });
   }, [engineType, namedColumnNames]);
 
+  useEffect(() => {
+    setIndexes((previous) => {
+      let didChange = false;
+      const next = previous.map((index) => {
+        const nextColumns: string[] = [];
+        for (const column of index.columns) {
+          const trimmed = column.trim();
+          if (!trimmed || !namedColumnNames.has(trimmed) || nextColumns.includes(trimmed)) {
+            didChange = true;
+            continue;
+          }
+          nextColumns.push(trimmed);
+        }
+
+        if (engineType !== 'postgres' && index.method) {
+          didChange = true;
+          return { ...index, columns: nextColumns, method: undefined };
+        }
+
+        if (nextColumns.length !== index.columns.length) {
+          return { ...index, columns: nextColumns };
+        }
+
+        return index;
+      });
+
+      return didChange ? next : previous;
+    });
+  }, [engineType, namedColumnNames]);
+
   const handleSave = useCallback(async () => {
     if (!connId) {
       setError('No active database connection');
@@ -483,7 +565,22 @@ export default function CreateTable({ tabId }: Props) {
         foreignKeys,
         checkConstraints,
       );
+      const indexSqlToRun = await buildCreateIndexesSQL(tableName, indexes, engineType);
+
       await executeQuery(sqlToRun, connId, 'guided');
+      for (let statementIndex = 0; statementIndex < indexSqlToRun.length; statementIndex += 1) {
+        const indexSql = indexSqlToRun[statementIndex];
+        try {
+          await executeQuery(indexSql, connId, 'guided');
+        } catch (indexError: any) {
+          const indexName =
+            getIndexNameFromCreateIndexSql(indexSql) ?? `#${statementIndex + 1}`;
+          const message = indexError?.toString?.() ?? String(indexError);
+          throw new Error(
+            `Table "${tableName.trim()}" was created, but index ${indexName} failed: ${message}`,
+          );
+        }
+      }
 
       const tables = await listTables(connId);
       if (activeConnection) {
@@ -496,7 +593,15 @@ export default function CreateTable({ tabId }: Props) {
         openTableTab(activeConnection.id, tableName.trim(), 'data');
       }
     } catch (unknownError: any) {
-      setError(unknownError?.toString() || 'Unknown error');
+      if (connId && activeConnection) {
+        try {
+          const tables = await listTables(connId);
+          setTables(activeConnection.id, tables);
+        } catch {
+          // Ignore refresh failures and preserve the original save error.
+        }
+      }
+      setError(unknownError?.message || unknownError?.toString() || 'Unknown error');
     } finally {
       setSaving(false);
     }
@@ -509,6 +614,7 @@ export default function CreateTable({ tabId }: Props) {
     engineType,
     foreignKeys,
     ifNotExists,
+    indexes,
     liveConstraintError,
     liveTypeParamsError,
     openTableTab,
@@ -616,6 +722,7 @@ export default function CreateTable({ tabId }: Props) {
             tableName={tableName}
             engineType={engineType}
             columns={columns}
+            indexes={indexes}
             foreignKeys={foreignKeys}
             checkConstraints={checkConstraints}
             referenceTableOptions={referenceTableOptions}
@@ -623,6 +730,10 @@ export default function CreateTable({ tabId }: Props) {
             loadingReferenceColumnsByTable={loadingReferenceColumnsByTable}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
+            onAddIndex={addIndex}
+            onUpdateIndex={updateIndex}
+            onToggleIndexColumn={toggleIndexColumn}
+            onRemoveIndex={removeIndex}
             onAddForeignKey={addForeignKey}
             onUpdateForeignKey={updateForeignKey}
             onRemoveForeignKey={removeForeignKey}

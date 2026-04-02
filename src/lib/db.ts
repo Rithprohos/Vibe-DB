@@ -1,6 +1,11 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { desktopDir, join } from "@tauri-apps/api/path";
-import type { ColumnDef, ForeignKeyConstraint, CheckConstraint } from "./createTableConstants";
+import type {
+  CheckConstraint,
+  ColumnDef,
+  CreateTableIndex,
+  ForeignKeyConstraint,
+} from "./createTableConstants";
 import type { QueryExecutionSurface } from "./queryGuard";
 import type { Connection, TableInfo, TableStructureData, QueryResult } from "../store/useAppStore";
 import type {
@@ -317,6 +322,27 @@ export async function buildCreateTableSQL(
       engineType,
       foreignKeys,
       checkConstraints: serializedCheckConstraints,
+    }),
+  );
+}
+
+export async function buildCreateIndexesSQL(
+  tableName: string,
+  indexes: CreateTableIndex[],
+  engineType: 'sqlite' | 'turso' | 'postgres' = 'sqlite',
+): Promise<string[]> {
+  const serializedIndexes = indexes.map((index) => ({
+    name: index.name,
+    columns: index.columns,
+    unique: index.unique,
+    method: index.method,
+  }));
+
+  return measureDevFetch("build_create_indexes_sql", () =>
+    invoke<string[]>("build_create_indexes_sql", {
+      tableName,
+      indexes: serializedIndexes,
+      engineType,
     }),
   );
 }

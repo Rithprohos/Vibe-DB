@@ -131,6 +131,7 @@ export default function TableStructure({ tableName, tabId }: Props) {
               <TableRow className="border-border/50 hover:bg-transparent">
                 <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-foreground pl-4">Name</TableHead>
                 <TableHead className="w-[100px] font-semibold uppercase tracking-wider text-[10px] text-foreground">Unique</TableHead>
+                <TableHead className="w-[110px] font-semibold uppercase tracking-wider text-[10px] text-foreground">Method</TableHead>
                 <TableHead className="font-semibold uppercase tracking-wider text-[10px] text-foreground">Columns</TableHead>
               </TableRow>
             </TableHeader>
@@ -147,6 +148,9 @@ export default function TableStructure({ tableName, tabId }: Props) {
                         Unique
                       </span>
                     )}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground uppercase">
+                    {idx.method ? idx.method : <span className="text-muted-foreground/40">-</span>}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {idx.columns.join(', ')}

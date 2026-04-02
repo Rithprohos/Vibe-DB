@@ -64,6 +64,28 @@ export interface CheckConstraint {
   value: string;
 }
 
+export type PostgresIndexMethod =
+  | 'btree'
+  | 'hash'
+  | 'gin'
+  | 'gist'
+  | 'brin'
+  | 'spgist';
+
+export interface CreateTableIndex {
+  id: string;
+  name: string;
+  columns: string[];
+  unique: boolean;
+  method?: string;
+}
+
+export interface PostgresIndexMethodOption {
+  value: PostgresIndexMethod;
+  label: string;
+  description: string;
+}
+
 /** Table constraint definitions */
 export interface TableConstraints {
   foreignKeys: ForeignKeyConstraint[];
@@ -167,6 +189,47 @@ export function getCheckConstraintOperatorOptions(
           disabled: true,
         },
   );
+}
+
+const POSTGRES_INDEX_METHOD_OPTIONS: readonly PostgresIndexMethodOption[] = [
+  {
+    value: 'btree',
+    label: 'BTREE',
+    description: 'Default for equality/range ordering comparisons.',
+  },
+  {
+    value: 'hash',
+    label: 'HASH',
+    description: 'Equality comparisons only.',
+  },
+  {
+    value: 'gin',
+    label: 'GIN',
+    description: 'Composite values (arrays/jsonb/full-text lookups).',
+  },
+  {
+    value: 'gist',
+    label: 'GIST',
+    description: 'Extensible strategy for specialized operators.',
+  },
+  {
+    value: 'brin',
+    label: 'BRIN',
+    description: 'Block-range index for very large naturally ordered data.',
+  },
+  {
+    value: 'spgist',
+    label: 'SPGIST',
+    description: 'Space-partitioned structures for specific data models.',
+  },
+] as const;
+
+export function getPostgresIndexMethodOptions(): readonly PostgresIndexMethodOption[] {
+  return POSTGRES_INDEX_METHOD_OPTIONS;
+}
+
+export function isPostgresIndexMethod(value: string): value is PostgresIndexMethod {
+  return POSTGRES_INDEX_METHOD_OPTIONS.some((option) => option.value === value);
 }
 
 export const CHECK_CONSTRAINT_SCOPE_OPTIONS: {
@@ -546,6 +609,25 @@ export function createEmptyCheckConstraint(): CheckConstraint {
     value: '',
     expression: '',
   };
+}
+
+export function createEmptyTableIndex(): CreateTableIndex {
+  return {
+    id: `idx-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    name: '',
+    columns: [],
+    unique: false,
+    method: undefined,
+  };
+}
+
+export function hasAnyTableIndexValue(index: CreateTableIndex): boolean {
+  return (
+    index.name.trim().length > 0 ||
+    index.columns.length > 0 ||
+    index.unique ||
+    typeof index.method === 'string'
+  );
 }
 
 /** Foreign key action options */

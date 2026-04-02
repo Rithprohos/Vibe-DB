@@ -44,6 +44,7 @@ export interface IndexInfo {
   name: string;
   unique: boolean;
   columns: string[];
+  method?: string;
 }
 
 export interface ForeignKeyInfo {

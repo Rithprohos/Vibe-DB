@@ -1,8 +1,9 @@
 use super::{
-    CheckConstraintInput, CreateTableColumnInput, ForeignKeyConstraintInput, RowDataInput,
-    RowIdentifierInput, RowUpdateInput, TypeParams, build_create_enum_sql, build_create_table_sql,
-    build_create_view_sql, build_delete_queries, build_insert_queries, build_insert_query,
-    build_update_queries, build_where_clause_for_row, quote_qualified_identifier,
+    CheckConstraintInput, CreateIndexInput, CreateTableColumnInput, ForeignKeyConstraintInput,
+    RowDataInput, RowIdentifierInput, RowUpdateInput, TypeParams, build_create_enum_sql,
+    build_create_indexes_sql, build_create_table_sql, build_create_view_sql, build_delete_queries,
+    build_insert_queries, build_insert_query, build_update_queries, build_where_clause_for_row,
+    quote_qualified_identifier,
 };
 use crate::engines::ColumnInfo;
 use serde_json::json;
@@ -761,6 +762,160 @@ fn build_create_table_sql_includes_named_check_constraint() {
         "Expected named check constraint. Got: {}",
         sql
     );
+}
+
+#[test]
+fn build_create_indexes_sql_sqlite_basic() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_users_email".to_string(),
+        columns: vec!["email".to_string()],
+        unique: false,
+        method: None,
+    }];
+
+    let sql = build_create_indexes_sql("users".to_string(), indexes, Some("sqlite".to_string()))
+        .expect("expected index SQL");
+
+    assert_eq!(
+        sql,
+        vec!["CREATE INDEX \"idx_users_email\" ON \"users\" (\"email\");".to_string()]
+    );
+}
+
+#[test]
+fn build_create_indexes_sql_postgres_with_method() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_events_payload".to_string(),
+        columns: vec!["payload".to_string()],
+        unique: false,
+        method: Some("gin".to_string()),
+    }];
+
+    let sql = build_create_indexes_sql("events".to_string(), indexes, Some("postgres".to_string()))
+        .expect("expected postgres index SQL");
+
+    assert_eq!(
+        sql,
+        vec![
+            "CREATE INDEX \"idx_events_payload\" ON \"events\" USING gin (\"payload\");"
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn build_create_indexes_sql_rejects_method_on_sqlite() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_users_email".to_string(),
+        columns: vec!["email".to_string()],
+        unique: false,
+        method: Some("btree".to_string()),
+    }];
+
+    let error = build_create_indexes_sql("users".to_string(), indexes, Some("sqlite".to_string()))
+        .expect_err("expected sqlite method validation error");
+
+    assert_eq!(
+        error,
+        "Index #1: index method is only supported for PostgreSQL"
+    );
+}
+
+#[test]
+fn build_create_indexes_sql_accepts_extension_postgres_method() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_events_payload".to_string(),
+        columns: vec!["payload".to_string()],
+        unique: false,
+        method: Some("bloom".to_string()),
+    }];
+
+    let sql = build_create_indexes_sql("events".to_string(), indexes, Some("postgres".to_string()))
+        .expect("expected postgres extension method SQL");
+
+    assert_eq!(
+        sql,
+        vec![
+            "CREATE INDEX \"idx_events_payload\" ON \"events\" USING bloom (\"payload\");"
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn build_create_indexes_sql_rejects_invalid_method_identifier() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_events_payload".to_string(),
+        columns: vec!["payload".to_string()],
+        unique: false,
+        method: Some("bad-method".to_string()),
+    }];
+
+    let error =
+        build_create_indexes_sql("events".to_string(), indexes, Some("postgres".to_string()))
+            .expect_err("expected invalid method identifier error");
+
+    assert_eq!(
+        error,
+        "Index method name must start with a letter or underscore and contain only letters, numbers, and underscores"
+    );
+}
+
+#[test]
+fn build_create_indexes_sql_rejects_unique_non_btree_method() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_events_payload".to_string(),
+        columns: vec!["payload".to_string()],
+        unique: true,
+        method: Some("gin".to_string()),
+    }];
+
+    let error =
+        build_create_indexes_sql("events".to_string(), indexes, Some("postgres".to_string()))
+            .expect_err("expected unique non-btree method error");
+
+    assert_eq!(
+        error,
+        "Index #1: UNIQUE indexes only support the BTREE method"
+    );
+}
+
+#[test]
+fn build_create_indexes_sql_rejects_duplicate_index_names() {
+    let indexes = vec![
+        CreateIndexInput {
+            name: "idx_users_email".to_string(),
+            columns: vec!["email".to_string()],
+            unique: false,
+            method: None,
+        },
+        CreateIndexInput {
+            name: "IDX_USERS_EMAIL".to_string(),
+            columns: vec!["name".to_string()],
+            unique: false,
+            method: None,
+        },
+    ];
+
+    let error = build_create_indexes_sql("users".to_string(), indexes, Some("sqlite".to_string()))
+        .expect_err("expected duplicate index name error");
+
+    assert_eq!(error, "Index \"IDX_USERS_EMAIL\" already exists");
+}
+
+#[test]
+fn build_create_indexes_sql_rejects_empty_columns() {
+    let indexes = vec![CreateIndexInput {
+        name: "idx_users_email".to_string(),
+        columns: vec![],
+        unique: false,
+        method: None,
+    }];
+
+    let error = build_create_indexes_sql("users".to_string(), indexes, Some("sqlite".to_string()))
+        .expect_err("expected empty column list validation error");
+
+    assert_eq!(error, "Index #1 requires at least one column");
 }
 
 #[test]

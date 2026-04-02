@@ -2,11 +2,13 @@ import { validateColumnName } from '../../lib/tableName';
 import {
   buildCheckConstraintExpression,
   FK_ACTION_OPTIONS,
+  hasAnyTableIndexValue,
   isCheckConstraintOperatorSupported,
   validateConstraintIdentifier,
   validateQualifiedConstraintIdentifier,
   validateTypeParams,
   type CheckConstraint,
+  type CreateTableIndex,
   type ColumnDef,
   type ForeignKeyConstraint,
   type SupportedEngine,
@@ -16,6 +18,7 @@ interface ConstraintValidationInput {
   engineType: SupportedEngine;
   foreignKeys: ForeignKeyConstraint[];
   checkConstraints: CheckConstraint[];
+  indexes: CreateTableIndex[];
   namedColumnNames: Set<string>;
 }
 
@@ -67,6 +70,7 @@ export function getLiveConstraintError({
   engineType,
   foreignKeys,
   checkConstraints,
+  indexes,
   namedColumnNames,
 }: ConstraintValidationInput): string | null {
   for (let index = 0; index < foreignKeys.length; index += 1) {
@@ -155,6 +159,72 @@ export function getLiveConstraintError({
       if (nameError) {
         return `Check constraint #${index + 1}: ${nameError}`;
       }
+    }
+  }
+
+  const seenIndexNames = new Set<string>();
+  for (let index = 0; index < indexes.length; index += 1) {
+    const tableIndex = indexes[index];
+    if (!hasAnyTableIndexValue(tableIndex)) {
+      continue;
+    }
+
+    const indexName = tableIndex.name.trim();
+    if (!indexName) {
+      return `Index #${index + 1} name is required`;
+    }
+
+    const indexNameError = validateConstraintIdentifier(indexName, 'Index name');
+    if (indexNameError) {
+      return `Index #${index + 1}: ${indexNameError}`;
+    }
+
+    const normalizedName = indexName.toLowerCase();
+    if (seenIndexNames.has(normalizedName)) {
+      return `Index "${indexName}" already exists`;
+    }
+    seenIndexNames.add(normalizedName);
+
+    if (tableIndex.columns.length === 0) {
+      return `Index #${index + 1} requires at least one column`;
+    }
+
+    const seenColumns = new Set<string>();
+    for (const column of tableIndex.columns) {
+      const columnName = column.trim();
+      if (!columnName) {
+        return `Index #${index + 1} has an empty column entry`;
+      }
+      if (!namedColumnNames.has(columnName)) {
+        return `Index #${index + 1} references unknown column "${columnName}"`;
+      }
+      if (seenColumns.has(columnName)) {
+        return `Index #${index + 1} has duplicate column "${columnName}"`;
+      }
+      seenColumns.add(columnName);
+    }
+
+    if (engineType !== 'postgres' && tableIndex.method) {
+      return `Index #${index + 1}: index method is only supported for PostgreSQL`;
+    }
+
+    if (tableIndex.method) {
+      const methodError = validateConstraintIdentifier(
+        tableIndex.method,
+        'Index method',
+      );
+      if (methodError) {
+        return `Index #${index + 1}: ${methodError}`;
+      }
+    }
+
+    if (
+      engineType === 'postgres' &&
+      tableIndex.unique &&
+      tableIndex.method &&
+      tableIndex.method.trim().toLowerCase() !== 'btree'
+    ) {
+      return `Index #${index + 1}: UNIQUE indexes only support the BTREE method`;
     }
   }
 

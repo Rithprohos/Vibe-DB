@@ -21,7 +21,9 @@ use commands::{
     update_rows,
 };
 use menu::setup_menu;
-use sql_helpers::{build_create_enum_sql, build_create_table_sql, build_create_view_sql};
+use sql_helpers::{
+    build_create_enum_sql, build_create_indexes_sql, build_create_table_sql, build_create_view_sql,
+};
 use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -60,6 +62,7 @@ pub fn run() {
             set_active_connection,
             update_connection_tag,
             build_create_enum_sql,
+            build_create_indexes_sql,
             build_create_table_sql,
             build_create_view_sql,
             list_tables,

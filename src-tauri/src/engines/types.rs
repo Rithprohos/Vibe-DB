@@ -175,6 +175,9 @@ pub struct IndexInfo {
     pub unique: bool,
     /// Column names in the index
     pub columns: Vec<String>,
+    /// Index method when available (e.g. btree/hash/gin for PostgreSQL)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
 }
 
 /// Information about a foreign key constraint.

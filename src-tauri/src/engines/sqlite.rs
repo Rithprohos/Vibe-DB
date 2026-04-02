@@ -240,6 +240,7 @@ impl DatabaseEngine for SqliteEngine {
                 name: index_name,
                 unique: unique != 0,
                 columns: index_columns,
+                method: None,
             });
         }
 

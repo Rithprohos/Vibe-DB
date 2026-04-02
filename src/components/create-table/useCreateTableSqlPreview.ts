@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { buildCreateTableSQL } from '../../lib/db';
+import { buildCreateIndexesSQL, buildCreateTableSQL } from '../../lib/db';
 import { validateTableName } from '../../lib/tableName';
 import type {
   CheckConstraint,
   ColumnDef,
+  CreateTableIndex,
   ForeignKeyConstraint,
   SupportedEngine,
 } from '../../lib/createTableConstants';
@@ -20,6 +21,7 @@ interface UseCreateTableSqlPreviewInput {
   engineType: SupportedEngine;
   foreignKeys: ForeignKeyConstraint[];
   checkConstraints: CheckConstraint[];
+  indexes: CreateTableIndex[];
   liveConstraintError: string | null;
 }
 
@@ -31,6 +33,7 @@ export function useCreateTableSqlPreview({
   engineType,
   foreignKeys,
   checkConstraints,
+  indexes,
   liveConstraintError,
 }: UseCreateTableSqlPreviewInput): string {
   const [sql, setSql] = useState('');
@@ -77,10 +80,19 @@ export function useCreateTableSqlPreview({
           foreignKeys,
           checkConstraints,
         );
+        const generatedIndexSql = await buildCreateIndexesSQL(
+          tableName,
+          indexes,
+          engineType,
+        );
         if (requestId !== sqlPreviewRequestIdRef.current) {
           return;
         }
-        setSql(generatedSql);
+        setSql(
+          generatedIndexSql.length > 0
+            ? `${generatedSql}\n\n${generatedIndexSql.join('\n')}`
+            : generatedSql,
+        );
       } catch {
         if (requestId !== sqlPreviewRequestIdRef.current) {
           return;
@@ -96,6 +108,7 @@ export function useCreateTableSqlPreview({
     engineType,
     foreignKeys,
     checkConstraints,
+    indexes,
     liveConstraintError,
   ]);
 
