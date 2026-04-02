@@ -723,9 +723,9 @@ export default function CreateTable({ tabId }: Props) {
       </div>
 
       {error && (
-        <div className="mx-6 mt-3 flex items-center gap-2 px-4 py-2.5 rounded-sm bg-destructive/10 border border-destructive/20 text-destructive text-sm font-mono max-w-6xl">
-          <AlertCircle size={16} className="flex-shrink-0" />
-          <span className="truncate">{error}</span>
+        <div className="mx-6 mt-3 flex items-start gap-2 px-4 py-2.5 rounded-sm bg-destructive/10 border border-destructive/20 text-destructive text-sm font-mono max-w-6xl">
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+          <span className="break-words whitespace-pre-wrap">{error}</span>
         </div>
       )}
 
