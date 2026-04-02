@@ -68,6 +68,32 @@ function getIndexNameFromCreateIndexSql(sql: string): string | null {
   return match[1].replace(/""/g, '"');
 }
 
+function normalizeErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error.trim();
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message.trim();
+    }
+  }
+  const fallback = String(error ?? '').trim();
+  return fallback || 'Unknown error';
+}
+
+function isOpaqueDatabaseError(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return (
+    normalized === 'query error: error returned from database:' ||
+    normalized === 'error returned from database:' ||
+    normalized.endsWith('error returned from database:')
+  );
+}
+
 export default function CreateTable({ tabId }: Props) {
   const tabs = useAppStore((state) => state.tabs);
   const connections = useAppStore((state) => state.connections);
@@ -575,9 +601,12 @@ export default function CreateTable({ tabId }: Props) {
         } catch (indexError: any) {
           const indexName =
             getIndexNameFromCreateIndexSql(indexSql) ?? `#${statementIndex + 1}`;
-          const message = indexError?.toString?.() ?? String(indexError);
+          const message = normalizeErrorMessage(indexError);
+          const detailMessage = isOpaqueDatabaseError(message)
+            ? `${message} Failing SQL: ${indexSql}`
+            : message;
           throw new Error(
-            `Table "${tableName.trim()}" was created, but index ${indexName} failed: ${message}`,
+            `Table "${tableName.trim()}" was created, but index ${indexName} failed: ${detailMessage}`,
           );
         }
       }

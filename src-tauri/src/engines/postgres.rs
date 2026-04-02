@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
-use sqlx::{Column, Row, TypeInfo};
+use sqlx::{Column, Error as SqlxError, Row, TypeInfo};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -143,6 +143,62 @@ impl PostgresEngine {
     /// Returns an error if the query appears unsafe.
     pub fn validate_query_safety(query: &str) -> EngineResult<()> {
         safety::validate_query_safety(query)
+    }
+
+    fn format_sqlx_query_error(error: &SqlxError) -> String {
+        if let SqlxError::Database(db_error) = error {
+            let mut parts: Vec<String> = Vec::new();
+
+            let primary_message = db_error.message().trim();
+            if !primary_message.is_empty() {
+                parts.push(primary_message.to_string());
+            }
+
+            if let Some(code) = db_error.code().map(|code| code.trim().to_string()) {
+                if !code.is_empty() {
+                    parts.push(format!("SQLSTATE {code}"));
+                }
+            }
+
+            if let Some(pg_error) = db_error.try_downcast_ref::<sqlx::postgres::PgDatabaseError>() {
+                if let Some(detail) = pg_error.detail().map(str::trim).filter(|v| !v.is_empty()) {
+                    parts.push(format!("Detail: {detail}"));
+                }
+                if let Some(hint) = pg_error.hint().map(str::trim).filter(|v| !v.is_empty()) {
+                    parts.push(format!("Hint: {hint}"));
+                }
+                if let Some(constraint) = pg_error
+                    .constraint()
+                    .map(str::trim)
+                    .filter(|v| !v.is_empty())
+                {
+                    parts.push(format!("Constraint: {constraint}"));
+                }
+                if let Some(table) = pg_error.table().map(str::trim).filter(|v| !v.is_empty()) {
+                    parts.push(format!("Table: {table}"));
+                }
+                if let Some(column) = pg_error.column().map(str::trim).filter(|v| !v.is_empty()) {
+                    parts.push(format!("Column: {column}"));
+                }
+            }
+
+            if !parts.is_empty() {
+                return parts.join(" | ");
+            }
+        }
+
+        let display_message = error.to_string();
+        if display_message.trim().is_empty() {
+            return format!("{error:?}");
+        }
+        if display_message.trim_end().ends_with(':') {
+            return format!("{display_message} {error:?}");
+        }
+        display_message
+    }
+
+    fn map_query_error(error: SqlxError) -> EngineError {
+        EngineError::QueryError(Self::format_sqlx_query_error(&error))
     }
 
     fn json_from_unchecked_text(row: &PgRow, col_name: &str) -> Option<serde_json::Value> {
@@ -424,7 +480,7 @@ impl DatabaseEngine for PostgresEngine {
         )
         .fetch_all(pool)
         .await
-        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        .map_err(Self::map_query_error)?;
 
         let tables = rows
             .iter()
@@ -511,14 +567,14 @@ impl DatabaseEngine for PostgresEngine {
         .bind(&table)
         .fetch_all(pool)
         .await
-        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        .map_err(Self::map_query_error)?;
 
         let columns: Vec<ColumnInfo> = column_rows
             .iter()
             .map(|row| {
                 let enum_values = row
                     .try_get::<Option<Vec<String>>, _>("enum_values")
-                    .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                    .map_err(Self::map_query_error)?;
 
                 Ok(ColumnInfo {
                     cid: row_decode::decode_postgres_i64(row, "cid")? - 1, // PostgreSQL is 1-indexed, we want 0-indexed
@@ -547,7 +603,7 @@ impl DatabaseEngine for PostgresEngine {
         .bind(&table)
         .fetch_all(pool)
         .await
-        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        .map_err(Self::map_query_error)?;
 
         let mut indexes: Vec<IndexInfo> = Vec::new();
         for row in &index_rows {
@@ -624,7 +680,7 @@ impl DatabaseEngine for PostgresEngine {
         .bind(&table)
         .fetch_all(pool)
         .await
-        .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        .map_err(Self::map_query_error)?;
 
         let foreign_keys: Vec<ForeignKeyInfo> = fk_rows
             .iter()
@@ -670,7 +726,7 @@ impl DatabaseEngine for PostgresEngine {
             let rows = sqlx::raw_sql(trimmed)
                 .fetch_all(pool)
                 .await
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                .map_err(Self::map_query_error)?;
 
             if rows.is_empty() {
                 return Ok(QueryResult {
@@ -707,7 +763,7 @@ impl DatabaseEngine for PostgresEngine {
             let result = sqlx::query(trimmed)
                 .execute(pool)
                 .await
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                .map_err(Self::map_query_error)?;
 
             let rows_affected = result.rows_affected();
             Ok(QueryResult {
@@ -731,10 +787,7 @@ impl DatabaseEngine for PostgresEngine {
             EngineError::ConnectionFailed("Not connected to database".to_string())
         })?;
 
-        let mut tx = pool
-            .begin()
-            .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        let mut tx = pool.begin().await.map_err(Self::map_query_error)?;
 
         let mut rows_affected_total = 0_u64;
         let mut statements_executed = 0_u64;
@@ -764,15 +817,13 @@ impl DatabaseEngine for PostgresEngine {
             let result = sqlx::query(trimmed)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| EngineError::QueryError(e.to_string()))?;
+                .map_err(Self::map_query_error)?;
 
             statements_executed += 1;
             rows_affected_total += result.rows_affected();
         }
 
-        tx.commit()
-            .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+        tx.commit().await.map_err(Self::map_query_error)?;
 
         Ok(QueryResult {
             columns: vec![],
@@ -813,7 +864,7 @@ impl DatabaseEngine for PostgresEngine {
         let result = sqlx::query(&sql)
             .execute(pool)
             .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+            .map_err(Self::map_query_error)?;
         let rows_affected = result.rows_affected();
 
         Ok(QueryResult {
@@ -841,7 +892,7 @@ impl DatabaseEngine for PostgresEngine {
         sqlx::query(&sql)
             .execute(pool)
             .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+            .map_err(Self::map_query_error)?;
 
         Ok(QueryResult {
             columns: vec![],
@@ -876,7 +927,7 @@ impl DatabaseEngine for PostgresEngine {
         let row = sqlx::query(&query)
             .fetch_one(pool)
             .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+            .map_err(Self::map_query_error)?;
 
         let count: i64 = row.get("count");
         Ok(count)
@@ -899,7 +950,7 @@ impl DatabaseEngine for PostgresEngine {
         let row = sqlx::query("SELECT version() as version")
             .fetch_one(pool)
             .await
-            .map_err(|e| EngineError::QueryError(e.to_string()))?;
+            .map_err(Self::map_query_error)?;
 
         let version: String = row.get("version");
         Ok(version)
